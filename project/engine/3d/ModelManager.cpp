@@ -33,12 +33,17 @@ void ModelManager::LoadModel(const std::string& filePath)
 		return;
 	}
 
-	//モデルの生成とファイル読み込み、初期化
-	std::unique_ptr<Model>model = std::make_unique<Model>();
-	model->Initialize(modelCommon, "Resources", filePath);
+	 size_t lastSlash = filePath.find_last_of("/\\");
+    std::string directory = (lastSlash != std::string::npos) ? 
+        "Resources/" + filePath.substr(0, lastSlash) : "Resources";
+    
+    // 获取文件名（如 "cube.obj"）
+    std::string filename = (lastSlash != std::string::npos) ? 
+        filePath.substr(lastSlash + 1) : filePath;
 
-	//モデルをmapコンテナに格納する
-	models.insert(std::make_pair(filePath, std::move(model)));
+    std::unique_ptr<Model> model = std::make_unique<Model>();
+    model->Initialize(modelCommon, directory, filename);  // 传递目录和文件名
+    models.insert({filePath, std::move(model)});
 }
 
 

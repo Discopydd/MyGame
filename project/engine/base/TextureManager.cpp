@@ -25,7 +25,7 @@ void TextureManager::Initialize(DirectXCommon*dxCommon, SrvManager* srvManager) 
 }
 //テクスチャファイルの読み込み
 void TextureManager::LoadTexture(const std::string& filePath) {
-//読み込み済みテクスチャを検索
+	//読み込み済みテクスチャを検索
 	if (textureDatas.contains(filePath)) {
 		return;
 	}
@@ -51,15 +51,19 @@ void TextureManager::LoadTexture(const std::string& filePath) {
 	textureData.resource = dxCommon_->CreateTextureResource(textureData.metadata);
 	textureData.intermediateResource = dxCommon_->UploadTextureData(textureData.resource, mipImages);
 
-    //テクスチャデータの要素数番号をSRVのインデックスとする
+	//テクスチャデータの要素数番号をSRVのインデックスとする
 	uint32_t srvIndex = static_cast<uint32_t>(textureDatas.size() - 1) + kSRVIndexTop;
 
 	textureData.srvIndex = srvManager_->Allocate();
 	textureData.srvHandleCPU = srvManager_->GetCPUDescriptorHandle(textureData.srvIndex);
 	textureData.srvHandleGPU = srvManager_->GetGPUDescriptorHandle(textureData.srvIndex);
 
+	DXGI_FORMAT format = textureData.metadata.format;
+	if (format == DXGI_FORMAT_R8G8B8A8_UNORM) {
+		format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+	}
 	srvManager_->CreateSRVforTexture2D(textureData.srvIndex, textureData.resource.Get(),
-		textureData.metadata.format, UINT(textureData.metadata.mipLevels));
+		format, UINT(textureData.metadata.mipLevels));
 
 }
 //SRVインデックスの開始番号
