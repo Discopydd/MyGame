@@ -1,6 +1,27 @@
 #include "GameScene.h"
 #include <numbers>
+void GameScene::GenerateBlocks() {
+    for (uint32_t y = 0; y < MapChipField::kNumBlockVirtical; y++) {
+        for (uint32_t x = 0; x < MapChipField::kNumBlockHorizontal; x++) {
+            // 获取当前格子类型
+            MapChipType type = mapChipField_.GetMapChipTypeByIndex(x, y);
 
+            // 如果是方块（kBlock），创建3D对象
+            if (type == MapChipType::kBlock) {
+                Object3d* block = new Object3d();
+                block->Initialize(object3dCommon_);
+                block->SetModel("cube/cube.obj");       // 使用方块模型
+                block->SetCamera(camera_);
+                // 设置方块位置（根据格子索引转换为世界坐标）
+                Vector3 position = mapChipField_.GetMapChipPositionByIndex(x, y);
+                block->SetTranslate(position);
+
+                // 添加到方块列表
+                mapBlocks_.push_back(block);
+            }
+        }
+    }
+}
 void GameScene::Initialize() {
     winApp_ = WinApp::GetInstance();
     dxCommon_ = DirectXCommon::GetInstance();
@@ -30,21 +51,19 @@ void GameScene::Initialize() {
     object3dCommon_->SetDefaultCamera(camera_);
 
     ModelManager::GetInstants()->LoadModel("cube/cube.obj");
-    box_ = new Object3d();
-    box_->Initialize(object3dCommon_);
-    box_->SetModel("cube/cube.obj");
-    box_->SetCamera(camera_);
-    box_->SetTranslate({ 0.0f, 0.0,0.0f });
 
+    mapChipField_.LoadMapChipCsv("Resources/map.csv");
+    GenerateBlocks();
 }
 
 void GameScene::Update() {
     camera_->Update();
     imguiManager_->Begin();
     input_->Update();
-    rotation_.x -= 0.003f;
-     box_->SetRotate({ 0.0f, rotation_.x, 0.0f });
-    box_->Update();
+
+    for (auto* block : mapBlocks_) {
+        block->Update();
+    }
     if (input_->TriggerKey(DIK_SPACE)) {
         SoundManager::GetInstance()->Play("fanfare", false, 1.0f);
     }
@@ -66,31 +85,6 @@ void GameScene::Update() {
             camera_->SetRotate({ camRotArr[0], camRotArr[1], camRotArr[2] });
         }
     }
-
-    // ======= Material =======
-    if (ImGui::CollapsingHeader("Material", ImGuiTreeNodeFlags_DefaultOpen)) {
-        static bool enableLighting = box_->GetModel()->GetEnableLighting();
-        if (ImGui::Checkbox("Enable Lighting", &enableLighting)) {
-            box_->GetModel()->SetEnableLighting(enableLighting);
-        }
-    }
-     // ======= Light =======
-    if (ImGui::CollapsingHeader("Light", ImGuiTreeNodeFlags_DefaultOpen)) {
-        static float lightColor[3] = { 1.0f, 1.0f, 1.0f };
-        static float lightDirection[3] = { 0.0f, -1.0f, 0.0f };
-        static float lightIntensity = 1.0f;
-
-        if (ImGui::ColorEdit3("Light Color", lightColor)) {
-            box_->GetDirectionalLightData()->color = { lightColor[0], lightColor[1], lightColor[2], 1.0f };
-        }
-        if (ImGui::DragFloat3("Light Direction", lightDirection, 0.01f, -1.0f, 1.0f)) {
-            box_->GetDirectionalLightData()->direction =
-                Math::Normalize(Vector3{ lightDirection[0], lightDirection[1], lightDirection[2] });
-        }
-        if (ImGui::DragFloat("Light Intensity", &lightIntensity, 0.01f, 0.0f, 5.0f)) {
-            box_->GetDirectionalLightData()->intensity = lightIntensity;
-        }
-    }
     ImGui::End();
 #endif
 
@@ -103,7 +97,9 @@ void GameScene::Draw() {
     srvManager_->PreDraw();
     object3dCommon_->CommonDraw();
 
-    box_->Draw();
+    for (auto* block : mapBlocks_) {
+        block->Draw();
+    }
     spriteCommon_->CommonDraw();
     for (auto* sprite : sprites_) {
         sprite->Draw();
@@ -122,7 +118,10 @@ void GameScene::Finalize() {
     delete camera_;
     delete spriteCommon_;
     delete object3dCommon_;
-    delete box_;
+    for (auto* block : mapBlocks_) {
+        delete block;
+    }
+    mapBlocks_.clear();
     delete imguiManager_;
     delete particleEmitter_;
 

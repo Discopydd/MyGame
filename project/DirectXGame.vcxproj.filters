@@ -35,6 +35,9 @@
     <Filter Include="main">
       <UniqueIdentifier>{35e34dec-a18f-4d09-b79a-d7bf0e1a1187}</UniqueIdentifier>
     </Filter>
+    <Filter Include="map">
+      <UniqueIdentifier>{64385157-92b7-4b5f-8ff1-dc628f7ddeb9}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="engine\math\MyMath.cpp">
@@ -120,6 +123,9 @@
     </ClCompile>
     <ClCompile Include="scene\Framework.cpp">
       <Filter>main</Filter>
+    </ClCompile>
+    <ClCompile Include="map\MapChipField.cpp">
+      <Filter>map</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -257,6 +263,9 @@
     </ClInclude>
     <ClInclude Include="engine\3d\PointLight.h">
       <Filter>project\3d</Filter>
+    </ClInclude>
+    <ClInclude Include="map\MapChipField.h">
+      <Filter>map</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

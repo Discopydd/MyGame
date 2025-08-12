@@ -192,6 +192,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="engine\math\MyMath.cpp" />
     <ClCompile Include="logger\Logger.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="map\MapChipField.cpp" />
     <ClCompile Include="MyGame.cpp" />
     <ClCompile Include="scene\Framework.cpp" />
     <ClCompile Include="scene\GameScene.cpp" />
@@ -239,6 +240,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="engine\math\Vector3.h" />
     <ClInclude Include="engine\math\Vector4.h" />
     <ClInclude Include="logger\Logger.h" />
+    <ClInclude Include="map\MapChipField.h" />
     <ClInclude Include="MyGame.h" />
     <ClInclude Include="scene\Framework.h" />
     <ClInclude Include="scene\GameScene.h" />
