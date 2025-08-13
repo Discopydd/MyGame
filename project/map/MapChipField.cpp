@@ -42,7 +42,7 @@ void MapChipField::LoadMapChipCsv(const std::string& filePath) {
 	}
 }
 
-MapChipType MapChipField::GetMapChipTypeByIndex(uint32_t xIndex, uint32_t yIndex) const {
+MapChipType MapChipField::GetMapChipTypeByIndex(uint32_t xIndex, uint32_t yIndex)const {
 	// 範囲オーバーなら
 	if (xIndex < 0 || kNumBlockHorizontal - 1 < xIndex)
 		return MapChipType::kBlank;
@@ -52,4 +52,27 @@ MapChipType MapChipField::GetMapChipTypeByIndex(uint32_t xIndex, uint32_t yIndex
 	return mapChipData_.data[yIndex][xIndex];
 }
 
-Vector3 MapChipField::GetMapChipPositionByIndex(uint32_t xIndex, uint32_t yIndex) const { return Vector3(kBlockHeight * xIndex, kBlockWidth * (kNumBlockVirtical - 1 - yIndex), 0); }
+Vector3 MapChipField::GetMapChipPositionByIndex(uint32_t xIndex, uint32_t yIndex) const{ return Vector3(kBlockHeight * xIndex, kBlockWidth * (kNumBlockVirtical - 1 - yIndex), 0); }
+
+MapChipField::IndexSet MapChipField::GetMapChipIndexByPosition(const Vector3& position)const
+{
+   IndexSet indexsSet{};
+	 float adjustedX = position.x + (kBlockWidth / 2.0f);
+    float adjustedY = position.y + (kBlockHeight / 2.0f);
+
+    indexsSet.xIndex = uint32_t(adjustedX / kBlockWidth);
+    indexsSet.yIndex = uint32_t(kNumBlockVirtical - adjustedY / kBlockHeight);
+	return indexsSet;
+}
+
+MapChipField::Rect MapChipField::GetRectByIndex(uint32_t xIndex, uint32_t yIndex)const
+{
+	Vector3 center = GetMapChipPositionByIndex(xIndex, yIndex);
+	Rect rect{};
+	rect.left = center.x - kBlockWidth / 2;
+	rect.right = center.x + kBlockWidth / 2;
+	rect.bottom = center.y - kBlockHeight / 2;
+	rect.top = center.y + kBlockHeight / 2;
+
+	return rect;
+}

@@ -46,7 +46,7 @@ void GameScene::Initialize() {
 
     camera_ = new Camera();
     camera_->SetRotate({ 0, 0, 0 });
-    camera_->SetTranslate({ 0, 0, -10 });
+    camera_->SetTranslate({ 0, 0, -50 });
     object3dCommon_->SetDefaultCamera(camera_);
 
     ModelManager::GetInstants()->LoadModel("cube/cube.obj");
@@ -57,7 +57,7 @@ void GameScene::Initialize() {
 
    player_ = new Player();
     player_->Initialize(object3dCommon_, camera_);
-    player_->SetPosition({0.0f, 0.0f, 0.0f});
+    player_->SetPosition({25.0f, 10.0f, 0.0f});
 }
 
 void GameScene::Update() {

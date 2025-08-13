@@ -12,6 +12,8 @@ public:
     void Update(Input* input, const MapChipField& mapChipField);
     void Draw();
 
+    void HandleMapCollision(const MapChipField& mapChipField);
+
     void SetPosition(const Vector3& pos) { position_ = pos; }
     Vector3 GetPosition() const { return position_; }
 
@@ -43,4 +45,7 @@ private:
 	int turnCurrentFrame_ = 0;
 	const int turnTotalFrames_ = 10;
     float currentRotationY_ = 0.0f;
+
+    float width_ = 2.0f;    // 玩家碰撞宽度（假设为1单位）
+    float height_ = 2.0f;   // 玩家碰撞高度（假设为2单位）
 };
