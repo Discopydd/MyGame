@@ -38,6 +38,9 @@
     <Filter Include="map">
       <UniqueIdentifier>{64385157-92b7-4b5f-8ff1-dc628f7ddeb9}</UniqueIdentifier>
     </Filter>
+    <Filter Include="player">
+      <UniqueIdentifier>{ca2425eb-abce-4000-baef-563030d7cca7}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="engine\math\MyMath.cpp">
@@ -126,6 +129,9 @@
     </ClCompile>
     <ClCompile Include="map\MapChipField.cpp">
       <Filter>map</Filter>
+    </ClCompile>
+    <ClCompile Include="player\PLAYER.CPP">
+      <Filter>player</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -266,6 +272,9 @@
     </ClInclude>
     <ClInclude Include="map\MapChipField.h">
       <Filter>map</Filter>
+    </ClInclude>
+    <ClInclude Include="player\Player.h">
+      <Filter>player</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

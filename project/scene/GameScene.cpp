@@ -15,7 +15,6 @@ void GameScene::GenerateBlocks() {
                 // 设置方块位置（根据格子索引转换为世界坐标）
                 Vector3 position = mapChipField_.GetMapChipPositionByIndex(x, y);
                 block->SetTranslate(position);
-
                 // 添加到方块列表
                 mapBlocks_.push_back(block);
             }
@@ -51,9 +50,14 @@ void GameScene::Initialize() {
     object3dCommon_->SetDefaultCamera(camera_);
 
     ModelManager::GetInstants()->LoadModel("cube/cube.obj");
+    ModelManager::GetInstants()->LoadModel("player/player.obj");
 
     mapChipField_.LoadMapChipCsv("Resources/map.csv");
     GenerateBlocks();
+
+   player_ = new Player();
+    player_->Initialize(object3dCommon_, camera_);
+    player_->SetPosition({0.0f, 0.0f, 0.0f});
 }
 
 void GameScene::Update() {
@@ -64,7 +68,8 @@ void GameScene::Update() {
     for (auto* block : mapBlocks_) {
         block->Update();
     }
-    if (input_->TriggerKey(DIK_SPACE)) {
+    player_->Update(input_, mapChipField_);
+    if (input_->TriggerKey(DIK_P)) {
         SoundManager::GetInstance()->Play("fanfare", false, 1.0f);
     }
 
@@ -85,6 +90,13 @@ void GameScene::Update() {
             camera_->SetRotate({ camRotArr[0], camRotArr[1], camRotArr[2] });
         }
     }
+     // ======= Player Info =======
+    if (ImGui::CollapsingHeader("Player Info", ImGuiTreeNodeFlags_DefaultOpen)) {
+        // 位置信息
+        Vector3 playerPos = player_->GetPosition();
+        float playerPosArr[3] = { playerPos.x, playerPos.y, playerPos.z };
+        ImGui::Text("Position: (%.2f, %.2f, %.2f)", playerPos.x, playerPos.y, playerPos.z);
+    }
     ImGui::End();
 #endif
 
@@ -100,16 +112,19 @@ void GameScene::Draw() {
     for (auto* block : mapBlocks_) {
         block->Draw();
     }
+     player_->Draw();
     spriteCommon_->CommonDraw();
     for (auto* sprite : sprites_) {
         sprite->Draw();
     }
+   
     // ParticleManager::GetInstance()->Draw();
     imguiManager_->Draw();
     dxCommon_->End();
 }
 
 void GameScene::Finalize() {
+    SoundManager::GetInstance()->Finalize();
     ParticleManager::GetInstance()->Finalize();
     TextureManager::GetInstance()->Finalize();
     ModelManager::GetInstants()->Finalize();
@@ -122,8 +137,8 @@ void GameScene::Finalize() {
         delete block;
     }
     mapBlocks_.clear();
+    delete player_;
     delete imguiManager_;
-    delete particleEmitter_;
 
     for (auto* sprite : sprites_) {
         delete sprite;

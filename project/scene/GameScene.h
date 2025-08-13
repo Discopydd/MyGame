@@ -18,6 +18,7 @@
 #include <vector>
 #include "BaseScene.h"
 #include <map/MapChipField.h>
+#include <player/Player.h>
 class GameScene : public BaseScene {
 public:
     void Initialize() override;
@@ -35,7 +36,6 @@ private:
     Object3dCommon* object3dCommon_ = nullptr;
     Camera* camera_ = nullptr;
     std::vector<Sprite*> sprites_;
-    ParticleEmitter* particleEmitter_ = nullptr;
 
     Vector2 rotation_{};
 
@@ -43,4 +43,6 @@ private:
 	MapChipField mapChipField_;              // 地图数据管理对象
     std::vector<Object3d*> mapBlocks_;       // 存储地图方块对象
 	void GenerateBlocks();
+
+    Player* player_ = nullptr;
 };

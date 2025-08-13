@@ -24,7 +24,9 @@ void SoundManager::Finalize() {
     for (auto& [_, voice] : activeVoices_) {
         if (voice.sourceVoice) {
             voice.sourceVoice->Stop();
+            voice.sourceVoice->FlushSourceBuffers();
             voice.sourceVoice->DestroyVoice();
+            voice.sourceVoice = nullptr; 
         }
     }
     activeVoices_.clear();
