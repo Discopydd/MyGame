@@ -44,9 +44,11 @@ void GameScene::Initialize() {
     soundMgr->Initialize();
     soundMgr->LoadWav("fanfare", "resources/fanfare.wav");
 
+    Vector3 playerStartPos = mapChipField_.GetMapChipPositionByIndex(2, 2);
+
     camera_ = new Camera();
     camera_->SetRotate({ 0, 0, 0 });
-    camera_->SetTranslate({ 0, 0, -50 });
+    camera_->SetTranslate(playerStartPos + Vector3{0, 0.0f, -40.0f});
     object3dCommon_->SetDefaultCamera(camera_);
 
     ModelManager::GetInstants()->LoadModel("cube/cube.obj");
@@ -55,9 +57,16 @@ void GameScene::Initialize() {
     mapChipField_.LoadMapChipCsv("Resources/map.csv");
     GenerateBlocks();
 
-   player_ = new Player();
+    player_ = new Player();
     player_->Initialize(object3dCommon_, camera_);
-    player_->SetPosition({25.0f, 10.0f, 0.0f});
+
+    player_->SetPosition(playerStartPos);
+
+    playerCamera_ = new PlayerCamera();
+    playerCamera_->Initialize(camera_, player_, &mapChipField_);
+    playerCamera_->SetOffset({0, 0.0f, -40.0f});
+    playerCamera_->SetFollowSpeed(0.1f);
+    playerCamera_->SetConstrainToMap(true);
 }
 
 void GameScene::Update() {
@@ -69,6 +78,7 @@ void GameScene::Update() {
         block->Update();
     }
     player_->Update(input_, mapChipField_);
+    playerCamera_->Update();
     if (input_->TriggerKey(DIK_P)) {
         SoundManager::GetInstance()->Play("fanfare", false, 1.0f);
     }
@@ -131,6 +141,7 @@ void GameScene::Finalize() {
     imguiManager_->Finalize();
 
     delete camera_;
+    delete playerCamera_;
     delete spriteCommon_;
     delete object3dCommon_;
     for (auto* block : mapBlocks_) {

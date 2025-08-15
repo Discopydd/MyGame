@@ -19,6 +19,7 @@
 #include "BaseScene.h"
 #include <map/MapChipField.h>
 #include <player/Player.h>
+#include <player/PlayerCamera.h>
 class GameScene : public BaseScene {
 public:
     void Initialize() override;
@@ -35,6 +36,7 @@ private:
     ImGuiManager* imguiManager_ = nullptr;
     Object3dCommon* object3dCommon_ = nullptr;
     Camera* camera_ = nullptr;
+    PlayerCamera* playerCamera_ = nullptr;
     std::vector<Sprite*> sprites_;
 
     Vector2 rotation_{};

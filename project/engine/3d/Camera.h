@@ -22,6 +22,9 @@ public:
 	const Matrix4x4& GetProjectionMatrix()const { return projectionMatrix; }
 	const Matrix4x4& GetViewprojectionMatrix()const { return viewProjectionMatrix; }
 	const Transform& GetTransform()const { return transform; }
+
+	float GetFovY() const { return fovY; }
+    float GetAspectRatio() const { return aspectRatio; }
 private:
 	Transform transform;
 	Matrix4x4 worldMatrix;

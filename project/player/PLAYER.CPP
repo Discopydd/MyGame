@@ -16,7 +16,7 @@ void Player::Initialize(Object3dCommon* object3dCommon, Camera* camera) {
 
     model_ = new Object3d();
     model_->Initialize(object3dCommon_);
-    model_->SetModel("player/player.obj"); // 模型路径
+    model_->SetModel("player/player.obj");
     model_->SetCamera(camera_);
 
     position_ = {-10, 0, 0};
@@ -104,28 +104,26 @@ void Player::Draw() {
     }
 }
 void Player::HandleMapCollision(const MapChipField& mapChipField) {
-    // 保存上一帧位置（因为外面 Update 已经做了 position_ += velocity_）
-    Vector3 prevPos = { position_.x - velocity_.x, position_.y - velocity_.y, position_.z };
+    Vector3 prevPos = position_ - velocity_; // 上一帧位置
 
-    // 临时标记是否着地
     bool onGround = false;
 
-    // --- 先处理水平方向 (只考虑 x 移动) ---
+    // --- 水平碰撞检测 (x轴) ---
     {
-        // 用上一帧的 y（不考虑本帧的 y 变化）来计算上下边界，避免竖直穿透干扰
-        float tempPlayerTop    = prevPos.y + height_ / 2.0f;
-        float tempPlayerBottom = prevPos.y - height_ / 2.0f;
+        float playerTop = prevPos.y + height_ / 2.0f;
+        float playerBottom = prevPos.y - height_ / 2.0f;
 
-        // 计算要检查的格子区域（以玩家当前位置 x + velocity.x 为基准）
-        float nextLeft  = prevPos.x + velocity_.x - width_ / 2.0f;
+        // 计算玩家下一步的左右边界
+        float nextLeft = prevPos.x + velocity_.x - width_ / 2.0f;
         float nextRight = prevPos.x + velocity_.x + width_ / 2.0f;
 
-        // 以玩家高度范围取几个 y 检测点（-1..1 的格子检测）
+        // 检测玩家周围的9个格子
         for (int yOffset = -1; yOffset <= 1; ++yOffset) {
             for (int xOffset = -1; xOffset <= 1; ++xOffset) {
+                // 检测点使用玩家当前位置
                 Vector3 checkPos = {
-                    prevPos.x + xOffset * MapChipField::kBlockWidth + velocity_.x,
-                    prevPos.y + yOffset * MapChipField::kBlockHeight,
+                    position_.x + xOffset * MapChipField::kBlockWidth,
+                    position_.y + yOffset * MapChipField::kBlockHeight,
                     0.0f
                 };
 
@@ -135,41 +133,37 @@ void Player::HandleMapCollision(const MapChipField& mapChipField) {
 
                 MapChipField::Rect blockRect = mapChipField.GetRectByIndex(index.xIndex, index.yIndex);
 
-                // 检测与格子在 y 上是否有重叠（只要垂直区间有重叠才需要处理水平碰撞）
-                if (!(nextRight > blockRect.left && nextLeft < blockRect.right &&
-                      tempPlayerTop > blockRect.bottom && tempPlayerBottom < blockRect.top)) {
-                    continue;
+                // 检查是否与玩家下一步位置重叠
+                if (nextRight > blockRect.left && nextLeft < blockRect.right &&
+                    playerTop > blockRect.bottom && playerBottom < blockRect.top)
+                {
+                    if (velocity_.x > 0) { // 向右移动
+                        position_.x = blockRect.left - width_ / 2.0f;
+                        velocity_.x = 0;
+                    }
+                    else if (velocity_.x < 0) { // 向左移动
+                        position_.x = blockRect.right + width_ / 2.0f;
+                        velocity_.x = 0;
+                    }
                 }
-
-                // 移动方向决定如何修正
-                if (velocity_.x > 0.0f) {
-                    // 向右移动，碰到方块左边
-                    position_.x = blockRect.left - width_ / 2.0f;
-                    velocity_.x = 0.0f;
-                } else if (velocity_.x < 0.0f) {
-                    // 向左移动，碰到方块右边
-                    position_.x = blockRect.right + width_ / 2.0f;
-                    velocity_.x = 0.0f;
-                }
-                // 一旦处理到一个阻挡块，就不必再处理其它水平块（已被修正）
             }
         }
     }
 
-    // --- 再处理竖直方向 (只考虑 y 移动) ---
+    // --- 垂直碰撞检测 (y轴) ---
     {
-        // 用当前（或已被水平修正的）x 来判断横向重叠
-        float tempPlayerLeft  = position_.x - width_ / 2.0f;
-        float tempPlayerRight = position_.x + width_ / 2.0f;
+        float playerLeft = position_.x - width_ / 2.0f;
+        float playerRight = position_.x + width_ / 2.0f;
 
+        // 计算玩家下一步的上下边界
         float nextBottom = prevPos.y + velocity_.y - height_ / 2.0f;
-        float nextTop    = prevPos.y + velocity_.y + height_ / 2.0f;
+        float nextTop = prevPos.y + velocity_.y + height_ / 2.0f;
 
         for (int yOffset = -1; yOffset <= 1; ++yOffset) {
             for (int xOffset = -1; xOffset <= 1; ++xOffset) {
                 Vector3 checkPos = {
-                    prevPos.x + xOffset * MapChipField::kBlockWidth,
-                    prevPos.y + yOffset * MapChipField::kBlockHeight + velocity_.y,
+                    position_.x + xOffset * MapChipField::kBlockWidth,
+                    position_.y + yOffset * MapChipField::kBlockHeight,
                     0.0f
                 };
 
@@ -179,30 +173,24 @@ void Player::HandleMapCollision(const MapChipField& mapChipField) {
 
                 MapChipField::Rect blockRect = mapChipField.GetRectByIndex(index.xIndex, index.yIndex);
 
-                // 检查横向是否重叠（只有横向有重叠才需处理竖直碰撞）
-                if (!(tempPlayerRight > blockRect.left && tempPlayerLeft < blockRect.right &&
-                      nextTop > blockRect.bottom && nextBottom < blockRect.top)) {
-                    continue;
+                // 检查是否与玩家下一步位置重叠
+                if (playerRight > blockRect.left && playerLeft < blockRect.right &&
+                    nextTop > blockRect.bottom && nextBottom < blockRect.top)
+                {
+                    if (velocity_.y > 0) { // 向上移动
+                        position_.y = blockRect.bottom - height_ / 2.0f;
+                        velocity_.y = 0;
+                    }
+                    else if (velocity_.y < 0) { // 向下移动
+                        position_.y = blockRect.top + height_ / 2.0f;
+                        velocity_.y = 0;
+                        onGround = true;
+                    }
                 }
-
-                // 当向下移动（velocity_.y < 0）且碰到地面时
-                if (velocity_.y < 0.0f) {
-                    // 把玩家放到方块上方
-                    position_.y = blockRect.top + height_ / 2.0f;
-                    velocity_.y = 0.0f;
-                    onGround = true;
-                }
-                // 当向上移动（velocity_.y > 0）且撞天花板时
-                else if (velocity_.y > 0.0f) {
-                    position_.y = blockRect.bottom - height_ / 2.0f;
-                    velocity_.y = 0.0f;
-                }
-                // 处理完一个垂直阻挡后可以继续检查（以保证处理多个小方块的情况）
             }
         }
     }
 
-    // 更新着地状态
     isOnGround_ = onGround;
 }
 

@@ -133,6 +133,9 @@
     <ClCompile Include="player\PLAYER.CPP">
       <Filter>player</Filter>
     </ClCompile>
+    <ClCompile Include="player\PlayerCamera.cpp">
+      <Filter>player</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="engine\math\Matrix3x3.h">
@@ -274,6 +277,9 @@
       <Filter>map</Filter>
     </ClInclude>
     <ClInclude Include="player\Player.h">
+      <Filter>player</Filter>
+    </ClInclude>
+    <ClInclude Include="player\PlayerCamera.h">
       <Filter>player</Filter>
     </ClInclude>
   </ItemGroup>
