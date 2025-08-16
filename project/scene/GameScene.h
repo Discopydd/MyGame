@@ -58,4 +58,6 @@ private:
 
     std::vector<PortalInfo> portals_;
     bool wasOnPortal_ = false;
+    std::string nextMapToLoad_;    // 记录下一帧要加载的地图路径
+    Vector3 nextMapStartPos_;      // 记录玩家在新地图的起点
 };

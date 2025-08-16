@@ -46,10 +46,11 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
     // 根据当前地图更新传送门列表
     portals_.clear();
     if (mapPath == "Resources/map/map.csv") {
-        portals_.push_back({ {26,11}, "Resources/map/new_map.csv", {3,3,0} });
-    } else if (mapPath == "Resources/map/new_map.csv") {
-        portals_.push_back({ {3,3}, "Resources/map/map.csv", {3,3,0} });
+        portals_.push_back({ {26,11}, "Resources/map/map2.csv", {3,3,0} });
+    } else if (mapPath == "Resources/map/map2.csv") {
+        portals_.push_back({ {26,1}, "Resources/map/map.csv", {3,3,0} });
     }
+    wasOnPortal_ = false;
 }
 void GameScene::Initialize() {
     winApp_ = WinApp::GetInstance();
@@ -121,14 +122,19 @@ void GameScene::Update() {
     bool onAnyPortal = false;
     for (auto& portal : portals_) {
         bool isOnPortal = (playerIndex.xIndex == portal.index.xIndex &&
-                           playerIndex.yIndex == portal.index.yIndex);
+            playerIndex.yIndex == portal.index.yIndex);
         if (isOnPortal && !wasOnPortal_) {
-            LoadMap(portal.targetMap, portal.targetStartPos);
+            nextMapToLoad_ = portal.targetMap;
+            nextMapStartPos_ = portal.targetStartPos;
             break;
         }
         if (isOnPortal) onAnyPortal = true;
     }
     wasOnPortal_ = onAnyPortal;
+    if (!nextMapToLoad_.empty()) {
+        LoadMap(nextMapToLoad_, nextMapStartPos_);
+        nextMapToLoad_.clear();
+    }
     float cooldownRatio = 0.0f;
     if (!player_->CanDash()) {
         cooldownRatio = player_->GetDashCooldown() / player_->GetDashCooldownDuration();
@@ -140,7 +146,7 @@ void GameScene::Update() {
         float visibleHeight = fullHeight * cooldownRatio;
         grayOverlaySprite_->SetTextureLeftTop({ 0.0f, 0.0f });
         grayOverlaySprite_->SetTextureSize({ 32.0f, visibleHeight });
-        grayOverlaySprite_->SetSize({32.0f, visibleHeight});
+        grayOverlaySprite_->SetSize({ 32.0f, visibleHeight });
     }
     skillSprite_->Update();
     grayOverlaySprite_->Update();
@@ -171,15 +177,15 @@ void GameScene::Update() {
         Vector3 playerPos = player_->GetPosition();
         float playerPosArr[3] = { playerPos.x, playerPos.y, playerPos.z };
         ImGui::Text("Position: (%.2f, %.2f, %.2f)", playerPos.x, playerPos.y, playerPos.z);
-           MapChipField::IndexSet playerIndex = mapChipField_.GetMapChipIndexByPosition(player_->GetPosition());
+        MapChipField::IndexSet playerIndex = mapChipField_.GetMapChipIndexByPosition(player_->GetPosition());
         ImGui::Text("MapChip Index: (%d, %d)", playerIndex.xIndex, playerIndex.yIndex);
-        
+
         // 添加当前格子类型信息
         MapChipType currentType = mapChipField_.GetMapChipTypeByIndex(playerIndex.xIndex, playerIndex.yIndex);
         const char* typeName = "Unknown";
-        switch(currentType) {
-            case MapChipType::kBlock: typeName = "Block"; break;
-            case MapChipType::kPortal: typeName = "Portal"; break;
+        switch (currentType) {
+        case MapChipType::kBlock: typeName = "Block"; break;
+        case MapChipType::kPortal: typeName = "Portal"; break;
         }
         ImGui::Text("Current MapChip Type: %s", typeName);
     }
