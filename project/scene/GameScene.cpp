@@ -29,6 +29,28 @@ void GameScene::GenerateBlocks() {
         }
     }
 }
+void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
+{
+    mapChipField_.LoadMapChipCsv(mapPath);
+
+    for (auto* block : mapBlocks_) delete block;
+    mapBlocks_.clear();
+    GenerateBlocks();
+
+    // 设置玩家起点
+    player_->SetPosition(startPos);
+
+    // 相机同步
+    camera_->SetTranslate(startPos + Vector3{0,0,-40});
+
+    // 根据当前地图更新传送门列表
+    portals_.clear();
+    if (mapPath == "Resources/map/map.csv") {
+        portals_.push_back({ {26,11}, "Resources/map/new_map.csv", {3,3,0} });
+    } else if (mapPath == "Resources/map/new_map.csv") {
+        portals_.push_back({ {3,3}, "Resources/map/map.csv", {3,3,0} });
+    }
+}
 void GameScene::Initialize() {
     winApp_ = WinApp::GetInstance();
     dxCommon_ = DirectXCommon::GetInstance();
@@ -52,22 +74,17 @@ void GameScene::Initialize() {
     soundMgr->Initialize();
     soundMgr->LoadWav("fanfare", "resources/fanfare.wav");
 
-    Vector3 playerStartPos = mapChipField_.GetMapChipPositionByIndex(2, 2);
-
     camera_ = new Camera();
     camera_->SetRotate({ 0, 0, 0 });
-    camera_->SetTranslate(playerStartPos + Vector3{ 0, 0.0f, -40.0f });
     object3dCommon_->SetDefaultCamera(camera_);
 
     ModelManager::GetInstants()->LoadModel("cube/cube.obj");
     ModelManager::GetInstants()->LoadModel("player/player.obj");
 
-    mapChipField_.LoadMapChipCsv("Resources/map/map.csv");
-    GenerateBlocks();
+
     player_ = new Player();
     player_->Initialize(object3dCommon_, camera_);
-
-    player_->SetPosition(playerStartPos);
+    LoadMap("Resources/map/map.csv", {3,3,0});
 
     playerCamera_ = new PlayerCamera();
     playerCamera_->Initialize(camera_, player_, &mapChipField_);
@@ -99,6 +116,19 @@ void GameScene::Update() {
     }
     player_->Update(input_, mapChipField_);
     playerCamera_->Update();
+    MapChipField::IndexSet playerIndex = mapChipField_.GetMapChipIndexByPosition(player_->GetPosition());
+
+    bool onAnyPortal = false;
+    for (auto& portal : portals_) {
+        bool isOnPortal = (playerIndex.xIndex == portal.index.xIndex &&
+                           playerIndex.yIndex == portal.index.yIndex);
+        if (isOnPortal && !wasOnPortal_) {
+            LoadMap(portal.targetMap, portal.targetStartPos);
+            break;
+        }
+        if (isOnPortal) onAnyPortal = true;
+    }
+    wasOnPortal_ = onAnyPortal;
     float cooldownRatio = 0.0f;
     if (!player_->CanDash()) {
         cooldownRatio = player_->GetDashCooldown() / player_->GetDashCooldownDuration();
@@ -141,6 +171,17 @@ void GameScene::Update() {
         Vector3 playerPos = player_->GetPosition();
         float playerPosArr[3] = { playerPos.x, playerPos.y, playerPos.z };
         ImGui::Text("Position: (%.2f, %.2f, %.2f)", playerPos.x, playerPos.y, playerPos.z);
+           MapChipField::IndexSet playerIndex = mapChipField_.GetMapChipIndexByPosition(player_->GetPosition());
+        ImGui::Text("MapChip Index: (%d, %d)", playerIndex.xIndex, playerIndex.yIndex);
+        
+        // 添加当前格子类型信息
+        MapChipType currentType = mapChipField_.GetMapChipTypeByIndex(playerIndex.xIndex, playerIndex.yIndex);
+        const char* typeName = "Unknown";
+        switch(currentType) {
+            case MapChipType::kBlock: typeName = "Block"; break;
+            case MapChipType::kPortal: typeName = "Portal"; break;
+        }
+        ImGui::Text("Current MapChip Type: %s", typeName);
     }
     ImGui::End();
 #endif

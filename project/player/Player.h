@@ -2,7 +2,6 @@
 #include "Object3d.h"
 #include "Input.h"
 #include "map/MapChipField.h"
-
 class Player {
 public:
     Player();
