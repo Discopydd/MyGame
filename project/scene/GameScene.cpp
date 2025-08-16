@@ -5,7 +5,7 @@ void GameScene::GenerateBlocks() {
         for (uint32_t x = 0; x < MapChipField::kNumBlockHorizontal; x++) {
             // 获取当前格子类型
             MapChipType type = mapChipField_.GetMapChipTypeByIndex(x, y);
-
+            Vector3 position = mapChipField_.GetMapChipPositionByIndex(x, y);
             // 如果是方块（kBlock），创建3D对象
             if (type == MapChipType::kBlock) {
                 Object3d* block = new Object3d();
@@ -13,10 +13,18 @@ void GameScene::GenerateBlocks() {
                 block->SetModel("cube/cube.obj");       // 使用方块模型
                 block->SetCamera(camera_);
                 // 设置方块位置（根据格子索引转换为世界坐标）
-                Vector3 position = mapChipField_.GetMapChipPositionByIndex(x, y);
                 block->SetTranslate(position);
                 // 添加到方块列表
                 mapBlocks_.push_back(block);
+            }
+            else if (type == MapChipType::kPortal) {
+                // 创建传送门可视化对象（例如使用不同颜色的方块）
+                Object3d* portal = new Object3d();
+                portal->Initialize(object3dCommon_);
+                portal->SetModel("cube/cube.obj"); // 特殊传送门模型
+                portal->SetCamera(camera_);
+                portal->SetTranslate(position);
+                mapBlocks_.push_back(portal);
             }
         }
     }
@@ -48,15 +56,14 @@ void GameScene::Initialize() {
 
     camera_ = new Camera();
     camera_->SetRotate({ 0, 0, 0 });
-    camera_->SetTranslate(playerStartPos + Vector3{0, 0.0f, -40.0f});
+    camera_->SetTranslate(playerStartPos + Vector3{ 0, 0.0f, -40.0f });
     object3dCommon_->SetDefaultCamera(camera_);
 
     ModelManager::GetInstants()->LoadModel("cube/cube.obj");
     ModelManager::GetInstants()->LoadModel("player/player.obj");
 
-    mapChipField_.LoadMapChipCsv("Resources/map.csv");
+    mapChipField_.LoadMapChipCsv("Resources/map/map.csv");
     GenerateBlocks();
-
     player_ = new Player();
     player_->Initialize(object3dCommon_, camera_);
 
@@ -64,12 +71,25 @@ void GameScene::Initialize() {
 
     playerCamera_ = new PlayerCamera();
     playerCamera_->Initialize(camera_, player_, &mapChipField_);
-    playerCamera_->SetOffset({0, 0.0f, -40.0f});
+    playerCamera_->SetOffset({ 0, 0.0f, -40.0f });
     playerCamera_->SetFollowSpeed(0.1f);
     playerCamera_->SetConstrainToMap(true);
-}
 
+    std::string textureFilePath[] = { "Resources/skill_icon.png", "Resources/gray.png" };
+
+    skillSprite_ = new Sprite();
+    skillSprite_->Initialize(spriteCommon_, textureFilePath[0]);
+    skillSprite_->SetPosition({ 50.0f, 50.0f }); // 左上角
+    skillSprite_->SetSize({ 32.0f, 32.0f });
+
+    grayOverlaySprite_ = new Sprite();
+    grayOverlaySprite_->Initialize(spriteCommon_, textureFilePath[1]);
+    grayOverlaySprite_->SetPosition({ 50.0f, 50.0f });
+    grayOverlaySprite_->SetSize({ 32.0f, 32.0f });
+
+}
 void GameScene::Update() {
+    const float deltaTime = 1.0f / 60.0f;
     camera_->Update();
     imguiManager_->Begin();
     input_->Update();
@@ -79,6 +99,21 @@ void GameScene::Update() {
     }
     player_->Update(input_, mapChipField_);
     playerCamera_->Update();
+    float cooldownRatio = 0.0f;
+    if (!player_->CanDash()) {
+        cooldownRatio = player_->GetDashCooldown() / player_->GetDashCooldownDuration();
+        cooldownRatio = (std::max)(0.0f, (std::min)(cooldownRatio, 1.0f)); // 限制在0~1
+    }
+
+    if (cooldownRatio > 0.0f) {
+        float fullHeight = 32.0f;
+        float visibleHeight = fullHeight * cooldownRatio;
+        grayOverlaySprite_->SetTextureLeftTop({ 0.0f, 0.0f });
+        grayOverlaySprite_->SetTextureSize({ 32.0f, visibleHeight });
+        grayOverlaySprite_->SetSize({32.0f, visibleHeight});
+    }
+    skillSprite_->Update();
+    grayOverlaySprite_->Update();
     if (input_->TriggerKey(DIK_P)) {
         SoundManager::GetInstance()->Play("fanfare", false, 1.0f);
     }
@@ -86,7 +121,7 @@ void GameScene::Update() {
 #ifdef USE_IMGUI
     ImGui::Begin("Scene Controller");
 
-      // ======= Camera =======
+    // ======= Camera =======
     if (ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen)) {
         Vector3 camPos = camera_->GetTransform().translate;
         Vector3 camRot = camera_->GetTransform().rotate;
@@ -100,7 +135,7 @@ void GameScene::Update() {
             camera_->SetRotate({ camRotArr[0], camRotArr[1], camRotArr[2] });
         }
     }
-     // ======= Player Info =======
+    // ======= Player Info =======
     if (ImGui::CollapsingHeader("Player Info", ImGuiTreeNodeFlags_DefaultOpen)) {
         // 位置信息
         Vector3 playerPos = player_->GetPosition();
@@ -124,10 +159,10 @@ void GameScene::Draw() {
     }
      player_->Draw();
     spriteCommon_->CommonDraw();
-    for (auto* sprite : sprites_) {
-        sprite->Draw();
+    skillSprite_->Draw();
+    if (!player_->CanDash()) {
+        grayOverlaySprite_->Draw();
     }
-   
     // ParticleManager::GetInstance()->Draw();
     imguiManager_->Draw();
     dxCommon_->End();
@@ -150,8 +185,6 @@ void GameScene::Finalize() {
     mapBlocks_.clear();
     delete player_;
     delete imguiManager_;
-
-    for (auto* sprite : sprites_) {
-        delete sprite;
-    }
+    delete skillSprite_;
+    delete grayOverlaySprite_;
 }

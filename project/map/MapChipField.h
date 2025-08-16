@@ -10,6 +10,7 @@
 enum class MapChipType {
 	kBlank, // 空白
 	kBlock, // ブロック
+	kPortal,
 };
 
 struct MapChipData {
@@ -25,7 +26,7 @@ public:
 	static inline const float kBlockHeight = 2;
 	// 縦横幅
 	static inline const uint32_t kNumBlockVirtical = 22;
-	static inline const uint32_t kNumBlockHorizontal = 100;
+	static inline const uint32_t kNumBlockHorizontal = 28;
 
 	void ResetMapChipData();
 	void LoadMapChipCsv(const std::string& filePath);

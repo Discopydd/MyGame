@@ -37,7 +37,6 @@ private:
     Object3dCommon* object3dCommon_ = nullptr;
     Camera* camera_ = nullptr;
     PlayerCamera* playerCamera_ = nullptr;
-    std::vector<Sprite*> sprites_;
 
     Vector2 rotation_{};
 
@@ -47,4 +46,7 @@ private:
 	void GenerateBlocks();
 
     Player* player_ = nullptr;
+
+    Sprite* skillSprite_ = nullptr;          // 技能图标精灵
+    Sprite* grayOverlaySprite_ = nullptr;    // 灰色遮罩精灵
 };

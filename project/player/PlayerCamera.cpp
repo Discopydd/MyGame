@@ -46,8 +46,8 @@ Vector3 PlayerCamera::ConstrainPosition(const Vector3& position) const {
   if (!map_ || !camera_) return position;
 
     // 获取地图实际边界
-    Vector3 mapMin = map_->GetMapMinPosition();
-    Vector3 mapMax = map_->GetMapMaxPosition();
+    Vector3 mapMin = useCustomBounds_ ? mapMin_ : map_->GetMapMinPosition();
+    Vector3 mapMax = useCustomBounds_ ? mapMax_ : map_->GetMapMaxPosition();
     
     // 使用相机实际位置计算视口
     float cameraZ = camera_->GetTransform().translate.z;

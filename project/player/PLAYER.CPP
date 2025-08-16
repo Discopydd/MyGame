@@ -21,31 +21,109 @@ void Player::Initialize(Object3dCommon* object3dCommon, Camera* camera) {
 
     position_ = {-10, 0, 0};
     velocity_ = {0, 0, 0};
+
+    isDashing_ = false;
+    dashTimer_ = 0.0f;
+    dashCooldownTimer_ = 0.0f;
+    canDash_ = true;
+    dashDirection_ = {1, 0, 0};
+
+    originalGravity_ = gravity_;
+    dashGravity_ = 0.0f;
 }
 
 void Player::Update(Input* input, const MapChipField& mapChipField) {
-  // 左右移动
+    const float deltaTime = 1.0f / 60.0f; // 假设60FPS
+
+    // 更新冲刺状态
+    if (isDashing_) {
+        dashTimer_ += deltaTime;
+
+        // 冲刺结束
+        if (dashTimer_ >= dashDuration_) {
+            isDashing_ = false;
+            dashTimer_ = 0.0f;
+            dashCooldownTimer_ = dashCooldown_;
+            canDash_ = false;
+            if (isDashJumping_) {
+                gravity_ = originalGravity_;
+                isDashJumping_ = false;
+            }
+        }
+    }
+
+    // 更新冷却时间
+    if (!canDash_) {
+        dashCooldownTimer_ -= deltaTime;
+        if (dashCooldownTimer_ <= dashCooldownThreshold_) {
+            dashCooldownTimer_ = 0.0f;
+            canDash_ = true;
+        }
+    }
+
+    // 检测冲刺按键（左Shift）
+    if (input->TriggerKey(DIK_LSHIFT) && canDash_ && !isDashing_) {
+        isDashing_ = true;
+        dashTimer_ = 0.0f;
+        dashCooldownTimer_ = dashCooldown_;
+        // 确定冲刺方向
+        if (lrDirection_ == LRDirection::kRight) {
+            dashDirection_ = { 1, 0, 0 }; // 向右
+        }
+        else {
+            dashDirection_ = { -1, 0, 0 }; // 向左
+        }
+        // 如果在跳跃过程中冲刺
+        if (!isOnGround_) {
+            isDashJumping_ = true;
+            gravity_ = dashGravity_; // 设置为零重力实现平移效果
+            velocity_.y = 0; // 重置垂直速度
+            isJumping_ = false;
+            jumpPressDuration_ = maxJumpPressTime_;
+        }
+    }
+
+    // 左右移动（冲刺时保持方向）
+    Vector3 moveInput = { 0, 0, 0 };
+
+    // 左右移动
     if (input->PushKey(DIK_D) || input->PushKey(DIK_RIGHT)) {
-        velocity_.x = moveSpeed_;
+        moveInput.x = 1.0f;
         if (lrDirection_ != LRDirection::kRight) {
-				lrDirection_ = LRDirection::kRight;
-				turnStartRotationY_ = currentRotationY_;
-                turnTargetRotationY_ = 0.0f;
-				turnCurrentFrame_ = 0;
-			}
-    } else if (input->PushKey(DIK_A) || input->PushKey(DIK_LEFT)) {
-        velocity_.x = -moveSpeed_;
+            lrDirection_ = LRDirection::kRight;
+            turnStartRotationY_ = currentRotationY_;
+            turnTargetRotationY_ = 0.0f;
+            turnCurrentFrame_ = 0;
+        }
+    }
+    else if (input->PushKey(DIK_A) || input->PushKey(DIK_LEFT)) {
+        moveInput.x = -1.0f;
         if (lrDirection_ != LRDirection::kLeft) {
-				lrDirection_ = LRDirection::kLeft;
-				turnStartRotationY_ = currentRotationY_;
-				turnTargetRotationY_  =DirectX::XM_PI;
-				turnCurrentFrame_ = 0;
-			}
-    } else {
+            lrDirection_ = LRDirection::kLeft;
+            turnStartRotationY_ = currentRotationY_;
+            turnTargetRotationY_ = DirectX::XM_PI;
+            turnCurrentFrame_ = 0;
+        }
+    }
+    else {
         velocity_.x = 0;
     }
- 
-    
+
+    // 计算实际移动速度（冲刺时使用冲刺速度）
+    float currentMoveSpeed = moveSpeed_;
+    Vector3 moveVelocity = moveInput * currentMoveSpeed;
+    if (isDashing_) {
+        // 冲刺时使用固定速度，忽略输入
+        moveVelocity = dashDirection_ * (moveSpeed_ * dashSpeedMultiplier_);
+         // 跳跃冲刺时保持水平移动
+        if (isDashJumping_) {
+            moveVelocity.y = 0; // 确保垂直速度为0
+        }
+    }
+
+    // 设置水平速度
+    velocity_.x = moveVelocity.x;
+
     // 检测空格键状态
     bool isSpacePressed = input->PushKey(DIK_SPACE);
 
@@ -55,11 +133,14 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
         isOnGround_ = false;
         isJumping_ = true;
         jumpPressDuration_ = 0.0f; // 重置蓄力时间
+         if (isDashing_) {
+            velocity_.x = dashDirection_.x * (moveSpeed_ * dashSpeedMultiplier_);
+        }
     }
 
     // 长按空格延长跳跃时间（但不增加速度）
-    if (isJumping_ && isSpacePressed) {
-        jumpPressDuration_ += 1.0f / 60.0f; // 帧率为60FPS
+    if (isJumping_ && isSpacePressed && !isDashing_) {
+        jumpPressDuration_ += deltaTime;
         jumpPressDuration_ = (std::min)(jumpPressDuration_, maxJumpPressTime_);
 
         // 仅当按住空格且在最大时间内时，保持跳跃速度
@@ -70,7 +151,7 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
 
 
     // 松开空格时停止蓄力
-   if (isJumping_ && (!isSpacePressed || jumpPressDuration_ >= maxJumpPressTime_)) {
+    if (isJumping_ && (!isSpacePressed || jumpPressDuration_ >= maxJumpPressTime_)) {
         isJumping_ = false;
     }
 
