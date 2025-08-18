@@ -1,8 +1,8 @@
 #include "GameScene.h"
 #include <numbers>
 void GameScene::GenerateBlocks() {
-    for (uint32_t y = 0; y < MapChipField::kNumBlockVirtical; y++) {
-        for (uint32_t x = 0; x < MapChipField::kNumBlockHorizontal; x++) {
+    for (uint32_t y = 0; y < mapChipField_.numBlockVertical_; y++) {
+        for (uint32_t x = 0; x < mapChipField_.numBlockHorizontal_; x++) {
             // 获取当前格子类型
             MapChipType type = mapChipField_.GetMapChipTypeByIndex(x, y);
             Vector3 position = mapChipField_.GetMapChipPositionByIndex(x, y);
@@ -42,13 +42,13 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
 
     // 相机同步
     camera_->SetTranslate(startPos + Vector3{0,0,-40});
-
+    playerCamera_->SetMapBounds(mapChipField_.GetMapMinPosition(), mapChipField_.GetMapMaxPosition());
     // 根据当前地图更新传送门列表
     portals_.clear();
     if (mapPath == "Resources/map/map.csv") {
         portals_.push_back({ {26,11}, "Resources/map/map2.csv", {3,3,0} });
     } else if (mapPath == "Resources/map/map2.csv") {
-        portals_.push_back({ {26,1}, "Resources/map/map.csv", {3,3,0} });
+        portals_.push_back({ {24,8}, "Resources/map/map.csv", {3,3,0} });
     }
     wasOnPortal_ = false;
 }
@@ -85,7 +85,7 @@ void GameScene::Initialize() {
 
     player_ = new Player();
     player_->Initialize(object3dCommon_, camera_);
-    LoadMap("Resources/map/map.csv", {3,3,0});
+
 
     playerCamera_ = new PlayerCamera();
     playerCamera_->Initialize(camera_, player_, &mapChipField_);
@@ -93,6 +93,7 @@ void GameScene::Initialize() {
     playerCamera_->SetFollowSpeed(0.1f);
     playerCamera_->SetConstrainToMap(true);
 
+    LoadMap("Resources/map/map.csv", {3,3,0});
     std::string textureFilePath[] = { "Resources/skill_icon.png", "Resources/gray.png" };
 
     skillSprite_ = new Sprite();

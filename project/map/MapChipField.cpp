@@ -11,47 +11,63 @@ std::map<std::string, MapChipType> mapChipTable = {
 
 void MapChipField::ResetMapChipData() {
 	mapChipData_.data.clear();
-	mapChipData_.data.resize(kNumBlockVirtical);
-	for (auto& mapChipDataLine : mapChipData_.data) {
-		mapChipDataLine.resize(kNumBlockHorizontal);
-	}
+	numBlockVertical_ = 0;
+    numBlockHorizontal_ = 0;
 }
 
 void MapChipField::LoadMapChipCsv(const std::string& filePath) {
     ResetMapChipData();
-    std::ifstream file;
-    file.open(filePath);
+   std::ifstream file(filePath);
     assert(file.is_open());
 
-    std::stringstream mapChipCsv;
-    mapChipCsv << file.rdbuf();
-    file.close();
-
+    std::string line;
     std::vector<std::vector<MapChipType>> tempData;
-    tempData.resize(kNumBlockVirtical);
 
-    for (uint32_t i = 0; i < kNumBlockVirtical; i++) {
-        std::string line;
-        std::getline(mapChipCsv, line);
+       while (std::getline(file, line)) {
+        if (line.empty()) continue; // 跳过空行
         std::istringstream line_stream(line);
-        tempData[i].resize(kNumBlockHorizontal);
-
-        for (uint32_t j = 0; j < kNumBlockHorizontal; j++) {
-            std::string word;
-            std::getline(line_stream, word, ',');
+        std::vector<MapChipType> row;
+        std::string word;
+        while (std::getline(line_stream, word, ',')) {
             if (mapChipTable.contains(word)) {
-                tempData[i][j] = mapChipTable[word];
+                row.push_back(mapChipTable[word]);
+            } else {
+                row.push_back(MapChipType::kBlank); // 兜底：未知字符 = 空白
             }
         }
+        if (!row.empty()) {
+            tempData.push_back(row);
+        }
+    }
+    file.close();
+
+    if (tempData.empty()) {
+        numBlockVertical_ = 0;
+        numBlockHorizontal_ = 0;
+        return; // 空地图
     }
 
-    for (uint32_t i = 0; i < kNumBlockVirtical; i++) {
-        uint32_t reversedIndex = kNumBlockVirtical - 1 - i;
-        mapChipData_.data[reversedIndex] = tempData[i];
+    // 统一每行的长度（避免列数不一致）
+    numBlockHorizontal_ = 0;
+    for (auto& row : tempData) {
+        if (row.size() > numBlockHorizontal_) {
+            numBlockHorizontal_ = static_cast<uint32_t>(row.size());
+        }
+    }
+    numBlockVertical_ = static_cast<uint32_t>(tempData.size());
+
+    // 重新分配并填充
+    mapChipData_.data.resize(numBlockVertical_);
+    for (uint32_t i = 0; i < numBlockVertical_; i++) {
+        uint32_t reversedIndex = numBlockVertical_ - 1 - i;
+        mapChipData_.data[reversedIndex].resize(numBlockHorizontal_, MapChipType::kBlank);
+        for (uint32_t j = 0; j < tempData[i].size(); j++) {
+            mapChipData_.data[reversedIndex][j] = tempData[i][j];
+        }
     }
 }
 MapChipType MapChipField::GetMapChipTypeByIndex(uint32_t xIndex, uint32_t yIndex)const {
-	if (xIndex >= kNumBlockHorizontal || yIndex >= kNumBlockVirtical) {
+	if (xIndex >= numBlockHorizontal_  || yIndex >= numBlockVertical_) {
         return MapChipType::kBlank;
     }
     return mapChipData_.data[yIndex][xIndex];

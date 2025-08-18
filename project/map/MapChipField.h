@@ -25,8 +25,9 @@ public:
 	static inline const float kBlockWidth = 2;
 	static inline const float kBlockHeight = 2;
 	// 縦横幅
-	static inline const uint32_t kNumBlockVirtical = 22;
-	static inline const uint32_t kNumBlockHorizontal = 28;
+	uint32_t numBlockVertical_  = 0;
+	uint32_t numBlockHorizontal_  = 0;
+
 
 	void ResetMapChipData();
 	void LoadMapChipCsv(const std::string& filePath);
@@ -50,8 +51,8 @@ public:
 	}
 	Vector3 GetMapMaxPosition() const {
 		return Vector3(
-			kNumBlockHorizontal * kBlockWidth,
-			kNumBlockVirtical * kBlockHeight,
+			numBlockHorizontal_  * kBlockWidth,
+			numBlockVertical_  * kBlockHeight,
 			0
 		);
 	}
