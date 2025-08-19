@@ -31,31 +31,7 @@ void GameScene::GenerateBlocks() {
         }
     }
 }
-void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
-{
-   
 
-    for (auto* block : mapBlocks_) delete block;
-    mapBlocks_.clear();
-    
-    mapChipField_.LoadMapChipCsv(mapPath);
-    GenerateBlocks();
-
-    // 设置玩家起点
-    player_->SetPosition(startPos);
-
-    // 相机同步
-    camera_->SetTranslate(startPos + Vector3{0,0,-40});
-    playerCamera_->SetMapBounds(mapChipField_.GetMapMinPosition(), mapChipField_.GetMapMaxPosition());
-    // 根据当前地图更新传送门列表
-    portals_.clear();
-    if (mapPath == "Resources/map/map.csv") {
-        portals_.push_back({ {26,11}, "Resources/map/map2.csv", {3,3,0} });
-    } else if (mapPath == "Resources/map/map2.csv") {
-        portals_.push_back({ {24,8}, "Resources/map/map.csv", {3,3,0} });
-    }
-    wasOnPortal_ = false;
-}
 void GameScene::Initialize() {
     winApp_ = WinApp::GetInstance();
     dxCommon_ = DirectXCommon::GetInstance();
@@ -113,6 +89,7 @@ void GameScene::Initialize() {
      isMapLoading_ = false;
     loadingTimer_ = 0.0f;
 }
+
 void GameScene::Update() {
     const float deltaTime = 1.0f / 60.0f;
     if (shouldStartLoading_) {
@@ -125,11 +102,11 @@ void GameScene::Update() {
         loadingTimer_ += deltaTime;
         if (loadingTimer_ >= LOADING_DURATION) {
             isMapLoading_ = false;
-            // 真正加载地图
-            LoadMap("Resources/map/map.csv", { 3,3,0 });
+
             if (sceneManager_) sceneManager_->ClearOverlayScene();
 
-
+            // 真正加载地图
+            LoadMap("Resources/map/map.csv", { 3,3,0 });
         }
         return;
     }
@@ -139,11 +116,10 @@ void GameScene::Update() {
         portalLoadingTimer_ += deltaTime;
         if (portalLoadingTimer_ >= LOADING_DURATION) {
             isPortalLoading_ = false;
-            // 真正加载地图
-            LoadMap(portalMapPath_, portalStartPos_);
             if (sceneManager_) sceneManager_->ClearOverlayScene();
 
-            
+            // 真正加载地图
+            LoadMap(portalMapPath_, portalStartPos_);
         }
         return;
     }
@@ -228,8 +204,6 @@ void GameScene::Update() {
     }
     ImGui::End();
 #endif
-
-
     imguiManager_->End();
 }
 
@@ -272,6 +246,7 @@ void GameScene::Finalize() {
     delete skillSprite_;
     delete grayOverlaySprite_;
 }
+
 void GameScene::StartLoadingMap(const std::string& mapPath, const Vector3& startPos, bool isPortal = false) {
     if (sceneManager_) {
         LoadingScene* loadingScene = new LoadingScene();
@@ -289,4 +264,34 @@ void GameScene::StartLoadingMap(const std::string& mapPath, const Vector3& start
         isMapLoading_ = true;
         loadingTimer_ = 0.0f;
     }
+}
+
+void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
+{
+    for (auto* block : mapBlocks_) delete block;
+    mapBlocks_.clear();
+
+    mapChipField_.LoadMapChipCsv(mapPath);
+    GenerateBlocks();
+
+    // 设置玩家起点
+    player_->SetPosition(startPos);
+
+    // 相机同步
+    camera_->SetTranslate(startPos + Vector3{ 0,0,-40 });
+    playerCamera_->SetMapBounds(mapChipField_.GetMapMinPosition(), mapChipField_.GetMapMaxPosition());
+    // 根据当前地图更新传送门列表
+    portals_.clear();
+    if (mapPath == "Resources/map/map.csv") {
+        portals_.push_back({ {26,11}, "Resources/map/map2.csv", {3,3,0} });
+    }
+    else if (mapPath == "Resources/map/map2.csv") {
+        portals_.push_back({ {24,8}, "Resources/map/map.csv", {3,3,0} });
+    }
+    wasOnPortal_ = false;
+
+    player_->Update(input_, mapChipField_);
+    for (auto* block : mapBlocks_) block->Update();
+    playerCamera_->Update();
+    camera_->Update();
 }
