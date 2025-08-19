@@ -10,6 +10,13 @@ public:
     // 设置（预约）下一个场景
     void SetNextScene(BaseScene* nextScene);
 
+
+    // 设置临时场景（如加载场景）
+    void SetOverlayScene(BaseScene* overlayScene);
+    void ClearOverlayScene();
+    // 新增：获取当前覆盖场景（OverlayScene）
+    BaseScene* GetOverlayScene() const { return overlayScene_; }
+
     // 更新处理
     void Update();
 
@@ -22,4 +29,6 @@ private:
 
     // 准备切换的下一个场景
     BaseScene* nextScene_ = nullptr;
+    // 覆盖场景（如加载场景）
+    BaseScene* overlayScene_ = nullptr;
 };

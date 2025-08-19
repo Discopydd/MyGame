@@ -136,6 +136,7 @@
     <ClCompile Include="player\PlayerCamera.cpp">
       <Filter>player</Filter>
     </ClCompile>
+    <ClCompile Include="LoadingScene.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="engine\math\Matrix3x3.h">
@@ -282,6 +283,7 @@
     <ClInclude Include="player\PlayerCamera.h">
       <Filter>player</Filter>
     </ClInclude>
+    <ClInclude Include="LoadingScene.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="..\externals\imgui\LICENSE.txt" />

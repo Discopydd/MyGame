@@ -6,14 +6,40 @@ SceneManager::~SceneManager() {
         scene_->Finalize();
         delete scene_;
     }
-     if (nextScene_) {
+    if (nextScene_) {
         delete nextScene_;
         nextScene_ = nullptr;
     }
+    if (overlayScene_) {
+        overlayScene_->Finalize();
+        delete overlayScene_;
+        overlayScene_ = nullptr;
+    }
+}
+void SceneManager::SetOverlayScene(BaseScene* overlayScene) {
+    if (overlayScene_) {
+        overlayScene_->Finalize();
+        delete overlayScene_;
+    }
+    overlayScene_ = overlayScene;
+    if (overlayScene_) {
+        overlayScene_->SetSceneManager(this);
+        overlayScene_->Initialize();
+    }
 }
 
+void SceneManager::ClearOverlayScene() {
+    if (overlayScene_) {
+        overlayScene_->Finalize();
+        delete overlayScene_;
+        overlayScene_ = nullptr;
+    }
+}
 void SceneManager::SetNextScene(BaseScene* nextScene) {
     nextScene_ = nextScene;
+     if (nextScene_) {
+        nextScene_->SetSceneManager(this);
+    }
 }
 
 void SceneManager::Update() {
@@ -37,11 +63,17 @@ void SceneManager::Update() {
     if (scene_) {
         scene_->Update();
     }
+    if (overlayScene_) {
+        overlayScene_->Update();
+    }
 }
 
 void SceneManager::Draw() {
     // 调用当前场景的绘制
-    if (scene_) {
+   if (overlayScene_) {
+        overlayScene_->Draw();
+    } else if (scene_) {
+        // 没有覆盖场景时，才绘制当前场景
         scene_->Draw();
     }
 }

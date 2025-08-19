@@ -20,7 +20,6 @@
 #include <map/MapChipField.h>
 #include <player/Player.h>
 #include <player/PlayerCamera.h>
-
 struct PortalInfo {
     MapChipField::IndexSet index;  // 传送门格子索引
     std::string targetMap;         // 目标地图路径
@@ -32,6 +31,8 @@ public:
     void Update() override;
     void Draw() override;
     void Finalize() override;
+
+    void StartLoadingMap(const std::string& mapPath, const Vector3& startPos, bool isPortal);
 
 private:
     WinApp* winApp_ = nullptr;
@@ -47,9 +48,9 @@ private:
     Vector2 rotation_{};
 
     //Map
-	MapChipField mapChipField_;              // 地图数据管理对象
+    MapChipField mapChipField_;              // 地图数据管理对象
     std::vector<Object3d*> mapBlocks_;       // 存储地图方块对象
-	void GenerateBlocks();
+    void GenerateBlocks();
     void LoadMap(const std::string& mapPath, const Vector3& startPos);
     Player* player_ = nullptr;
 
@@ -60,4 +61,18 @@ private:
     bool wasOnPortal_ = false;
     std::string nextMapToLoad_;    // 记录下一帧要加载的地图路径
     Vector3 nextMapStartPos_;      // 记录玩家在新地图的起点
+
+    // ================== 加载相关 ==================
+    bool shouldStartLoading_ = true;     // 延迟初始化加载
+    bool isMapLoading_ = false;          // 初始化加载标志
+    bool isPortalLoading_ = false;       // 传送门加载标志
+
+    std::string portalMapPath_;          // 传送门目标地图
+    Vector3 portalStartPos_;             // 传送门起点
+    float portalLoadingTimer_ = 0.0f;    // 传送门计时
+    float loadingTimer_ = 0.0f;          // 初始化加载计时
+    bool loadingStarted_ = false;        // 延迟一帧标志
+
+    static constexpr float LOADING_DURATION = 1.0f; // 1秒
+
 };

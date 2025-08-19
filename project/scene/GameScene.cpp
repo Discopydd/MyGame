@@ -1,5 +1,7 @@
 #include "GameScene.h"
 #include <numbers>
+#include <LoadingScene.h>
+#include "SceneManager.h"
 void GameScene::GenerateBlocks() {
     for (uint32_t y = 0; y < mapChipField_.numBlockVertical_; y++) {
         for (uint32_t x = 0; x < mapChipField_.numBlockHorizontal_; x++) {
@@ -31,10 +33,12 @@ void GameScene::GenerateBlocks() {
 }
 void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
 {
-    mapChipField_.LoadMapChipCsv(mapPath);
+   
 
     for (auto* block : mapBlocks_) delete block;
     mapBlocks_.clear();
+    
+    mapChipField_.LoadMapChipCsv(mapPath);
     GenerateBlocks();
 
     // 设置玩家起点
@@ -106,9 +110,43 @@ void GameScene::Initialize() {
     grayOverlaySprite_->SetPosition({ 50.0f, 50.0f });
     grayOverlaySprite_->SetSize({ 32.0f, 32.0f });
 
+     isMapLoading_ = false;
+    loadingTimer_ = 0.0f;
 }
 void GameScene::Update() {
     const float deltaTime = 1.0f / 60.0f;
+    if (shouldStartLoading_) {
+        shouldStartLoading_ = false;
+        StartLoadingMap("Resources/map/map.csv", { 3,3,0 }, false);
+        return; // 本帧先显示 LoadingScene
+    }
+    // 2️⃣ 初始加载计时
+    if (isMapLoading_) {
+        loadingTimer_ += deltaTime;
+        if (loadingTimer_ >= LOADING_DURATION) {
+            isMapLoading_ = false;
+            // 真正加载地图
+            LoadMap("Resources/map/map.csv", { 3,3,0 });
+            if (sceneManager_) sceneManager_->ClearOverlayScene();
+
+
+        }
+        return;
+    }
+
+    // 3️⃣ 传送门加载计时
+    if (isPortalLoading_) {
+        portalLoadingTimer_ += deltaTime;
+        if (portalLoadingTimer_ >= LOADING_DURATION) {
+            isPortalLoading_ = false;
+            // 真正加载地图
+            LoadMap(portalMapPath_, portalStartPos_);
+            if (sceneManager_) sceneManager_->ClearOverlayScene();
+
+            
+        }
+        return;
+    }
     camera_->Update();
     imguiManager_->Begin();
     input_->Update();
@@ -125,9 +163,7 @@ void GameScene::Update() {
         bool isOnPortal = (playerIndex.xIndex == portal.index.xIndex &&
             playerIndex.yIndex == portal.index.yIndex);
         if (isOnPortal && !wasOnPortal_) {
-            nextMapToLoad_ = portal.targetMap;
-            nextMapStartPos_ = portal.targetStartPos;
-            break;
+            StartLoadingMap(portal.targetMap, portal.targetStartPos, true);
         }
         if (isOnPortal) onAnyPortal = true;
     }
@@ -235,4 +271,22 @@ void GameScene::Finalize() {
     delete imguiManager_;
     delete skillSprite_;
     delete grayOverlaySprite_;
+}
+void GameScene::StartLoadingMap(const std::string& mapPath, const Vector3& startPos, bool isPortal = false) {
+    if (sceneManager_) {
+        LoadingScene* loadingScene = new LoadingScene();
+        sceneManager_->SetOverlayScene(loadingScene);
+    }
+    if (isPortal) {
+        // 传送门加载
+        isPortalLoading_ = true;
+        portalMapPath_ = mapPath;
+        portalStartPos_ = startPos;
+        portalLoadingTimer_ = 0.0f;
+    }
+    else {
+        // 初始化加载
+        isMapLoading_ = true;
+        loadingTimer_ = 0.0f;
+    }
 }

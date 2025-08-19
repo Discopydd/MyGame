@@ -11,6 +11,7 @@ public:
     virtual void Finalize() = 0;
 
     virtual void SetSceneManager(SceneManager* sceneManager) { sceneManager_ = sceneManager; }
+    SceneManager* GetSceneManager() { return sceneManager_; }
 protected:
     SceneManager* sceneManager_ = nullptr;
 };
