@@ -23,7 +23,7 @@ void GameScene::GenerateBlocks() {
                 // 创建传送门可视化对象（例如使用不同颜色的方块）
                 Object3d* portal = new Object3d();
                 portal->Initialize(object3dCommon_);
-                portal->SetModel("cube/cube.obj"); // 特殊传送门模型
+                portal->SetModel("door/Door.obj"); // 特殊传送门模型
                 portal->SetCamera(camera_);
                 portal->SetTranslate(position);
                 mapBlocks_.push_back(portal);
@@ -61,7 +61,7 @@ void GameScene::Initialize() {
 
     ModelManager::GetInstants()->LoadModel("cube/cube.obj");
     ModelManager::GetInstants()->LoadModel("player/player.obj");
-
+    ModelManager::GetInstants()->LoadModel("door/Door.obj");
 
     player_ = new Player();
     player_->Initialize(object3dCommon_, camera_);
