@@ -2,6 +2,38 @@
 #include <numbers>
 #include <LoadingScene.h>
 #include "SceneManager.h"
+// 将3D世界坐标转换为屏幕坐标
+Vector3 WorldToScreen(const Vector3& worldPos, Camera* camera)
+{
+    // 先构建齐次坐标
+    float x = worldPos.x;
+    float y = worldPos.y;
+    float z = worldPos.z;
+    float w = 1.0f;
+
+    // VP 矩阵
+    const Matrix4x4& vp = camera->GetViewprojectionMatrix();
+
+    // 变换到 clip space
+    float clipX = x * vp.m[0][0] + y * vp.m[1][0] + z * vp.m[2][0] + w * vp.m[3][0];
+    float clipY = x * vp.m[0][1] + y * vp.m[1][1] + z * vp.m[2][1] + w * vp.m[3][1];
+    float clipZ = x * vp.m[0][2] + y * vp.m[1][2] + z * vp.m[2][2] + w * vp.m[3][2];
+    float clipW = x * vp.m[0][3] + y * vp.m[1][3] + z * vp.m[2][3] + w * vp.m[3][3];
+
+    // 透视除法
+    if (clipW != 0.0f)
+    {
+        clipX /= clipW;
+        clipY /= clipW;
+    }
+
+    // NDC (-1~1) -> 屏幕坐标
+    float screenX = (clipX * 0.5f + 0.5f) * float(WinApp::kClientWidth);
+    float screenY = (1.0f - (clipY * 0.5f + 0.5f)) * float(WinApp::kClientHeight);
+
+    return { screenX, screenY, 0.0f };
+}
+
 void GameScene::GenerateBlocks() {
     for (uint32_t y = 0; y < mapChipField_.numBlockVertical_; y++) {
         for (uint32_t x = 0; x < mapChipField_.numBlockHorizontal_; x++) {
@@ -73,7 +105,7 @@ void GameScene::Initialize() {
     playerCamera_->SetFollowSpeed(0.1f);
     playerCamera_->SetConstrainToMap(true);
 
-    LoadMap("Resources/map/map.csv", {3,3,0});
+    LoadMap("Resources/map/map.csv", { 3,3,0 });
     std::string textureFilePath[] = { "Resources/skill_icon.png", "Resources/gray.png" };
 
     skillSprite_ = new Sprite();
@@ -86,8 +118,14 @@ void GameScene::Initialize() {
     grayOverlaySprite_->SetPosition({ 50.0f, 50.0f });
     grayOverlaySprite_->SetSize({ 32.0f, 32.0f });
 
-     isMapLoading_ = false;
+    isMapLoading_ = false;
     loadingTimer_ = 0.0f;
+
+    portalHintSprite_ = new Sprite();
+    portalHintSprite_->Initialize(spriteCommon_, "Resources/letterE.png"); // 你的提示图
+    portalHintSprite_->SetPosition({ 0.0f, 0.0f }); // 初始位置，稍后动态更新
+    portalHintSprite_->SetSize({ 32.0f, 32.0f });
+    portalHintSprite_->SetVisible(false); // 默认隐藏
 }
 
 void GameScene::Update() {
@@ -138,12 +176,29 @@ void GameScene::Update() {
     for (auto& portal : portals_) {
         bool isOnPortal = (playerIndex.xIndex == portal.index.xIndex &&
             playerIndex.yIndex == portal.index.yIndex);
-        if (isOnPortal && !wasOnPortal_) {
-            StartLoadingMap(portal.targetMap, portal.targetStartPos, true);
+        if (isOnPortal) {
+            // 如果按下E键，才触发传送
+            if (input_->TriggerKey(DIK_E)) {
+                StartLoadingMap(portal.targetMap, portal.targetStartPos, true);
+            }
+            onAnyPortal = true;
+            break;
         }
-        if (isOnPortal) onAnyPortal = true;
     }
     wasOnPortal_ = onAnyPortal;
+    if (portalHintSprite_) {
+        if (onAnyPortal) {
+            portalHintSprite_->SetVisible(true);
+            Vector3 playerPos = player_->GetPosition();
+            playerPos.x -= 0.25f;
+            playerPos.y += 2.0f; // 玩家头顶偏移
+            Vector3 screenPos = WorldToScreen(playerPos, camera_);
+            portalHintSprite_->SetPosition({ screenPos.x, screenPos.y });
+        }
+        else {
+            portalHintSprite_->SetVisible(false);
+        }
+    }
     if (!nextMapToLoad_.empty()) {
         LoadMap(nextMapToLoad_, nextMapStartPos_);
         nextMapToLoad_.clear();
@@ -163,6 +218,7 @@ void GameScene::Update() {
     }
     skillSprite_->Update();
     grayOverlaySprite_->Update();
+    portalHintSprite_->Update();
     if (input_->TriggerKey(DIK_P)) {
         SoundManager::GetInstance()->Play("fanfare", false, 1.0f);
     }
@@ -221,6 +277,9 @@ void GameScene::Draw() {
     if (!player_->CanDash()) {
         grayOverlaySprite_->Draw();
     }
+    if (portalHintSprite_ && portalHintSprite_->IsVisible()) {
+        portalHintSprite_->Draw();
+    }
     // ParticleManager::GetInstance()->Draw();
     imguiManager_->Draw();
     dxCommon_->End();
@@ -245,6 +304,7 @@ void GameScene::Finalize() {
     delete imguiManager_;
     delete skillSprite_;
     delete grayOverlaySprite_;
+    delete portalHintSprite_;
 }
 
 void GameScene::StartLoadingMap(const std::string& mapPath, const Vector3& startPos, bool isPortal = false) {
@@ -283,10 +343,10 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
     // 根据当前地图更新传送门列表
     portals_.clear();
     if (mapPath == "Resources/map/map.csv") {
-        portals_.push_back({ {26,11}, "Resources/map/map2.csv", {3,3,0} });
+        portals_.push_back({ {26,11}, "Resources/map/map2.csv", mapChipField_.GetMapChipPositionByIndex(24,8) });
     }
     else if (mapPath == "Resources/map/map2.csv") {
-        portals_.push_back({ {24,8}, "Resources/map/map.csv", {3,3,0} });
+        portals_.push_back({ {24,8}, "Resources/map/map.csv", mapChipField_.GetMapChipPositionByIndex(26,11) });
     }
     wasOnPortal_ = false;
 

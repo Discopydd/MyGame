@@ -75,4 +75,5 @@ private:
 
     static constexpr float LOADING_DURATION = 1.0f; // 1秒
 
+    Sprite* portalHintSprite_ = nullptr;    // 传送提示图标精灵
 };

@@ -78,6 +78,7 @@ void Sprite::Update() {
 }
 //描画
 void Sprite::Draw() {
+	if (!isVisible_) return;
 	//VertexBufferViewを設定
 	spriteCommon->GetDxCommon()->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferView);
 	//IndexBufferViewを設定

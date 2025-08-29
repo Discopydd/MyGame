@@ -20,6 +20,7 @@ public:
     float GetDashCooldown() const { return dashCooldownTimer_; }
     float GetDashCooldownDuration() const { return dashCooldown_; }
     bool CanDash() const { return canDash_; }
+    float GetHeight() const { return height_; }
 private:
     Object3d* model_ = nullptr;
     Object3dCommon* object3dCommon_ = nullptr;
