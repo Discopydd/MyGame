@@ -65,6 +65,11 @@ private:
 
     bool isDashJumping_ = false;        // 是否在跳跃过程中冲刺
     float originalGravity_ = -0.01f;    // 原始重力值
-    float dashGravity_ = 0.0f;          // 冲刺时的重力（设置为0实现无重力效果）
+    float dashGravity_ = 0.0f;          // 冲刺时的重力（设置为0实现无重力效果） 
+
+    // Player.h
+    float headBonkTimer_ = 0.0f;                // 顶头后的短暂锁
+    static inline const float kHeadBonkLock_ = 0.05f; // 50ms，可根据手感调
+
 
 };

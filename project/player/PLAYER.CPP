@@ -1,6 +1,7 @@
 #include "Player.h"
 #include "ModelManager.h"
 #include <algorithm>
+#include <numbers>
 Player::Player() {}
 
 Player::~Player() {
@@ -33,8 +34,10 @@ void Player::Initialize(Object3dCommon* object3dCommon, Camera* camera) {
 }
 
 void Player::Update(Input* input, const MapChipField& mapChipField) {
-    const float deltaTime = 1.0f / 60.0f; // 假设60FPS
 
+    const float deltaTime = 1.0f / 60.0f; // 假设60FPS
+     // deltaTime 你的代码里目前固定 1/60，也可以传参
+    headBonkTimer_ = (std::max)(0.0f, headBonkTimer_ - deltaTime);
     // 更新冲刺状态
     if (isDashing_) {
         dashTimer_ += deltaTime;
@@ -138,17 +141,17 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
         }
     }
 
-    // 长按空格延长跳跃时间（但不增加速度）
-    if (isJumping_ && isSpacePressed && !isDashing_) {
-        jumpPressDuration_ += deltaTime;
-        jumpPressDuration_ = (std::min)(jumpPressDuration_, maxJumpPressTime_);
+     // ====== 长按续升（受顶头锁控制） ======
+    if (headBonkTimer_ <= 0.0f) {
+        if (isJumping_ && isSpacePressed && !isDashing_) {
+            jumpPressDuration_ += deltaTime;
+            jumpPressDuration_ = (std::min)(jumpPressDuration_, maxJumpPressTime_);
 
-        // 仅当按住空格且在最大时间内时，保持跳跃速度
-        if (jumpPressDuration_ < maxJumpPressTime_) {
-            velocity_.y = jumpPower_; // 保持初始跳跃速度
+            if (jumpPressDuration_ < maxJumpPressTime_) {
+                velocity_.y = jumpPower_; // 保持初始跳跃速度
+            }
         }
     }
-
 
     // 松开空格时停止蓄力
     if (isJumping_ && (!isSpacePressed || jumpPressDuration_ >= maxJumpPressTime_)) {
@@ -161,8 +164,6 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
     // 重力
     velocity_.y += gravity_;
 
-    // 临时保存下一步位置
-    position_ += velocity_;
 
     // 检测碰撞并修正位置
     HandleMapCollision(mapChipField);
@@ -185,93 +186,88 @@ void Player::Draw() {
     }
 }
 void Player::HandleMapCollision(const MapChipField& mapChipField) {
-    Vector3 prevPos = position_ - velocity_; // 上一帧位置
+    const float deltaTime = 1.0f / 60.0f; // 如果你之后传参，可以去掉
+    const float kHalfW = width_ / 2.0f;
+    const float kHalfH = height_ / 2.0f;
 
     bool onGround = false;
 
-    // --- 水平碰撞检测 (x轴) ---
+    // ---------- 先处理 X ----------
     {
-        float playerTop = prevPos.y + height_ / 2.0f;
-        float playerBottom = prevPos.y - height_ / 2.0f;
+        float nextX = position_.x + velocity_.x;
 
-        // 计算玩家下一步的左右边界
-        float nextLeft = prevPos.x + velocity_.x - width_ / 2.0f;
-        float nextRight = prevPos.x + velocity_.x + width_ / 2.0f;
+        float left   = nextX - kHalfW;
+        float right  = nextX + kHalfW;
+        float bottom = position_.y - kHalfH;
+        float top    = position_.y + kHalfH;
 
-        // 检测玩家周围的9个格子
-        for (int yOffset = -1; yOffset <= 1; ++yOffset) {
-            for (int xOffset = -1; xOffset <= 1; ++xOffset) {
-                // 检测点使用玩家当前位置
-                Vector3 checkPos = {
-                    position_.x + xOffset * MapChipField::kBlockWidth,
-                    position_.y + yOffset * MapChipField::kBlockHeight,
-                    0.0f
-                };
+        auto minIdx = mapChipField.GetMapChipIndexByPosition({ left,  bottom, 0 });
+        auto maxIdx = mapChipField.GetMapChipIndexByPosition({ right, top,    0 });
 
-                MapChipField::IndexSet index = mapChipField.GetMapChipIndexByPosition(checkPos);
-                MapChipType type = mapChipField.GetMapChipTypeByIndex(index.xIndex, index.yIndex);
-                if (type != MapChipType::kBlock) continue;
+        bool hitX = false;
+        float fixX = nextX;
 
-                MapChipField::Rect blockRect = mapChipField.GetRectByIndex(index.xIndex, index.yIndex);
+        for (uint32_t y = minIdx.yIndex; y <= maxIdx.yIndex; ++y) {
+            for (uint32_t x = minIdx.xIndex; x <= maxIdx.xIndex; ++x) {
+                if (mapChipField.GetMapChipTypeByIndex(x, y) != MapChipType::kBlock) continue;
+                auto r = mapChipField.GetRectByIndex(x, y);
 
-                // 检查是否与玩家下一步位置重叠
-                if (nextRight > blockRect.left && nextLeft < blockRect.right &&
-                    playerTop > blockRect.bottom && playerBottom < blockRect.top)
-                {
-                    if (velocity_.x > 0) { // 向右移动
-                        position_.x = blockRect.left - width_ / 2.0f;
-                        velocity_.x = 0;
-                    }
-                    else if (velocity_.x < 0) { // 向左移动
-                        position_.x = blockRect.right + width_ / 2.0f;
-                        velocity_.x = 0;
-                    }
+                bool overlapY = !(top <= r.bottom || bottom >= r.top);
+                bool overlapX = !(right <= r.left || left >= r.right);
+                if (overlapX && overlapY) {
+                    hitX = true;
+                    if (velocity_.x > 0) fixX = r.left - kHalfW;
+                    else if (velocity_.x < 0) fixX = r.right + kHalfW;
                 }
             }
         }
+
+        position_.x = hitX ? fixX : nextX;
+        if (hitX) velocity_.x = 0.0f;
     }
 
-    // --- 垂直碰撞检测 (y轴) ---
+    // ---------- 再处理 Y ----------
     {
-        float playerLeft = position_.x - width_ / 2.0f;
-        float playerRight = position_.x + width_ / 2.0f;
+        float nextY = position_.y + velocity_.y;
 
-        // 计算玩家下一步的上下边界
-        float nextBottom = prevPos.y + velocity_.y - height_ / 2.0f;
-        float nextTop = prevPos.y + velocity_.y + height_ / 2.0f;
+        float left   = position_.x - kHalfW;
+        float right  = position_.x + kHalfW;
+        float bottom = nextY - kHalfH;
+        float top    = nextY + kHalfH;
 
-        for (int yOffset = -1; yOffset <= 1; ++yOffset) {
-            for (int xOffset = -1; xOffset <= 1; ++xOffset) {
-                Vector3 checkPos = {
-                    position_.x + xOffset * MapChipField::kBlockWidth,
-                    position_.y + yOffset * MapChipField::kBlockHeight,
-                    0.0f
-                };
+        auto minIdx = mapChipField.GetMapChipIndexByPosition({ left,  bottom, 0 });
+        auto maxIdx = mapChipField.GetMapChipIndexByPosition({ right, top,    0 });
 
-                MapChipField::IndexSet index = mapChipField.GetMapChipIndexByPosition(checkPos);
-                MapChipType type = mapChipField.GetMapChipTypeByIndex(index.xIndex, index.yIndex);
-                if (type != MapChipType::kBlock) continue;
+        bool hitY = false;
+        float fixY = nextY;
 
-                MapChipField::Rect blockRect = mapChipField.GetRectByIndex(index.xIndex, index.yIndex);
+        for (uint32_t y = minIdx.yIndex; y <= maxIdx.yIndex; ++y) {
+            for (uint32_t x = minIdx.xIndex; x <= maxIdx.xIndex; ++x) {
+                if (mapChipField.GetMapChipTypeByIndex(x, y) != MapChipType::kBlock) continue;
+                auto r = mapChipField.GetRectByIndex(x, y);
 
-                // 检查是否与玩家下一步位置重叠
-                if (playerRight > blockRect.left && playerLeft < blockRect.right &&
-                    nextTop > blockRect.bottom && nextBottom < blockRect.top)
-                {
-                    if (velocity_.y > 0) { // 向上移动
-                        position_.y = blockRect.bottom - height_ / 2.0f;
+                bool overlapX = !(right <= r.left || left >= r.right);
+                bool overlapY = !(top   <= r.bottom || bottom >= r.top);
+                if (overlapX && overlapY) {
+                    hitY = true;
+                    if (velocity_.y > 0) { // 顶头
+                        fixY = r.bottom - kHalfH;
                         velocity_.y = 0;
-                    }
-                    else if (velocity_.y < 0) { // 向下移动
-                        position_.y = blockRect.top + height_ / 2.0f;
+                        isJumping_ = false;
+                        headBonkTimer_ = kHeadBonkLock_; // <<=== 关键
+                    } else if (velocity_.y < 0) { // 落地
+                        fixY = r.top + kHalfH;
                         velocity_.y = 0;
                         onGround = true;
                     }
                 }
             }
         }
+
+        position_.y = hitY ? fixY : nextY;
     }
 
     isOnGround_ = onGround;
 }
+
 
