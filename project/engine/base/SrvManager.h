@@ -28,6 +28,8 @@ public://初期化
     SrvManager& operator=(const SrvManager&) = delete;
 
     static SrvManager* GetInstance();
+
+	void Finalize();
 private:
 	DirectXCommon* directXCommon = nullptr;
 	//SRV用DescriptorSizeを取得

@@ -39,7 +39,7 @@ public:
 
 	// 色
 	const Vector4& GetColor()const { return materialData->color; }
-	void setColor(const Vector4& color) { materialData->color = color; }
+	void SetColor(const Vector4& color) { materialData->color = color; }
 
 	// アンカー
 	const Vector2& GetAnchorPoint()const { return anchorPoint_; }

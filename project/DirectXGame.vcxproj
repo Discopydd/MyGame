@@ -190,15 +190,15 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="engine\base\WinApp.cpp" />
     <ClCompile Include="engine\input\Input.cpp" />
     <ClCompile Include="engine\math\MyMath.cpp" />
-    <ClCompile Include="LoadingScene.cpp" />
     <ClCompile Include="logger\Logger.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="map\MapChipField.cpp" />
     <ClCompile Include="MyGame.cpp" />
-    <ClCompile Include="player\PLAYER.CPP" />
+    <ClCompile Include="player\Player.cpp" />
     <ClCompile Include="player\PlayerCamera.cpp" />
     <ClCompile Include="scene\Framework.cpp" />
     <ClCompile Include="scene\GameScene.cpp" />
+    <ClCompile Include="scene\LoadingScene.cpp" />
     <ClCompile Include="scene\TitleScene.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -242,7 +242,6 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="engine\math\Vector2.h" />
     <ClInclude Include="engine\math\Vector3.h" />
     <ClInclude Include="engine\math\Vector4.h" />
-    <ClInclude Include="LoadingScene.h" />
     <ClInclude Include="logger\Logger.h" />
     <ClInclude Include="map\MapChipField.h" />
     <ClInclude Include="MyGame.h" />
@@ -250,6 +249,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="player\PlayerCamera.h" />
     <ClInclude Include="scene\Framework.h" />
     <ClInclude Include="scene\GameScene.h" />
+    <ClInclude Include="scene\LoadingScene.h" />
     <ClInclude Include="scene\TitleScene.h" />
   </ItemGroup>
   <ItemGroup>

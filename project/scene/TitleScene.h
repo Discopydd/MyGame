@@ -26,6 +26,11 @@ public:
     void Finalize() override;
 
 private:
+     enum class State {
+        Idle,
+        FadingOut,
+        ShowingLoading
+    };
     WinApp* winApp_ = nullptr;
     DirectXCommon* dxCommon_ = nullptr;
     Input* input_ = nullptr;
@@ -34,4 +39,14 @@ private:
     std::vector<Sprite*> sprites_;
     Vector2 rotation_{};
 
+    bool isFadingOut_ = false;       // 是否正在淡出
+    float fadeAlpha_ = 0.0f;         // 当前淡出透明度 (0=透明,1=全黑)
+    Sprite* fadeSprite_ = nullptr;   // 用于覆盖全屏的淡出精灵
+
+    Sprite* titleSprite_ = nullptr;
+    Sprite* loadingSprite_ = nullptr;
+    bool showLoading_ = false;
+
+    State state_ = State::Idle;
+    int   loadingHoldFrames_ = 0;     // 黑幕上显示 Loading 的停留帧数
 };

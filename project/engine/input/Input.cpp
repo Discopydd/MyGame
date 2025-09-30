@@ -58,3 +58,11 @@ bool Input::TriggerKey(BYTE keyNumber)
 
     return false;
 }
+void Input::Finalize() {
+    if (keyboard) {
+        keyboard->Unacquire();
+        keyboard.Reset();
+    }
+    directInput.Reset();
+    winApp_ = nullptr;
+}

@@ -112,8 +112,20 @@ void SpriteCommon::GraphicsPipelineInitialize()
 	inputLayoutDesc.NumElements = _countof(inputElementDescs);
 	//BlendStateの設定
 	D3D12_BLEND_DESC blendDesc{};
+
+	auto& rt = blendDesc.RenderTarget[0];
 	//すべての色素要素を書き込む
 	blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+
+	// ★ 开启 Alpha 混合（前景=SrcAlpha，背景=InvSrcAlpha）
+	rt.BlendEnable = TRUE;
+	rt.SrcBlend = D3D12_BLEND_SRC_ALPHA;
+	rt.DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+	rt.BlendOp = D3D12_BLEND_OP_ADD;
+	// Alpha 通道（可用 ONE / INV_SRC_ALPHA）
+	rt.SrcBlendAlpha = D3D12_BLEND_ONE;
+	rt.DestBlendAlpha = D3D12_BLEND_INV_SRC_ALPHA;
+	rt.BlendOpAlpha = D3D12_BLEND_OP_ADD;
 	//RasiterzerStateの設定
 	D3D12_RASTERIZER_DESC rasterizerDesc{};
 	//裏面（時計回り）を表示しない

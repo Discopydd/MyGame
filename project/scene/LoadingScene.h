@@ -35,4 +35,6 @@ private:
     float progress_ = 0.0f;
     Sprite* progressBar_ = nullptr;
     Sprite* progressBackground_ = nullptr;
+
+    Sprite* blackSprite_ = nullptr;
 };

@@ -130,13 +130,15 @@
     <ClCompile Include="map\MapChipField.cpp">
       <Filter>map</Filter>
     </ClCompile>
-    <ClCompile Include="player\PLAYER.CPP">
-      <Filter>player</Filter>
-    </ClCompile>
     <ClCompile Include="player\PlayerCamera.cpp">
       <Filter>player</Filter>
     </ClCompile>
-    <ClCompile Include="LoadingScene.cpp" />
+    <ClCompile Include="player\Player.cpp">
+      <Filter>player</Filter>
+    </ClCompile>
+    <ClCompile Include="scene\LoadingScene.cpp">
+      <Filter>scene</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="engine\math\Matrix3x3.h">
@@ -283,7 +285,9 @@
     <ClInclude Include="player\PlayerCamera.h">
       <Filter>player</Filter>
     </ClInclude>
-    <ClInclude Include="LoadingScene.h" />
+    <ClInclude Include="scene\LoadingScene.h">
+      <Filter>scene</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Text Include="..\externals\imgui\LICENSE.txt" />

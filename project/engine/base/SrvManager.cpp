@@ -81,3 +81,12 @@ D3D12_GPU_DESCRIPTOR_HANDLE SrvManager::GetGPUDescriptorHandle(uint32_t index)
 	handleGPU.ptr += (descriptorSize * index);
 	return handleGPU;
 }
+
+void SrvManager::Finalize() {
+    // 释放描述符堆（这通常是活对象的根源之一）
+    descriptorHeap.Reset();
+    // 复位内部状态，避免下一次运行的“脏状态”
+    useIndex = 0;
+    descriptorSize = 0;
+    directXCommon = nullptr;
+}
