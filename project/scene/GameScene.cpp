@@ -133,16 +133,65 @@ void GameScene::Initialize() {
     fadeSprite_->SetPosition({ 0, 0 });
     fadeSprite_->SetSize({ (float)WinApp::kClientWidth, (float)WinApp::kClientHeight });
 
+    // ===== Intro 视觉元素 =====
     // 初次进入 GameScene：先黑(1.0)，加载完成后淡入
     fadeAlpha_ = 1.0f;
     fadeSprite_->SetColor({ 1,1,1,fadeAlpha_ });
     fadePhase_ = FadePhase::LoadingHold;  // 由你现有的加载流程推进到 FadingIn
+    const float W = (float)WinApp::kClientWidth;
+    const float H = (float)WinApp::kClientHeight;
+    const float barH = H * 0.25f;
+    // 电影黑边（两条黑色Sprite，从屏幕外滑入）
+    letterboxTop_ = new Sprite();
+    letterboxTop_->Initialize(spriteCommon_, "Resources/black.png");
+    letterboxTop_->SetSize({ (float)WinApp::kClientWidth, (float)WinApp::kClientHeight * 0.14f });
+    letterboxTop_->SetPosition({ 0.0f, -WinApp::kClientHeight * 0.14f }); // 起始在屏幕外
+    letterboxTop_->SetColor({ 1,1,1,0 }); // 先透明以免突兀
 
+    letterboxBottom_ = new Sprite();
+    letterboxBottom_->Initialize(spriteCommon_, "Resources/black.png");
+    letterboxBottom_->SetSize({ (float)WinApp::kClientWidth, (float)WinApp::kClientHeight * 0.14f });
+    letterboxBottom_->SetPosition({ 0.0f, (float)WinApp::kClientHeight }); // 起始在屏幕外
+    letterboxBottom_->SetColor({ 1,1,1,0 });
+
+    // 暗角（可用一张灰色或黑色贴图近似；也可后续换真正vignette贴图）
+    vignette_ = new Sprite();
+    vignette_->Initialize(spriteCommon_, "Resources/gray.png");
+    vignette_->SetSize({ (float)WinApp::kClientWidth, (float)WinApp::kClientHeight });
+    vignette_->SetPosition({ 0.0f, 0.0f });
+    vignette_->SetColor({ 1,1,1,0.0f }); // 逐步淡入
+
+    // 开场标题（可替换成你的关卡名贴图）
+    introTitle_ = new Sprite();
+    introTitle_->Initialize(spriteCommon_, "Resources/GameTitle.png");
+    introTitle_->SetPosition({ 0.0f, WinApp::kClientHeight * 0.15f });
+    introTitle_->SetColor({ 1,1,1,0 }); // 先透明
+
+    // Skip 提示
+    skipHint_ = new Sprite();
+    skipHint_->Initialize(spriteCommon_, "Resources/Start.png"); // 先复用Start.png字样
+    skipHint_->SetPosition({ 0.0f, WinApp::kClientHeight * 0.42f });
+    skipHint_->SetColor({ 1,1,1,0 });
+    skipHint_->SetVisible(false);
 }
 
 void GameScene::Update() {
     const float deltaTime = 1.0f / 60.0f;
-// ===== 画面淡入淡出状态机（优先执行）=====
+    input_->Update();
+    // ===== Intro 驱动（在加载/淡出等早退之前执行，但不盖过Loading）=====
+    if (fadePhase_ == FadePhase::None) {
+        UpdateIntro_(deltaTime);
+        // 在 Intro 未完成时屏蔽输入与地图交互（仅渲染）
+        if (introState_ != IntroState::Done) {
+            // 更新必要的可见元素
+            if (letterboxTop_) letterboxTop_->Update();
+            if (letterboxBottom_) letterboxBottom_->Update();
+            if (vignette_) vignette_->Update();
+            if (introTitle_) introTitle_->Update();
+            if (skipHint_) skipHint_->Update();
+        }
+    }
+    // ===== 画面淡入淡出状态机（优先执行）=====
     if (fadePhase_ == FadePhase::FadingOut) {
         fadeAlpha_ += fadeSpeed_;
         if (fadeAlpha_ > 1.0f) fadeAlpha_ = 1.0f;
@@ -161,8 +210,8 @@ void GameScene::Update() {
         }
     }
 
-// 在本帧后段会处理 FadingIn（如下）
-   if (shouldStartLoading_) {
+    // 在本帧后段会处理 FadingIn（如下）
+    if (shouldStartLoading_) {
         shouldStartLoading_ = false;
         StartLoadingMap("Resources/map/map.csv", { 3,3,0 }, false);
         return; // 本帧先显示 LoadingScene
@@ -179,6 +228,9 @@ void GameScene::Update() {
             LoadMap("Resources/map/map.csv", { 3,3,0 });
 
             fadePhase_ = FadePhase::FadingIn;
+            if (!introStarted_) {
+                StartIntro_();
+            }
         }
         if (fadeSprite_) fadeSprite_->Update();
         return;
@@ -194,18 +246,26 @@ void GameScene::Update() {
             // 真正加载地图
             LoadMap(portalMapPath_, portalStartPos_);
             fadePhase_ = FadePhase::FadingIn;
+            if (!introStarted_) {
+                StartIntro_();
+            }
         }
         if (fadeSprite_) fadeSprite_->Update();
         return;
     }
     camera_->Update();
     imguiManager_->Begin();
-    input_->Update();
 
     for (auto* block : mapBlocks_) {
         block->Update();
     }
-    player_->Update(input_, mapChipField_);
+    // 玩家在 Intro 期间不可操作
+    if (introState_ != IntroState::Done) {
+        player_->Update(nullptr, mapChipField_);  // 不处理输入
+    }
+    else {
+        player_->Update(input_, mapChipField_);
+    }
     playerCamera_->Update();
     MapChipField::IndexSet playerIndex = mapChipField_.GetMapChipIndexByPosition(player_->GetPosition());
 
@@ -271,12 +331,17 @@ void GameScene::Update() {
         if (fadeAlpha_ < 0.0f) {
             fadeAlpha_ = 0.0f;
             fadePhase_ = FadePhase::None; // 淡入完成
+            // ★ 淡入完成→启动开场演出
+            if (!introStarted_) {
+                StartIntro_();
+            }
         }
         if (fadeSprite_) {
             fadeSprite_->SetColor({ 1,1,1,fadeAlpha_ });
-            fadeSprite_->Update();             // ★新增
+            fadeSprite_->Update();
         }
     }
+
 #ifdef USE_IMGUI
     ImGui::Begin("Scene Controller");
 
@@ -334,6 +399,9 @@ void GameScene::Draw() {
     if (portalHintSprite_ && portalHintSprite_->IsVisible()) {
         portalHintSprite_->Draw();
     }
+    // ===== Intro 覆盖绘制（电影黑边、暗角、标题、Skip）=====
+    DrawIntro_();
+
     // 叠加绘制黑幕（位于最上层）
     if (fadeSprite_) {
         fadeSprite_->Draw();
@@ -364,6 +432,11 @@ void GameScene::Finalize() {
     delete grayOverlaySprite_;
     delete portalHintSprite_;
     if (fadeSprite_) { delete fadeSprite_; fadeSprite_ = nullptr; }
+    delete letterboxTop_;    letterboxTop_ = nullptr;
+    delete letterboxBottom_; letterboxBottom_ = nullptr;
+    delete vignette_;        vignette_ = nullptr;
+    delete introTitle_;      introTitle_ = nullptr;
+    delete skipHint_;        skipHint_ = nullptr;
 
 }
 
@@ -414,4 +487,164 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
     for (auto* block : mapBlocks_) block->Update();
     playerCamera_->Update();
     camera_->Update();
+}
+void GameScene::StartIntro_() {
+    introStarted_ = true;
+    introState_ = IntroState::BarsIn;
+    introT_ = 0.0f;
+
+    // 以玩家当前位置为环绕中心
+    camPivot_ = player_->GetPosition();
+
+    // 提前把相机拉到远景位（不会突变，因为刚好淡入完成）
+    //camera_->SetTranslate(camStartPos_ + camPivot_);
+
+    // 初值
+    camOrbitDeg_ = -25.0f;      // 从-25度侧面开始
+    shakeTime_ = 0.0f;
+    shakeAmp_  = 0.0f;
+
+    // 让黑边立即可见
+    if (letterboxTop_)    letterboxTop_->SetColor({1,1,1,1});
+    if (letterboxBottom_) letterboxBottom_->SetColor({1,1,1,1});
+    if (vignette_)        vignette_->SetColor({1,1,1,0});
+    if (introTitle_)      introTitle_->SetColor({1,1,1,0});
+    if (skipHint_)        { skipHint_->SetColor({1,1,1,0}); skipHint_->SetVisible(false); }
+}
+
+void GameScene::UpdateIntro_(float dt) {
+    if (introState_ == IntroState::None || introState_ == IntroState::Done) return;
+
+    // 跳过
+    if (introSkippable_ && input_ && (input_->TriggerKey(DIK_SPACE) || input_->TriggerKey(DIK_RETURN) || input_->TriggerKey(DIK_E))) {
+        introState_ = IntroState::BarsOut;
+        introT_ = 0.0f;
+        shakeTime_ = 0.0f;
+        shakeAmp_ = 0.0f;
+    }
+
+    introT_ += dt;
+
+    switch (introState_) {
+    case IntroState::BarsIn: {
+        // 黑边 0.6s 内滑入
+        float d = (std::min)(introT_ / 0.35f, 1.0f);
+        d = EaseOutCubic_(d);
+        const float H = (float)WinApp::kClientHeight;
+        const float barH = H * 0.25f;
+
+        // 显式给出起点与终点（无需假设锚点）
+        const float topStart = -barH;     // 顶部条从屏幕上方外侧进入
+        const float topEnd = 0.0f;      // 进入后贴紧顶部（y=0）
+
+        const float botStart = H;         // 底部条从屏幕下方外侧进入
+        const float botEnd = H - barH;  // 进入后贴紧底部
+
+        const float topY = topStart + (topEnd - topStart) * d;
+        const float botY = botStart + (botEnd - botStart) * d;
+
+        if (letterboxTop_)    letterboxTop_->SetPosition({ 0.0f, topY });
+        if (letterboxTop_)    letterboxTop_->SetSize({ (float)WinApp::kClientWidth,  barH });
+        if (letterboxBottom_) letterboxBottom_->SetPosition({ 0.0f, botY });
+        if (letterboxBottom_) letterboxBottom_->SetSize({ (float)WinApp::kClientWidth,  barH });
+        // 暗角淡入到 0.25
+        if (vignette_) vignette_->SetColor({ 1,1,1, 0.25f * d });
+
+        if (introT_ >= 0.7f) { introState_ = IntroState::OrbitZoom; introT_ = 0.0f; }
+        break;
+    }
+    case IntroState::OrbitZoom: {
+        // 1.8s 环绕+推进
+        float d = (std::min)(introT_ / 1.0f, 1.0f);
+        float e = EaseInOutSine_(d);
+
+
+        // 标题在中后段淡入
+        if (introTitle_) {
+            float titleAlpha = std::clamp((d - 0.35f) / 0.35f, 0.0f, 1.0f);
+            introTitle_->SetColor({1,1,1, titleAlpha});
+        }
+
+        // Skip 提示闪烁
+        if (skipHint_) {
+            skipHint_->SetVisible(true);
+            float blink = (sinf(introT_ * 6.0f) * 0.5f + 0.5f) * 0.85f; // 0~0.85
+            skipHint_->SetColor({1,1,1, blink});
+        }
+
+        if (introT_ >= 1.8f) { introState_ = IntroState::TitleShow; introT_ = 0.0f; }
+        break;
+    }
+    case IntroState::TitleShow: {
+        // 0.9s 标题停留，暗角稍加强到 0.35
+        float d = (std::min)(introT_ / 0.5f, 1.0f);
+        if (vignette_) vignette_->SetColor({1,1,1, 0.25f + 0.10f * d});
+
+        // 轻微二段震动
+        if (introT_ < 0.2f) { shakeTime_ = 0.2f; shakeAmp_ = 0.12f; }
+
+        if (introT_ >= 0.9f) { introState_ = IntroState::BarsOut; introT_ = 0.0f; }
+        break;
+    }
+    case IntroState::BarsOut: {
+        float d = (std::min)(introT_ / 0.3f, 1.0f);
+        d = EaseOutCubic_(d);
+
+        const float H = (float)WinApp::kClientHeight;
+        const float barH = H * 0.25f;
+
+        // 顶部：从 on-screen(0) → off-screen(-barH)
+        const float topStart = 0.0f;
+        const float topEnd = -barH;
+
+        // 底部：从 on-screen(H - barH) → off-screen(H)
+        const float botStart = H - barH;
+        const float botEnd = H;
+
+        const float topY = topStart + (topEnd - topStart) * d;
+        const float botY = botStart + (botEnd - botStart) * d;
+
+        if (letterboxTop_)    letterboxTop_->SetPosition({ 0.0f, topY });
+        if (letterboxTop_)    letterboxTop_->SetSize({ (float)WinApp::kClientWidth,  barH });
+        if (letterboxBottom_) letterboxBottom_->SetPosition({ 0.0f, botY });
+        if (letterboxBottom_) letterboxBottom_->SetSize({ (float)WinApp::kClientWidth,  barH });
+        if (vignette_)   vignette_->SetColor({ 1,1,1, (1.0f - d) * 0.35f });
+        if (introTitle_) introTitle_->SetColor({ 1,1,1, (1.0f - d) });
+        if (skipHint_)   skipHint_->SetColor({ 1,1,1, (1.0f - d) });
+
+        if (introT_ >= 0.5f) { introState_ = IntroState::Done; introT_ = 0.0f; }
+        break;
+    }
+    default: break;
+    }
+
+    // 更新摇镜计时
+    if (shakeTime_ > 0.0f) {
+        shakeTime_ -= dt;
+        if (shakeTime_ < 0.0f) shakeTime_ = 0.0f;
+    }
+}
+
+void GameScene::DrawIntro_() {
+    if (introState_ == IntroState::None || !spriteCommon_) return;
+
+    spriteCommon_->CommonDraw();
+
+     //标题与暗角
+    if (vignette_)        vignette_->Draw();
+    if (introTitle_)      introTitle_->Draw();
+     // 黑边
+    if (letterboxTop_)    letterboxTop_->Draw();
+    if (letterboxBottom_) letterboxBottom_->Draw();
+    // Skip 提示
+    //if (skipHint_ && skipHint_->IsVisible()) skipHint_->Draw();
+}
+
+void GameScene::ApplyScreenShake_(Vector3& camPos) {
+    if (shakeTime_ <= 0.0f || shakeAmp_ <= 0.0f) return;
+    // 简单伪随机噪声（帧相干）
+    float nx = sinf(introT_ * 47.0f) * 0.5f + sinf(introT_ * 91.0f) * 0.5f;
+    float ny = cosf(introT_ * 37.0f) * 0.5f + cosf(introT_ * 73.0f) * 0.5f;
+    camPos.x += nx * shakeAmp_;
+    camPos.y += ny * shakeAmp_ * 0.6f;
 }

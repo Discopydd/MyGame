@@ -78,16 +78,53 @@ private:
     Sprite* portalHintSprite_ = nullptr;    // 传送提示图标精灵
 
     // ===== 画面淡入淡出 =====
-enum class FadePhase { None, FadingOut, LoadingHold, FadingIn };
-FadePhase fadePhase_ = FadePhase::None;
+    enum class FadePhase { None, FadingOut, LoadingHold, FadingIn };
+    FadePhase fadePhase_ = FadePhase::None;
 
-Sprite* fadeSprite_ = nullptr;   // 全屏黑幕
-float   fadeAlpha_  = 0.0f;      // 0透明 -> 1全黑
-float   fadeSpeed_  = 0.04f;     // 淡速（可调）
+    Sprite* fadeSprite_ = nullptr;   // 全屏黑幕
+    float   fadeAlpha_ = 0.0f;      // 0透明 -> 1全黑
+    float   fadeSpeed_ = 0.04f;     // 淡速（可调）
 
-// 传送门触发：等待到黑后再开始加载
-bool        pendingPortalLoad_ = false;
-std::string pendingPortalMapPath_;
-Vector3     pendingPortalStartPos_;
+    // 传送门触发：等待到黑后再开始加载
+    bool        pendingPortalLoad_ = false;
+    std::string pendingPortalMapPath_;
+    Vector3     pendingPortalStartPos_;
+
+
+
+    // ====== Intro (开场演出) ======
+    enum class IntroState { None, BarsIn, OrbitZoom, TitleShow, BarsOut, Done };
+    IntroState introState_ = IntroState::None;
+    float      introT_ = 0.0f;          // 当前阶段计时
+    bool       introSkippable_ = true;  // 允许按键跳过
+    bool       introStarted_ = false;   // 防止重复启动
+
+    // 电影黑边&UI
+    Sprite* letterboxTop_ = nullptr;
+    Sprite* letterboxBottom_ = nullptr;
+    Sprite* vignette_ = nullptr;        // 暗角
+    Sprite* introTitle_ = nullptr;      // 开场大字
+    Sprite* skipHint_ = nullptr;        // "Press Any Key to Skip"
+
+    // 相机演出参数
+    Vector3 camStartPos_{ 0, 12, -85 };   // 初始远景
+    Vector3 camTargetPos_{ 0,  8, -38 };  // 结束近景
+    Vector3 camPivot_{ 0, 0, 0 };         // 围绕的中心(稍后以玩家位置为基准设定)
+    float   camOrbitDeg_ = 0.0f;          // 环绕角度
+
+    // 屏幕震动
+    float shakeTime_ = 0.0f;
+    float shakeAmp_ = 0.0f;
+    void  ApplyScreenShake_(Vector3& camPos);
+
+    // Easing
+    float EaseOutCubic_(float t) { return 1.0f - powf(1.0f - t, 3.0f); }
+    float EaseInOutSine_(float t) { return 0.5f * (1.0f - cosf(3.1415926f * t)); }
+
+    // Intro 驱动
+    void StartIntro_();
+    void UpdateIntro_(float dt);
+    void DrawIntro_();
+
 
 };

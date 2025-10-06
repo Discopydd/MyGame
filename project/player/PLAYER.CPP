@@ -38,6 +38,14 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
     const float deltaTime = 1.0f / 60.0f; // 假设60FPS
      // deltaTime 你的代码里目前固定 1/60，也可以传参
     headBonkTimer_ = (std::max)(0.0f, headBonkTimer_ - deltaTime);
+    if (input == nullptr) {
+        // 如果没有输入（Intro 等阶段），只处理物理、重力与模型更新
+        velocity_.y += gravity_;
+        HandleMapCollision(mapChipField);
+        model_->SetTranslate(position_);
+        model_->Update();
+        return;
+    }
     // 更新冲刺状态
     if (isDashing_) {
         dashTimer_ += deltaTime;
