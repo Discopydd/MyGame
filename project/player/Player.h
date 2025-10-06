@@ -21,6 +21,8 @@ public:
     float GetDashCooldownDuration() const { return dashCooldown_; }
     bool CanDash() const { return canDash_; }
     float GetHeight() const { return height_; }
+
+    void ResetForMapTransition(bool keepFacing = true);
 private:
     Object3d* model_ = nullptr;
     Object3dCommon* object3dCommon_ = nullptr;

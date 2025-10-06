@@ -178,6 +178,10 @@ void GameScene::Initialize() {
 void GameScene::Update() {
     const float deltaTime = 1.0f / 60.0f;
     input_->Update();
+    // —— 是否允许玩家操作（淡出/加载/淡入期间 & 开场演出期间都禁止）——
+    const bool isFading = (fadePhase_ != FadePhase::None);
+    const bool inIntro = (introStarted_ && introState_ != IntroState::Done);
+    const bool canControl = !(isFading || inIntro);
     // ===== Intro 驱动（在加载/淡出等早退之前执行，但不盖过Loading）=====
     if (fadePhase_ == FadePhase::None) {
         UpdateIntro_(deltaTime);
@@ -228,8 +232,15 @@ void GameScene::Update() {
             LoadMap("Resources/map/map.csv", { 3,3,0 });
 
             fadePhase_ = FadePhase::FadingIn;
-            if (!introStarted_) {
-                StartIntro_();
+            if (playIntroOnThisMap_ && !introStarted_) {
+                StartIntro_();             // 播放完整演出
+                playIntroOnThisMap_ = false; // 播放完重置
+            }
+            if (player_) {
+                player_->ResetForMapTransition(true);
+            }
+            if (input_) {
+                input_->ResetAllKeys();
             }
         }
         if (fadeSprite_) fadeSprite_->Update();
@@ -249,6 +260,12 @@ void GameScene::Update() {
             if (!introStarted_) {
                 StartIntro_();
             }
+            if (player_) {
+                player_->ResetForMapTransition(true);
+            }
+            if (input_) {
+                input_->ResetAllKeys();
+            }
         }
         if (fadeSprite_) fadeSprite_->Update();
         return;
@@ -259,13 +276,9 @@ void GameScene::Update() {
     for (auto* block : mapBlocks_) {
         block->Update();
     }
-    // 玩家在 Intro 期间不可操作
-    if (introState_ != IntroState::Done) {
-        player_->Update(nullptr, mapChipField_);  // 不处理输入
-    }
-    else {
-        player_->Update(input_, mapChipField_);
-    }
+    // 淡入淡出/加载/演出期间都不可操作
+    player_->Update(canControl ? input_ : nullptr, mapChipField_);
+
     playerCamera_->Update();
     MapChipField::IndexSet playerIndex = mapChipField_.GetMapChipIndexByPosition(player_->GetPosition());
 
@@ -275,7 +288,7 @@ void GameScene::Update() {
             playerIndex.yIndex == portal.index.yIndex);
         if (isOnPortal) {
             // 如果按下E键，才触发传送
-            if (input_->TriggerKey(DIK_E)) {
+            if (canControl && input_->TriggerKey(DIK_E)) {
                 pendingPortalMapPath_ = portal.targetMap;
                 pendingPortalStartPos_ = portal.targetStartPos;
                 pendingPortalLoad_ = true;
@@ -290,7 +303,7 @@ void GameScene::Update() {
     }
     wasOnPortal_ = onAnyPortal;
     if (portalHintSprite_) {
-        if (onAnyPortal) {
+        if (onAnyPortal && canControl) {
             portalHintSprite_->SetVisible(true);
             Vector3 playerPos = player_->GetPosition();
             playerPos.x -= 0.25f;
@@ -466,10 +479,18 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
 
     mapChipField_.LoadMapChipCsv(mapPath);
     GenerateBlocks();
-
+     // --- 判断是否播放演出 ---
+    if (mapPath == "Resources/map/map.csv" || mapPath == "Resources/map/map2.csv") {
+        playIntroOnThisMap_ = true;
+        // 重置 Intro 状态
+        introStarted_ = false;
+        introState_ = IntroState::None;
+    } else {
+        playIntroOnThisMap_ = false;
+    }
     // 设置玩家起点
     player_->SetPosition(startPos);
-
+    player_->ResetForMapTransition(true);
     // 相机同步
     camera_->SetTranslate(startPos + Vector3{ 0,0,-40 });
     playerCamera_->SetMapBounds(mapChipField_.GetMapMinPosition(), mapChipField_.GetMapMaxPosition());
@@ -489,6 +510,10 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
     camera_->Update();
 }
 void GameScene::StartIntro_() {
+    if (player_) {
+        player_->ResetForMapTransition(true);  // 停止移动、跳跃、冲刺等
+    }
+    if (input_) input_->ResetAllKeys();
     introStarted_ = true;
     introState_ = IntroState::BarsIn;
     introT_ = 0.0f;
@@ -562,14 +587,14 @@ void GameScene::UpdateIntro_(float dt) {
         // 标题在中后段淡入
         if (introTitle_) {
             float titleAlpha = std::clamp((d - 0.35f) / 0.35f, 0.0f, 1.0f);
-            introTitle_->SetColor({1,1,1, titleAlpha});
+            introTitle_->SetColor({ 1,1,1, titleAlpha });
         }
 
         // Skip 提示闪烁
         if (skipHint_) {
             skipHint_->SetVisible(true);
             float blink = (sinf(introT_ * 6.0f) * 0.5f + 0.5f) * 0.85f; // 0~0.85
-            skipHint_->SetColor({1,1,1, blink});
+            skipHint_->SetColor({ 1,1,1, blink });
         }
 
         if (introT_ >= 1.8f) { introState_ = IntroState::TitleShow; introT_ = 0.0f; }

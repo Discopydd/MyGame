@@ -126,5 +126,7 @@ private:
     void UpdateIntro_(float dt);
     void DrawIntro_();
 
+    // 是否需要播放开场演出
+    bool playIntroOnThisMap_ = false;
 
 };

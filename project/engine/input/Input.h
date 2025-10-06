@@ -22,6 +22,7 @@ public:
 	bool TriggerKey(BYTE keyNumber);
 
 	void Finalize();
+	void ResetAllKeys();
 private:
 	ComPtr<IDirectInputDevice8> keyboard;
 	ComPtr<IDirectInput8> directInput;

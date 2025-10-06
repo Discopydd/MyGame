@@ -66,3 +66,7 @@ void Input::Finalize() {
     directInput.Reset();
     winApp_ = nullptr;
 }
+void Input::ResetAllKeys() {
+    memset(key,    0, sizeof(key));
+    memset(keyPre, 0, sizeof(keyPre));
+}

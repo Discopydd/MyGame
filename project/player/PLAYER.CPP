@@ -278,4 +278,25 @@ void Player::HandleMapCollision(const MapChipField& mapChipField) {
     isOnGround_ = onGround;
 }
 
+void Player::ResetForMapTransition(bool keepFacing) {
+    // 清零速度 & 动作
+    velocity_ = { 0, 0, 0 };
+    isJumping_ = false;
+    wasSpacePressed_ = false;
+    jumpPressDuration_ = 0.0f;
+    isOnGround_ = false;
+    headBonkTimer_ = 0.0f;
+
+    // 冲刺状态复位
+    isDashing_ = false;
+    isDashJumping_ = false;
+    dashTimer_ = 0.0f;
+    dashCooldownTimer_ = 0.0f;  // 过图后冷却清零；若想保留冷却可去掉这行
+    canDash_ = true;
+
+    // 重力恢复
+    gravity_ = originalGravity_;
+}
+
+
 
