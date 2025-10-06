@@ -44,7 +44,7 @@ AdjustWindowRect(&wrc, WS_OVERLAPPEDWINDOW, false);
 
 hwnd = CreateWindow(
     wc.lpszClassName,
-    L"Engine",
+    L"ポータル・リープ",
     WS_OVERLAPPEDWINDOW,
     CW_USEDEFAULT,
     CW_USEDEFAULT,

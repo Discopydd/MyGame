@@ -105,7 +105,7 @@ void GameScene::Initialize() {
     playerCamera_->SetFollowSpeed(0.1f);
     playerCamera_->SetConstrainToMap(true);
 
-    LoadMap("Resources/map/map.csv", { 3,3,0 });
+    //LoadMap("Resources/map/map.csv", { 3,3,0 });
     std::string textureFilePath[] = { "Resources/skill_icon.png", "Resources/gray.png" };
 
     skillSprite_ = new Sprite();
@@ -126,11 +126,43 @@ void GameScene::Initialize() {
     portalHintSprite_->SetPosition({ 0.0f, 0.0f }); // 初始位置，稍后动态更新
     portalHintSprite_->SetSize({ 32.0f, 32.0f });
     portalHintSprite_->SetVisible(false); // 默认隐藏
+
+    // ===== 全屏黑幕由 GameScene 统一管理 =====
+    fadeSprite_ = new Sprite();
+    fadeSprite_->Initialize(spriteCommon_, "Resources/black.png");
+    fadeSprite_->SetPosition({ 0, 0 });
+    fadeSprite_->SetSize({ (float)WinApp::kClientWidth, (float)WinApp::kClientHeight });
+
+    // 初次进入 GameScene：先黑(1.0)，加载完成后淡入
+    fadeAlpha_ = 1.0f;
+    fadeSprite_->SetColor({ 1,1,1,fadeAlpha_ });
+    fadePhase_ = FadePhase::LoadingHold;  // 由你现有的加载流程推进到 FadingIn
+
 }
 
 void GameScene::Update() {
     const float deltaTime = 1.0f / 60.0f;
-    if (shouldStartLoading_) {
+// ===== 画面淡入淡出状态机（优先执行）=====
+    if (fadePhase_ == FadePhase::FadingOut) {
+        fadeAlpha_ += fadeSpeed_;
+        if (fadeAlpha_ > 1.0f) fadeAlpha_ = 1.0f;
+        if (fadeSprite_) {
+            fadeSprite_->SetColor({ 1,1,1,fadeAlpha_ });
+            fadeSprite_->Update();             // ★新增
+        }
+
+        if (fadeAlpha_ >= 1.0f) {
+            // 到全黑：如果是传送门触发，正式开始加载
+            if (pendingPortalLoad_) {
+                pendingPortalLoad_ = false;
+                StartLoadingMap(pendingPortalMapPath_, pendingPortalStartPos_, true);
+            }
+            fadePhase_ = FadePhase::LoadingHold; // 进入“加载中”阶段
+        }
+    }
+
+// 在本帧后段会处理 FadingIn（如下）
+   if (shouldStartLoading_) {
         shouldStartLoading_ = false;
         StartLoadingMap("Resources/map/map.csv", { 3,3,0 }, false);
         return; // 本帧先显示 LoadingScene
@@ -145,7 +177,10 @@ void GameScene::Update() {
 
             // 真正加载地图
             LoadMap("Resources/map/map.csv", { 3,3,0 });
+
+            fadePhase_ = FadePhase::FadingIn;
         }
+        if (fadeSprite_) fadeSprite_->Update();
         return;
     }
 
@@ -158,7 +193,9 @@ void GameScene::Update() {
 
             // 真正加载地图
             LoadMap(portalMapPath_, portalStartPos_);
+            fadePhase_ = FadePhase::FadingIn;
         }
+        if (fadeSprite_) fadeSprite_->Update();
         return;
     }
     camera_->Update();
@@ -179,7 +216,13 @@ void GameScene::Update() {
         if (isOnPortal) {
             // 如果按下E键，才触发传送
             if (input_->TriggerKey(DIK_E)) {
-                StartLoadingMap(portal.targetMap, portal.targetStartPos, true);
+                pendingPortalMapPath_ = portal.targetMap;
+                pendingPortalStartPos_ = portal.targetStartPos;
+                pendingPortalLoad_ = true;
+
+                // 开始淡出到全黑
+                fadePhase_ = FadePhase::FadingOut;
+
             }
             onAnyPortal = true;
             break;
@@ -222,7 +265,18 @@ void GameScene::Update() {
     if (input_->TriggerKey(DIK_P)) {
         SoundManager::GetInstance()->Play("fanfare", false, 1.0f);
     }
-
+    // ===== FadingIn：从全黑淡入 =====
+    if (fadePhase_ == FadePhase::FadingIn) {
+        fadeAlpha_ -= fadeSpeed_;
+        if (fadeAlpha_ < 0.0f) {
+            fadeAlpha_ = 0.0f;
+            fadePhase_ = FadePhase::None; // 淡入完成
+        }
+        if (fadeSprite_) {
+            fadeSprite_->SetColor({ 1,1,1,fadeAlpha_ });
+            fadeSprite_->Update();             // ★新增
+        }
+    }
 #ifdef USE_IMGUI
     ImGui::Begin("Scene Controller");
 
@@ -280,6 +334,10 @@ void GameScene::Draw() {
     if (portalHintSprite_ && portalHintSprite_->IsVisible()) {
         portalHintSprite_->Draw();
     }
+    // 叠加绘制黑幕（位于最上层）
+    if (fadeSprite_) {
+        fadeSprite_->Draw();
+    }
     // ParticleManager::GetInstance()->Draw();
     imguiManager_->Draw();
     dxCommon_->End();
@@ -305,6 +363,8 @@ void GameScene::Finalize() {
     delete skillSprite_;
     delete grayOverlaySprite_;
     delete portalHintSprite_;
+    if (fadeSprite_) { delete fadeSprite_; fadeSprite_ = nullptr; }
+
 }
 
 void GameScene::StartLoadingMap(const std::string& mapPath, const Vector3& startPos, bool isPortal = false) {

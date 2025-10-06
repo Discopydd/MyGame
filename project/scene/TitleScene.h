@@ -26,7 +26,7 @@ public:
     void Finalize() override;
 
 private:
-     enum class State {
+    enum class State {
         Idle,
         FadingOut,
         ShowingLoading
@@ -45,8 +45,20 @@ private:
 
     Sprite* titleSprite_ = nullptr;
     Sprite* loadingSprite_ = nullptr;
+    Sprite* startSprite_ = nullptr;
     bool showLoading_ = false;
 
     State state_ = State::Idle;
     int   loadingHoldFrames_ = 0;     // 黑幕上显示 Loading 的停留帧数
+
+    // --- Title drop & bounce (tuned) ---
+    float titleY_ = -260.0f;  // 起始更高一点，入场更明显
+    float titleTargetY_ = 0.0f;    // 着陆位置
+    float titleVy_ = 0.0f;
+    float titleGravity_ = 0.90f;    // 重力稍小，弹跳节奏更柔
+    float titleBounce_ = 0.72f;    // 弹性更大 → 弹跳次数更多
+    float titleStopEps_ = 0.35f;    // 终止阈值更小 → 不会太早停
+    bool  titleSettled_ = false;
+
+    float frameCount_ = 0;
 };

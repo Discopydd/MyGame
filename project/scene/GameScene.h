@@ -76,4 +76,18 @@ private:
     static constexpr float LOADING_DURATION = 1.0f; // 1秒
 
     Sprite* portalHintSprite_ = nullptr;    // 传送提示图标精灵
+
+    // ===== 画面淡入淡出 =====
+enum class FadePhase { None, FadingOut, LoadingHold, FadingIn };
+FadePhase fadePhase_ = FadePhase::None;
+
+Sprite* fadeSprite_ = nullptr;   // 全屏黑幕
+float   fadeAlpha_  = 0.0f;      // 0透明 -> 1全黑
+float   fadeSpeed_  = 0.04f;     // 淡速（可调）
+
+// 传送门触发：等待到黑后再开始加载
+bool        pendingPortalLoad_ = false;
+std::string pendingPortalMapPath_;
+Vector3     pendingPortalStartPos_;
+
 };
