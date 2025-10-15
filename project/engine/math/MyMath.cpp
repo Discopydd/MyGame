@@ -274,6 +274,16 @@ namespace Math {
 
         return result;
     }
+    Vector3 Math::TransformCoordLocal(const Vector3& v, const Matrix4x4& m)
+    {
+        // 当作 (x,y,z,1) * m
+        float x = v.x * m.m[0][0] + v.y * m.m[1][0] + v.z * m.m[2][0] + 1.0f * m.m[3][0];
+        float y = v.x * m.m[0][1] + v.y * m.m[1][1] + v.z * m.m[2][1] + 1.0f * m.m[3][1];
+        float z = v.x * m.m[0][2] + v.y * m.m[1][2] + v.z * m.m[2][2] + 1.0f * m.m[3][2];
+        float w = v.x * m.m[0][3] + v.y * m.m[1][3] + v.z * m.m[2][3] + 1.0f * m.m[3][3];
+        if (w != 0.0f) { x /= w; y /= w; z /= w; }
+        return { x, y, z };
+    }
 
     Matrix4x4 Math::MakePerspectiveFovMatrix(float fovY, float aspectRatio, float nearClip, float farClip) {
        	Matrix4x4 perspectiveMatrix;

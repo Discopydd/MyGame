@@ -33,6 +33,18 @@ Vector3 WorldToScreen(const Vector3& worldPos, Camera* camera)
 
     return { screenX, screenY, 0.0f };
 }
+// 将屏幕像素坐标(x,y)映射到世界坐标，ndcZ∈[0,1]：0=近裁剪面, 1=远裁剪面
+static Vector3 ScreenToWorld(float screenX, float screenY, float ndcZ, Camera* camera)
+{
+    const Matrix4x4& vp = camera->GetViewprojectionMatrix();
+    Matrix4x4 invVP = Math::Inverse(vp); // 需要你项目里的矩阵求逆函数
+
+    float ndcX = (screenX / float(WinApp::kClientWidth)) * 2.0f - 1.0f;
+    float ndcY = -(screenY / float(WinApp::kClientHeight)) * 2.0f + 1.0f; // 注意Y翻转
+
+    Vector3 world = Math::TransformCoordLocal(Vector3{ ndcX, ndcY, ndcZ }, invVP);
+    return world;
+}
 
 void GameScene::GenerateBlocks() {
     for (uint32_t y = 0; y < mapChipField_.numBlockVertical_; y++) {
@@ -94,7 +106,17 @@ void GameScene::Initialize() {
     ModelManager::GetInstants()->LoadModel("cube/cube.obj");
     ModelManager::GetInstants()->LoadModel("player/player.obj");
     ModelManager::GetInstants()->LoadModel("door/Door.obj");
-
+    ModelManager::GetInstants()->LoadModel("strip/strip.obj");        // 载入模型
+    hpStrips_.reserve(hpSegments_);
+    for (int i = 0; i < hpSegments_; ++i) {
+        auto* seg = new Object3d();
+        seg->Initialize(object3dCommon_);
+        seg->SetModel("strip/strip.obj");
+        seg->SetCamera(camera_);
+        // 体感缩放：根据你的 strip 模型大小微调
+        seg->SetScale({ 0.001f, 0.001f, 0.001f });
+        hpStrips_.push_back(seg);
+    }
     player_ = new Player();
     player_->Initialize(object3dCommon_, camera_);
 
@@ -110,12 +132,12 @@ void GameScene::Initialize() {
 
     skillSprite_ = new Sprite();
     skillSprite_->Initialize(spriteCommon_, textureFilePath[0]);
-    skillSprite_->SetPosition({ 50.0f, 50.0f }); // 左上角
+    skillSprite_->SetPosition({ 40.0f, 80.0f }); // 左上角
     skillSprite_->SetSize({ 32.0f, 32.0f });
 
     grayOverlaySprite_ = new Sprite();
     grayOverlaySprite_->Initialize(spriteCommon_, textureFilePath[1]);
-    grayOverlaySprite_->SetPosition({ 50.0f, 50.0f });
+    grayOverlaySprite_->SetPosition({ 40.0f, 80.0f });
     grayOverlaySprite_->SetSize({ 32.0f, 32.0f });
 
     isMapLoading_ = false;
@@ -173,6 +195,8 @@ void GameScene::Initialize() {
     skipHint_->SetPosition({ 0.0f, WinApp::kClientHeight * 0.42f });
     skipHint_->SetColor({ 1,1,1,0 });
     skipHint_->SetVisible(false);
+
+
 }
 
 void GameScene::Update() {
@@ -270,16 +294,38 @@ void GameScene::Update() {
         if (fadeSprite_) fadeSprite_->Update();
         return;
     }
-    camera_->Update();
     imguiManager_->Begin();
-
-    for (auto* block : mapBlocks_) {
-        block->Update();
-    }
     // 淡入淡出/加载/演出期间都不可操作
     player_->Update(canControl ? input_ : nullptr, mapChipField_);
 
     playerCamera_->Update();
+    camera_->Update();
+
+
+    float hpRatio = 1.0f;
+    hpVisibleCount_ = (int)std::ceil(hpRatio * hpSegments_);
+    hpVisibleCount_ = (std::max)(0, (std::min)(hpVisibleCount_, hpSegments_));
+
+    // ===== 屏幕基点（左上向内偏移） =====
+    const float pad = 16.0f;
+    float baseX = pad + hpInsetX_;
+    float baseY = pad + hpInsetY_;
+
+    // ===== 给每一段计算屏幕坐标 → 反投到世界 → Update =====
+    for (int i = 0; i < hpSegments_; ++i) {
+        float sx = baseX + i * (hpSegPixelW_ + hpGapPixel_);
+        float sy = baseY;
+        Vector3 world = ScreenToWorld(sx, sy, hpNdcZ_, camera_);
+        hpStrips_[i]->SetTranslate(world);
+
+        // 可选：轻微缩放衰减/高亮首段等，这里先保持一致
+        // 可选：若你的 Object3d 支持朝向/关闭剔除，可在此设置
+        hpStrips_[i]->Update();
+    }
+    for (auto* block : mapBlocks_) {
+        block->Update();
+    }
+
     MapChipField::IndexSet playerIndex = mapChipField_.GetMapChipIndexByPosition(player_->GetPosition());
 
     bool onAnyPortal = false;
@@ -403,7 +449,11 @@ void GameScene::Draw() {
     for (auto* block : mapBlocks_) {
         block->Draw();
     }
-     player_->Draw();
+    for (int i = 0; i < hpVisibleCount_; ++i) {
+        hpStrips_[i]->Draw();
+    }
+
+    player_->Draw();
     spriteCommon_->CommonDraw();
     skillSprite_->Draw();
     if (!player_->CanDash()) {
@@ -450,7 +500,8 @@ void GameScene::Finalize() {
     delete vignette_;        vignette_ = nullptr;
     delete introTitle_;      introTitle_ = nullptr;
     delete skipHint_;        skipHint_ = nullptr;
-
+    for (auto* seg : hpStrips_) delete seg;
+    hpStrips_.clear();
 }
 
 void GameScene::StartLoadingMap(const std::string& mapPath, const Vector3& startPos, bool isPortal = false) {

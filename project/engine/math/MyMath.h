@@ -41,6 +41,6 @@ namespace Math {
 
 	Vector3 Subtract(const Vector3& v1, const Vector3& v2);
 	Vector3 Multiply(const Vector3& vec, float scalar);
-
+	Vector3 TransformCoordLocal(const Vector3& v, const Matrix4x4& m);
 
 }
