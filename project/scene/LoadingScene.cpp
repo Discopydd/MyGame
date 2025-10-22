@@ -12,12 +12,6 @@ void LoadingScene::Initialize() {
 
     auto* tm = TextureManager::GetInstance();
     tm->Initialize(dxCommon_, srvManager_);
-    TextureManager::GetInstance()->LoadTexture("Resources/loading.png");
-
-    loadingSprite_ = new Sprite();
-    loadingSprite_->Initialize(spriteCommon_, "Resources/loading.png");
-    loadingSprite_->SetPosition({ 0,0 });
-    loadingSprite_->SetSize({ (float)WinApp::kClientWidth, (float)WinApp::kClientHeight });
 
     TextureManager::GetInstance()->LoadTexture("Resources/black.png");
 
@@ -29,16 +23,11 @@ void LoadingScene::Initialize() {
 
     TextureManager::GetInstance()->LoadTexture(spinnerTexPath_.c_str());
 
-    CreateSpinner_();;
+    CreateSpinner_();
 }
 
 void LoadingScene::Update() {
-    if (showDelayFrames_ > 0) {
-        --showDelayFrames_;  // 递减延迟计数
-    }
-
     blackSprite_->Update();
-    loadingSprite_->Update();
      // ===== Spinner 角度推进（按60fps估算；若你有全局deltaTime请替换）=====
     const float dt = 1.0f / 60.0f;
     spinnerHeadAngle_ += spinnerSpeed_ * dt;
@@ -49,9 +38,10 @@ void LoadingScene::Update() {
         return a;
     };
 
-    // 屏幕中心
-    const float cx = WinApp::kClientWidth  * 0.5f;
-    const float cy = WinApp::kClientHeight * 0.5f;
+    // 屏幕右下
+    const float pad = 24.0f; // 边距可调
+    const float cx = WinApp::kClientWidth  - pad - spinnerRadius_;
+    const float cy = WinApp::kClientHeight - pad - spinnerRadius_;
 
     for (int i = 0; i < (int)spinnerDots_.size(); ++i) {
         float baseAngle = (6.2831852f * i) / (float)spinnerCount_;
@@ -79,15 +69,13 @@ void LoadingScene::Draw() {
     if (blackSprite_) {
         blackSprite_->Draw();
     }
-    if (showDelayFrames_ <= 0) {
-        for (auto* dot : spinnerDots_) dot->Draw();
-    }
+    for (auto* dot : spinnerDots_) dot->Draw();
+   
 
     dxCommon_->End();
 }
 
 void LoadingScene::Finalize() {
-    delete loadingSprite_;
     delete blackSprite_;
     delete spriteCommon_;
     for (auto* s : spinnerDots_) delete s;
@@ -96,12 +84,15 @@ void LoadingScene::Finalize() {
 
 void LoadingScene::CreateSpinner_() {
     spinnerDots_.reserve(spinnerCount_);
+    const float pad = 24.0f;
+    const float cx = WinApp::kClientWidth  - pad - spinnerRadius_;
+    const float cy = WinApp::kClientHeight - pad - spinnerRadius_;
     for (int i = 0; i < spinnerCount_; ++i) {
         auto* s = new Sprite();
         s->Initialize(spriteCommon_, spinnerTexPath_.c_str());
         s->SetSize({ spinnerSize_, spinnerSize_ });
         // 先放到屏幕中心，Update时会被覆盖为圆周位置
-        s->SetPosition({ WinApp::kClientWidth * 0.5f, WinApp::kClientHeight * 0.5f });
+        s->SetPosition({ cx, cy });
         s->SetColor({ 1, 1, 1, spinnerMinAlpha_ });
         spinnerDots_.push_back(s);
     }

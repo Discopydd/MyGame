@@ -76,16 +76,20 @@ void TitleScene::Update() {
         fadeAlpha_ += 0.02f; // 控制淡出速度
         if (fadeAlpha_ >= 1.0f) {
             fadeAlpha_ = 1.0f;
-            //叠加通用 LoadingScene（白点转圈由它负责）
-            if (!overlayPushed_) {
+            if (!reachedBlack_) {
+                reachedBlack_ = true;
+                blackHoldFrames_ = 1;        // 先纯黑停 1 帧（你也可以 2~3 帧）
+                break;                       // 本帧先不叠加 Loading
+            }
+            if (blackHoldFrames_ > 0) {      // 消耗黑屏保留帧
+                --blackHoldFrames_;
+                break;
+            }
+            if (!overlayPushed_) {           // 现在才叠加 Loading
                 sceneManager_->SetOverlayScene(new LoadingScene());
                 overlayPushed_ = true;
             }
-
-            //请求切到 GameScene（真正的资源加载在 GameScene 内进行）
             sceneManager_->SetNextScene(new GameScene());
-
-            // 关键：不再让 Title 进入本地 ShowingLoading；直接交给 SceneManager 切场景
             return;
         }
         break;

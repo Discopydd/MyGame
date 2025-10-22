@@ -59,4 +59,7 @@ private:
     float frameCount_ = 0;
 
     bool overlayPushed_ = false;
+
+    bool reachedBlack_ = false;
+    int  blackHoldFrames_ = 0;
 };

@@ -221,21 +221,49 @@ void GameScene::Update() {
     }
     // ===== 画面淡入淡出状态机（优先执行）=====
     if (fadePhase_ == FadePhase::FadingOut) {
+        // 渐黑
         fadeAlpha_ += fadeSpeed_;
         if (fadeAlpha_ > 1.0f) fadeAlpha_ = 1.0f;
+
         if (fadeSprite_) {
-            fadeSprite_->SetColor({ 1,1,1,fadeAlpha_ });
-            fadeSprite_->Update();             // ★新增
+            // 确保黑幕可见并更新颜色
+            fadeSprite_->SetVisible(true);
+            fadeSprite_->SetColor({ 1.0f, 1.0f, 1.0f, fadeAlpha_ });
+            fadeSprite_->Update();
         }
 
+        // 到达纯黑：本帧先不切场景，先停一帧纯黑（与 Title 同步）
         if (fadeAlpha_ >= 1.0f) {
-            // 到全黑：如果是传送门触发，正式开始加载
+            if (!reachedBlack_) {
+                reachedBlack_ = true;
+                blackHoldFrames_ = 1;   // 纯黑保留1帧（可调为2~3）
+                return;                 // 本帧结束，保证能看到完整纯黑
+            }
+            if (blackHoldFrames_ > 0) {
+                --blackHoldFrames_;     // 消耗纯黑保留帧
+                return;
+            }
+
+            // 保留帧结束 → 叠加 Loading 叠层（仅一次）
+            if (!overlayPushed_) {
+                if (sceneManager_) {
+                    sceneManager_->SetOverlayScene(new LoadingScene());
+                }
+                overlayPushed_ = true;
+            }
+
+            // 如为传送门触发，则在此刻真正开始加载（已经保证出现过完整纯黑）
             if (pendingPortalLoad_) {
                 pendingPortalLoad_ = false;
                 StartLoadingMap(pendingPortalMapPath_, pendingPortalStartPos_, true);
             }
-            fadePhase_ = FadePhase::LoadingHold; // 进入“加载中”阶段
+
+            // 进入 LoadingHold 等待加载完成
+            fadePhase_ = FadePhase::LoadingHold;
+            return;
         }
+
+        return; // 仍在变黑过程中
     }
 
     // 在本帧后段会处理 FadingIn（如下）
@@ -339,9 +367,16 @@ void GameScene::Update() {
                 pendingPortalStartPos_ = portal.targetStartPos;
                 pendingPortalLoad_ = true;
 
+                fadeAlpha_ = 0.0f;
+                reachedBlack_ = false;
+                blackHoldFrames_ = 0;
+                overlayPushed_ = false;
                 // 开始淡出到全黑
                 fadePhase_ = FadePhase::FadingOut;
-
+                if (fadeSprite_) {
+                    fadeSprite_->SetVisible(true);
+                    fadeSprite_->SetColor({ 1,1,1,fadeAlpha_ });
+                }
             }
             onAnyPortal = true;
             break;

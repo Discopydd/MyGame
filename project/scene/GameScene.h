@@ -131,11 +131,15 @@ private:
 
     // ===== HP 3D条段 =====
     std::vector<Object3d*> hpStrips_;
-    int   hpSegments_      = 10;     // 总段数（10格血）
-    int   hpVisibleCount_  = 10;     // 本帧可见段数（随HP变化）
-    float hpInsetX_        = 40.0f;  // 屏幕左侧内边距（像素）
-    float hpInsetY_        = 50.0f; // 屏幕上侧内边距（像素）→数值越大越靠下
-    float hpSegPixelW_     = 45.0f;  // 每段在屏幕横向占用（像素）
-    float hpGapPixel_      = 4.0f;   // 段间距（像素）
-    float hpNdcZ_          = 0.08f;  // 贴近相机，避免被遮挡s
+    int   hpSegments_ = 10;     // 总段数（10格血）
+    int   hpVisibleCount_ = 10;     // 本帧可见段数（随HP变化）
+    float hpInsetX_ = 40.0f;  // 屏幕左侧内边距（像素）
+    float hpInsetY_ = 50.0f; // 屏幕上侧内边距（像素）→数值越大越靠下
+    float hpSegPixelW_ = 45.0f;  // 每段在屏幕横向占用（像素）
+    float hpGapPixel_ = 4.0f;   // 段间距（像素）
+    float hpNdcZ_ = 0.08f;  // 贴近相机，避免被遮挡s
+
+    bool overlayPushed_ = false;  // 是否已叠加 LoadingScene
+    bool reachedBlack_ = false;  // 是否已达到纯黑（刚到1.0的那一帧）
+    int  blackHoldFrames_ = 0;    // 纯黑保留帧数
 };
