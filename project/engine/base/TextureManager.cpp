@@ -15,13 +15,20 @@ TextureManager* TextureManager::GetInstance() {
 }
 //終了
 void TextureManager::Finalize() {
-	delete instance;
-	instance = nullptr;
+	if (!instance) return;
+    instance->textureDatas.clear();
+    instance->initialized_ = false;
+    delete instance;
+    instance = nullptr;
 }
 //初期化
 void TextureManager::Initialize(DirectXCommon*dxCommon, SrvManager* srvManager) {
+	if (initialized_) {
+		return;
+	}
 	dxCommon_ = dxCommon;
 	srvManager_ = srvManager;
+	initialized_ = true;
 }
 //テクスチャファイルの読み込み
 void TextureManager::LoadTexture(const std::string& filePath) {

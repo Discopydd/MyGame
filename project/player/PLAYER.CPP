@@ -36,6 +36,11 @@ void Player::Initialize(Object3dCommon* object3dCommon, Camera* camera) {
 void Player::Update(Input* input, const MapChipField& mapChipField) {
 
     const float deltaTime = 1.0f / 60.0f; // 假设60FPS
+        // --- 每秒逐渐扣血 ---
+    if (hpDrainPerSec_ > 0.0f && hp_ > 0.0f) {
+        hp_ -= hpDrainPerSec_ * deltaTime;
+        if (hp_ < 0.0f) hp_ = 0.0f;
+    }
      // deltaTime 你的代码里目前固定 1/60，也可以传参
     headBonkTimer_ = (std::max)(0.0f, headBonkTimer_ - deltaTime);
     if (input == nullptr) {

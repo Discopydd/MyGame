@@ -57,6 +57,11 @@ void ImGuiManager::Draw() {
 #ifdef USE_IMGUI
 	ID3D12GraphicsCommandList* commandList = directXCommon_->GetCommandList().Get();
 
+    ImDrawData* dd = ImGui::GetDrawData();
+    // 关键判空/判尺寸/判命令条数 — 没数据就直接跳过，避免崩溃
+    if (dd == nullptr || dd->CmdListsCount == 0 || dd->DisplaySize.x <= 0.0f || dd->DisplaySize.y <= 0.0f) {
+        return;
+    }
 	//デスクリプタヒープの配列をセットするコマンド
 	srvmanager_->PreDraw();
 	//描画コマンドを発行

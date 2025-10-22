@@ -13,6 +13,8 @@ private:
 
 	static TextureManager* instance;
 
+
+	 bool initialized_ = false;
 	TextureManager() = default;
 	~TextureManager() = default;
 	TextureManager(TextureManager&) = default;

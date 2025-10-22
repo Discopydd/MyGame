@@ -23,6 +23,15 @@ public:
     float GetHeight() const { return height_; }
 
     void ResetForMapTransition(bool keepFacing = true);
+
+    // --- HP APIs ---
+    float  GetHpRatio()   const { return maxHP_ > 0 ? hp_ / (float)maxHP_ : 0.0f; }
+    float  GetHP()        const { return hp_; }
+    int    GetMaxHP()     const { return maxHP_; }
+    void   SetHpDrainPerSec(float v) { hpDrainPerSec_ = (std::max)(0.0f, v); }
+    void   TakeDamage(float v) { hp_ = (std::max)(0.0f, hp_ - v); }
+    void   Heal(float v) { hp_ = (std::min)(hp_ + v, (float)maxHP_); }
+
 private:
     Object3d* model_ = nullptr;
     Object3dCommon* object3dCommon_ = nullptr;
@@ -73,5 +82,9 @@ private:
     float headBonkTimer_ = 0.0f;                // 顶头后的短暂锁
     static inline const float kHeadBonkLock_ = 0.05f; // 50ms，可根据手感调
 
+    // --- HP members ---
+    int   maxHP_ = 100;
+    float hp_ = 100.0f;
+    float hpDrainPerSec_ = 5.0f;   // 每秒扣 5 点，按需调整
 
 };

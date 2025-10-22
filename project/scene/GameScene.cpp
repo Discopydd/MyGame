@@ -250,11 +250,9 @@ void GameScene::Update() {
         if (loadingTimer_ >= LOADING_DURATION) {
             isMapLoading_ = false;
 
-            if (sceneManager_) sceneManager_->ClearOverlayScene();
-
             // 真正加载地图
             LoadMap("Resources/map/map.csv", { 3,3,0 });
-
+            if (sceneManager_) sceneManager_->ClearOverlayScene();
             fadePhase_ = FadePhase::FadingIn;
             if (playIntroOnThisMap_ && !introStarted_) {
                 StartIntro_();             // 播放完整演出
@@ -276,10 +274,11 @@ void GameScene::Update() {
         portalLoadingTimer_ += deltaTime;
         if (portalLoadingTimer_ >= LOADING_DURATION) {
             isPortalLoading_ = false;
-            if (sceneManager_) sceneManager_->ClearOverlayScene();
+            
 
             // 真正加载地图
             LoadMap(portalMapPath_, portalStartPos_);
+            if (sceneManager_) sceneManager_->ClearOverlayScene();
             fadePhase_ = FadePhase::FadingIn;
             if (!introStarted_) {
                 StartIntro_();
@@ -302,9 +301,10 @@ void GameScene::Update() {
     camera_->Update();
 
 
-    float hpRatio = 1.0f;
+    float hpRatio = player_ ? player_->GetHpRatio() : 1.0f;
     hpVisibleCount_ = (int)std::ceil(hpRatio * hpSegments_);
     hpVisibleCount_ = (std::max)(0, (std::min)(hpVisibleCount_, hpSegments_));
+
 
     // ===== 屏幕基点（左上向内偏移） =====
     const float pad = 16.0f;

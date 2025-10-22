@@ -137,5 +137,5 @@ private:
     float hpInsetY_        = 50.0f; // 屏幕上侧内边距（像素）→数值越大越靠下
     float hpSegPixelW_     = 45.0f;  // 每段在屏幕横向占用（像素）
     float hpGapPixel_      = 4.0f;   // 段间距（像素）
-    float hpNdcZ_          = 0.08f;  // 贴近相机，避免被遮挡
+    float hpNdcZ_          = 0.08f;  // 贴近相机，避免被遮挡s
 };

@@ -1,6 +1,7 @@
 #include "TitleScene.h"
 #include "SceneManager.h"
 #include "scene/GameScene.h"
+#include "scene/LoadingScene.h"
 void TitleScene::Initialize() {
     winApp_ = WinApp::GetInstance();
     dxCommon_ = DirectXCommon::GetInstance();
@@ -28,16 +29,8 @@ void TitleScene::Initialize() {
     fadeSprite_->SetColor({ 1.0f, 1.0f, 1.0f, 0.0f });
     fadeSprite_->SetVisible(false);
 
-    TextureManager::GetInstance()->LoadTexture("Resources/loading.png");
-    loadingSprite_ = new Sprite();
-    loadingSprite_->Initialize(spriteCommon_, "Resources/loading.png");
-    loadingSprite_->SetPosition({ 0.0f, 0.0f });
-    loadingSprite_->SetSize({ (float)WinApp::kClientWidth, (float)WinApp::kClientHeight });
-    loadingSprite_->SetVisible(false);
-
     state_ = State::Idle;
     fadeAlpha_ = 0.0f;
-    loadingHoldFrames_ = 0;
 }
 
 void TitleScene::Update() {
@@ -83,22 +76,17 @@ void TitleScene::Update() {
         fadeAlpha_ += 0.02f; // 控制淡出速度
         if (fadeAlpha_ >= 1.0f) {
             fadeAlpha_ = 1.0f;
-            // 进入“黑屏+Loading”阶段，先停留一段时间以确保能看到 Loading
-            state_ = State::ShowingLoading;
-            loadingHoldFrames_ = 30; // 约0.5秒@60fps，可自行调整或改成异步准备信号
-            if (loadingSprite_) loadingSprite_->SetVisible(true);
-        }
-        break;
+            //叠加通用 LoadingScene（白点转圈由它负责）
+            if (!overlayPushed_) {
+                sceneManager_->SetOverlayScene(new LoadingScene());
+                overlayPushed_ = true;
+            }
 
-    case State::ShowingLoading:
-        // 这里你也可以触发资源加载或预创建 GameScene
-        // 为简单起见，停留一定帧后再切场景
-        if (loadingHoldFrames_ > 0) {
-            --loadingHoldFrames_;
-        }
-        else {
-            BaseScene* next = new GameScene();
-            sceneManager_->SetNextScene(next);
+            //请求切到 GameScene（真正的资源加载在 GameScene 内进行）
+            sceneManager_->SetNextScene(new GameScene());
+
+            // 关键：不再让 Title 进入本地 ShowingLoading；直接交给 SceneManager 切场景
+            return;
         }
         break;
     }
@@ -108,7 +96,6 @@ void TitleScene::Update() {
     startSprite_->Update();
     fadeSprite_->SetColor({ 1.0f, 1.0f, 1.0f, fadeAlpha_ });
     fadeSprite_->Update();
-    loadingSprite_->Update();
 }
 
 void TitleScene::Draw() {
@@ -128,22 +115,16 @@ void TitleScene::Draw() {
         fadeSprite_->Draw();
     }
 
-    // 3) 在“黑屏期间”画 Loading（要在黑幕之后画，才能显示在黑上面）
-    if (state_ == State::ShowingLoading && loadingSprite_) {
-        loadingSprite_->Draw();
-    }
-
     dxCommon_->End();
 }
 
 void TitleScene::Finalize() {
     // 若 TextureManager 作为全局单例供后续场景继续使用，建议不要在这里 Finalize
-    TextureManager::GetInstance()->Finalize();
+    //TextureManager::GetInstance()->Finalize();
 
     delete spriteCommon_;  spriteCommon_ = nullptr;
     delete titleSprite_;   titleSprite_ = nullptr;
     delete fadeSprite_;    fadeSprite_ = nullptr;
-    delete loadingSprite_; loadingSprite_ = nullptr;
     delete startSprite_;   startSprite_ = nullptr;
 }
 

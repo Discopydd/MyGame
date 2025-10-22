@@ -29,7 +29,6 @@ private:
     enum class State {
         Idle,
         FadingOut,
-        ShowingLoading
     };
     WinApp* winApp_ = nullptr;
     DirectXCommon* dxCommon_ = nullptr;
@@ -44,12 +43,9 @@ private:
     Sprite* fadeSprite_ = nullptr;   // 用于覆盖全屏的淡出精灵
 
     Sprite* titleSprite_ = nullptr;
-    Sprite* loadingSprite_ = nullptr;
     Sprite* startSprite_ = nullptr;
-    bool showLoading_ = false;
 
     State state_ = State::Idle;
-    int   loadingHoldFrames_ = 0;     // 黑幕上显示 Loading 的停留帧数
 
     // --- Title drop & bounce (tuned) ---
     float titleY_ = -260.0f;  // 起始更高一点，入场更明显
@@ -61,4 +57,6 @@ private:
     bool  titleSettled_ = false;
 
     float frameCount_ = 0;
+
+    bool overlayPushed_ = false;
 };
