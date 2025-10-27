@@ -79,13 +79,26 @@ Vector3 MapChipField::GetMapChipPositionByIndex(uint32_t xIndex, uint32_t yIndex
         0.0f
     ); }
 
-MapChipField::IndexSet MapChipField::GetMapChipIndexByPosition(const Vector3& position)const
-{
-   IndexSet indexSet{};
-    indexSet.xIndex = static_cast<uint32_t>(position.x / kBlockWidth);
-    indexSet.yIndex = static_cast<uint32_t>(position.y / kBlockHeight);
-    return indexSet;
+MapChipField::IndexSet MapChipField::GetMapChipIndexByPosition(const Vector3& position) const {
+    IndexSet idx{};
+
+    // 以格子左下为 0 开始的网格索引：先 floor，再夹到范围内
+    int xi = static_cast<int>(std::floor(position.x / kBlockWidth));
+    int yi = static_cast<int>(std::floor(position.y / kBlockHeight));
+
+    if (numBlockHorizontal_ == 0 || numBlockVertical_ == 0) {
+        idx.xIndex = 0; idx.yIndex = 0; 
+        return idx; // 空地图保护
+    }
+
+    xi = (std::max)(0, (std::min)(xi, static_cast<int>(numBlockHorizontal_ - 1)));
+    yi = (std::max)(0, (std::min)(yi, static_cast<int>(numBlockVertical_  - 1)));
+
+    idx.xIndex = static_cast<uint32_t>(xi);
+    idx.yIndex = static_cast<uint32_t>(yi);
+    return idx;
 }
+
 
 MapChipField::Rect MapChipField::GetRectByIndex(uint32_t xIndex, uint32_t yIndex)const
 {

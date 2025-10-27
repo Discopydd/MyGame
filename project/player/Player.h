@@ -2,6 +2,7 @@
 #include "Object3d.h"
 #include "Input.h"
 #include "map/MapChipField.h"
+
 class Player {
 public:
     Player();
@@ -40,51 +41,60 @@ private:
     Vector3 position_ = { 0, 0, 0 };
     Vector3 velocity_ = { 0, 0, 0 };
 
-    float moveSpeed_ = 0.1f;
-    float jumpPower_ = 0.25f;       // 基础跳跃高度
-    float maxJumpPower_ = 0.5f;     // 长按最大跳跃高度
-    float gravity_ = -0.01f;
-    bool isOnGround_ = false;
-    bool isJumping_ = false;        // 是否正在蓄力跳跃
-    bool wasSpacePressed_ = false;  // 上一帧空格键是否按下
-    float jumpPressDuration_ = 0.0f; // 空格键按下的持续时间（秒）
-    const float maxJumpPressTime_ = 0.5f; // 长按空格的最大有效时间（秒）
+    // ===== Movement =====
+    float moveSpeed_ = 0.25f;
 
-    enum class LRDirection {
-        kRight,//右
-        kLeft,//左
-    };
+    // ===== Jump tuning =====
+    // 起跳瞬间给一次“初速度”；长按在限定时窗内给予少量“向上加速度”，并对上升速度设上限
+    float jumpVelInit_      = 0.56f;   // 起跳初速度
+    float jumpVelMax_       = 1.05f;   // 上升速度上限
+    float jumpHoldAccel_    = 2.15f;   // 长按时的额外向上加速度（单位：世界单位/秒^2）
+    float maxJumpHoldTime_  = 0.18f;   // 长按生效的最大时长（秒）
+    bool  isOnGround_       = false;
+    bool  isJumping_        = false;   // “可控上升”阶段（在 hold 窗口内且还在上升）
+    float jumpPressDuration_ = 0.0f;   // 已长按时长（秒）
+
+    // 可变重力：让“早松手/下落”更利落
+    float gravityBase_           = -2.20f; // 基础重力（向下为负）
+    float lowJumpGravityScale_   = 1.60f;  // 早松手仍在上升时的额外下拉倍率
+    float fallGravityScale_      = 2.20f;  // 下落期的额外下拉倍率
+
+    // 朝向 / 转身
+    enum class LRDirection { kRight, kLeft };
     LRDirection lrDirection_ = LRDirection::kRight;
     float turnStartRotationY_ = 0;
     float turnTargetRotationY_ = 0;
-    int turnCurrentFrame_ = 0;
+    int   turnCurrentFrame_ = 0;
     const int turnTotalFrames_ = 10;
     float currentRotationY_ = 0.0f;
 
-    float width_ = 1.5f;    // 玩家碰撞宽度（假设为1单位）
-    float height_ = 1.5f;   // 玩家碰撞高度（假设为2单位）
+    // 碰撞体积
+    float width_ = 1.5f;
+    float height_ = 1.5f;
 
-    bool isDashing_ = false;          // 是否正在冲刺
-    float dashSpeedMultiplier_ = 2.0f; // 冲刺速度倍率
-    float dashDuration_ = 0.5f;        // 冲刺持续时间（秒）
-    float dashTimer_ = 0.0f;           // 冲刺计时器
-    float dashCooldown_ = 1.5;        // 冲刺冷却时间（秒）
-    float dashCooldownTimer_ = 0.0f;   // 冷却计时器
-    bool canDash_ = true;              // 是否可以冲刺
-    const float dashCooldownThreshold_ = 0.1f; // 冷却完成阈值
-    Vector3 dashDirection_ = { 1, 0, 0 }; // 冲刺方向（默认为向右）
+    // ===== Dash =====
+    bool  isDashing_ = false;
+    float dashSpeedMultiplier_ = 2.0f;
+    float dashDuration_ = 0.22f;      // 秒
+    float dashTimer_ = 0.0f;
+    float dashCooldown_ = 1.5f;      // 秒
+    float dashCooldownTimer_ = 0.0f;
+    bool  canDash_ = true;
+    const float dashCooldownThreshold_ = 0.1f;
+    Vector3 dashDirection_ = { 1, 0, 0 };
 
-    bool isDashJumping_ = false;        // 是否在跳跃过程中冲刺
-    float originalGravity_ = -0.01f;    // 原始重力值
-    float dashGravity_ = 0.0f;          // 冲刺时的重力（设置为0实现无重力效果） 
+    bool  isDashJumping_ = false;       // 空中冲刺：无重力漂移
+    float dashGravity_ = 0.0f;          // 仅用于保持兼容（Update 内以 isDashJumping_ 控制 g=0）
 
-    // Player.h
-    float headBonkTimer_ = 0.0f;                // 顶头后的短暂锁
-    static inline const float kHeadBonkLock_ = 0.05f; // 50ms，可根据手感调
+    // 顶头后的短锁
+    float headBonkTimer_ = 0.0f;
+    static inline const float kHeadBonkLock_ = 0.05f;
 
     // --- HP members ---
     int   maxHP_ = 100;
     float hp_ = 100.0f;
-    float hpDrainPerSec_ = 5.0f;   // 每秒扣 5 点，按需调整
+    float hpDrainPerSec_ = 5.0f;   // 每秒扣 5 点
 
+    // 兼容旧接口（现在不再直接使用外部“每帧重力值”，但保留复位逻辑）
+    float originalGravity_ = -2.20f; // 与 gravityBase_ 对齐
 };

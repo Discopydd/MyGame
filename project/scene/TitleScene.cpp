@@ -58,7 +58,7 @@ void TitleScene::Update() {
         Vector2 pos = { 0.0f, titleY_ };
         titleSprite_->SetPosition(pos);
     }
-    float blinkSpeed = 0.05f; // 数值越小闪烁越慢
+    float blinkSpeed = 0.10f; // 数值越小闪烁越慢
     float alpha = (std::sin(frameCount_ * blinkSpeed) * 0.5f + 0.5f); // 0~1波动
     startSprite_->SetColor({ 1.0f, 1.0f, 1.0f, alpha });
     switch (state_) {
@@ -73,7 +73,7 @@ void TitleScene::Update() {
 
     case State::FadingOut:
         // 递增透明度
-        fadeAlpha_ += 0.02f; // 控制淡出速度
+        fadeAlpha_ += 0.04f; // 控制淡出速度
         if (fadeAlpha_ >= 1.0f) {
             fadeAlpha_ = 1.0f;
             if (!reachedBlack_) {

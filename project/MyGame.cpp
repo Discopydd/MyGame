@@ -7,11 +7,11 @@ void MyGame::Initialize() {
 
 void MyGame::Update() {
     Framework::Update();
-    sceneManager_->Update();
+    //sceneManager_->Update();
 }
 
 void MyGame::Draw() {
-    sceneManager_->Draw();
+    Framework::Draw();
 }
 
 void MyGame::Finalize() {

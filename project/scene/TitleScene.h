@@ -51,7 +51,7 @@ private:
     float titleY_ = -260.0f;  // 起始更高一点，入场更明显
     float titleTargetY_ = 0.0f;    // 着陆位置
     float titleVy_ = 0.0f;
-    float titleGravity_ = 0.90f;    // 重力稍小，弹跳节奏更柔
+    float titleGravity_ = 3.6f;    // 重力稍小，弹跳节奏更柔
     float titleBounce_ = 0.72f;    // 弹性更大 → 弹跳次数更多
     float titleStopEps_ = 0.35f;    // 终止阈值更小 → 不会太早停
     bool  titleSettled_ = false;

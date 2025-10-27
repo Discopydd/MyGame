@@ -2,6 +2,8 @@
 #include "ModelManager.h"
 #include <algorithm>
 #include <numbers>
+#include <cmath>
+
 Player::Player() {}
 
 Player::~Player() {
@@ -20,55 +22,65 @@ void Player::Initialize(Object3dCommon* object3dCommon, Camera* camera) {
     model_->SetModel("player/player.obj");
     model_->SetCamera(camera_);
 
-    position_ = {-10, 0, 0};
-    velocity_ = {0, 0, 0};
+    position_ = { -10, 0, 0 };
+    velocity_ = { 0, 0, 0 };
 
+    // Dash 初始状态
     isDashing_ = false;
     dashTimer_ = 0.0f;
     dashCooldownTimer_ = 0.0f;
     canDash_ = true;
-    dashDirection_ = {1, 0, 0};
+    dashDirection_ = { 1, 0, 0 };
 
-    originalGravity_ = gravity_;
+    // 让“旧的 originalGravity_”与当前新参数对齐
+    originalGravity_ = gravityBase_;
     dashGravity_ = 0.0f;
 }
 
 void Player::Update(Input* input, const MapChipField& mapChipField) {
+    const float deltaTime = 1.0f / 60.0f; // 先按 60FPS 固定，后续可外部传参
 
-    const float deltaTime = 1.0f / 60.0f; // 假设60FPS
-        // --- 每秒逐渐扣血 ---
+    // --- HP 每秒递减 ---
     if (hpDrainPerSec_ > 0.0f && hp_ > 0.0f) {
         hp_ -= hpDrainPerSec_ * deltaTime;
         if (hp_ < 0.0f) hp_ = 0.0f;
     }
-     // deltaTime 你的代码里目前固定 1/60，也可以传参
+
+    // 顶头短暂锁
     headBonkTimer_ = (std::max)(0.0f, headBonkTimer_ - deltaTime);
+
+    // ========== 无输入（如 Intro）时：只做物理 ==========
     if (input == nullptr) {
-        // 如果没有输入（Intro 等阶段），只处理物理、重力与模型更新
-        velocity_.y += gravity_;
+        // 仅根据“可变重力”推进
+        float g = gravityBase_;
+        if (!isOnGround_ && velocity_.y <= 0.0f) {
+            g *= fallGravityScale_;
+        }
+        if (isDashJumping_) g = 0.0f;
+
+        velocity_.y += g * deltaTime;
+
         HandleMapCollision(mapChipField);
         model_->SetTranslate(position_);
         model_->Update();
         return;
     }
-    // 更新冲刺状态
+
+    // ========= Dash 状态刷新 =========
     if (isDashing_) {
         dashTimer_ += deltaTime;
-
-        // 冲刺结束
         if (dashTimer_ >= dashDuration_) {
             isDashing_ = false;
             dashTimer_ = 0.0f;
             dashCooldownTimer_ = dashCooldown_;
             canDash_ = false;
+
+            // 结束空中冲刺，恢复正常重力控制
             if (isDashJumping_) {
-                gravity_ = originalGravity_;
                 isDashJumping_ = false;
             }
         }
     }
-
-    // 更新冷却时间
     if (!canDash_) {
         dashCooldownTimer_ -= deltaTime;
         if (dashCooldownTimer_ <= dashCooldownThreshold_) {
@@ -77,32 +89,27 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
         }
     }
 
-    // 检测冲刺按键（左Shift）
+    // 触发冲刺（左 Shift）
     if (input->TriggerKey(DIK_LSHIFT) && canDash_ && !isDashing_) {
         isDashing_ = true;
         dashTimer_ = 0.0f;
         dashCooldownTimer_ = dashCooldown_;
+
         // 确定冲刺方向
-        if (lrDirection_ == LRDirection::kRight) {
-            dashDirection_ = { 1, 0, 0 }; // 向右
-        }
-        else {
-            dashDirection_ = { -1, 0, 0 }; // 向左
-        }
-        // 如果在跳跃过程中冲刺
+        if (lrDirection_ == LRDirection::kRight)  dashDirection_ = { 1, 0, 0 };
+        else                                      dashDirection_ = { -1, 0, 0 };
+
+        // 空中冲刺：无重力漂移
         if (!isOnGround_) {
             isDashJumping_ = true;
-            gravity_ = dashGravity_; // 设置为零重力实现平移效果
-            velocity_.y = 0; // 重置垂直速度
-            isJumping_ = false;
-            jumpPressDuration_ = maxJumpPressTime_;
+            velocity_.y = 0.0f;   // 立即切断上升
+            isJumping_ = false;   // 结束可控上升
+            jumpPressDuration_ = maxJumpHoldTime_; // 关闭长按窗口
         }
     }
 
-    // 左右移动（冲刺时保持方向）
+    // ========= 水平移动 =========
     Vector3 moveInput = { 0, 0, 0 };
-
-    // 左右移动
     if (input->PushKey(DIK_D) || input->PushKey(DIK_RIGHT)) {
         moveInput.x = 1.0f;
         if (lrDirection_ != LRDirection::kRight) {
@@ -111,8 +118,7 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
             turnTargetRotationY_ = 0.0f;
             turnCurrentFrame_ = 0;
         }
-    }
-    else if (input->PushKey(DIK_A) || input->PushKey(DIK_LEFT)) {
+    } else if (input->PushKey(DIK_A) || input->PushKey(DIK_LEFT)) {
         moveInput.x = -1.0f;
         if (lrDirection_ != LRDirection::kLeft) {
             lrDirection_ = LRDirection::kLeft;
@@ -120,75 +126,87 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
             turnTargetRotationY_ = DirectX::XM_PI;
             turnCurrentFrame_ = 0;
         }
-    }
-    else {
-        velocity_.x = 0;
+    } else {
+        velocity_.x = 0.0f;
     }
 
-    // 计算实际移动速度（冲刺时使用冲刺速度）
     float currentMoveSpeed = moveSpeed_;
     Vector3 moveVelocity = moveInput * currentMoveSpeed;
+
     if (isDashing_) {
-        // 冲刺时使用固定速度，忽略输入
+        // 冲刺期间固定速度，忽略输入
         moveVelocity = dashDirection_ * (moveSpeed_ * dashSpeedMultiplier_);
-         // 跳跃冲刺时保持水平移动
         if (isDashJumping_) {
-            moveVelocity.y = 0; // 确保垂直速度为0
+            moveVelocity.y = 0.0f;
         }
     }
 
-    // 设置水平速度
     velocity_.x = moveVelocity.x;
 
-    // 检测空格键状态
-    bool isSpacePressed = input->PushKey(DIK_SPACE);
+    // ========= 跳跃（一次性冲量 + 长按小加速度 + 可变重力）=========
+    const bool isSpacePressed   = input->PushKey(DIK_SPACE);
+    const bool justPressedJump  = input->TriggerKey(DIK_SPACE);
 
-    // 按下空格立即跳跃（仅在地面时触发）
-    if (isOnGround_ && input->TriggerKey(DIK_SPACE)) {
-        velocity_.y = jumpPower_; // 初始跳跃高度
+    // 起跳：仅地面
+    if (isOnGround_ && justPressedJump) {
         isOnGround_ = false;
         isJumping_ = true;
-        jumpPressDuration_ = 0.0f; // 重置蓄力时间
-         if (isDashing_) {
+        jumpPressDuration_ = 0.0f;
+        velocity_.y = jumpVelInit_;
+
+        // 冲刺中起跳的水平保持
+        if (isDashing_) {
             velocity_.x = dashDirection_.x * (moveSpeed_ * dashSpeedMultiplier_);
         }
     }
 
-     // ====== 长按续升（受顶头锁控制） ======
-    if (headBonkTimer_ <= 0.0f) {
-        if (isJumping_ && isSpacePressed && !isDashing_) {
+    // 长按小加速度：在“可控上升”窗口内且仍在上升
+    if (isJumping_) {
+        if (isSpacePressed && jumpPressDuration_ < maxJumpHoldTime_) {
             jumpPressDuration_ += deltaTime;
-            jumpPressDuration_ = (std::min)(jumpPressDuration_, maxJumpPressTime_);
 
-            if (jumpPressDuration_ < maxJumpPressTime_) {
-                velocity_.y = jumpPower_; // 保持初始跳跃速度
+            if (velocity_.y > 0.0f) {
+                velocity_.y += jumpHoldAccel_ * deltaTime;
+                if (velocity_.y > jumpVelMax_) {
+                    velocity_.y = jumpVelMax_;
+                }
             }
+        } else {
+            isJumping_ = false; // 窗口结束或已松手
         }
     }
 
-    // 松开空格时停止蓄力
-    if (isJumping_ && (!isSpacePressed || jumpPressDuration_ >= maxJumpPressTime_)) {
-        isJumping_ = false;
+    // 可变重力
+    float g = gravityBase_;
+    // 早松手（结束可控上升但还在上升）→ 更大重力，短跳更利落
+    if (!isOnGround_ && velocity_.y > 0.0f && !isJumping_) {
+        g *= lowJumpGravityScale_;
+    }
+    // 下落期 → 更重
+    if (!isOnGround_ && velocity_.y <= 0.0f) {
+        g *= fallGravityScale_;
+    }
+    // 空中冲刺 → 无重力
+    if (isDashJumping_) {
+        g = 0.0f;
     }
 
-    // 更新上一帧空格键状态
-    wasSpacePressed_ = isSpacePressed;
+    // 应用重力
+    velocity_.y += g * deltaTime;
 
-    // 重力
-    velocity_.y += gravity_;
-
-
-    // 检测碰撞并修正位置
+    // ========= 碰撞修正 =========
     HandleMapCollision(mapChipField);
 
+    // ========= 转身插值 =========
     if (turnCurrentFrame_ < turnTotalFrames_) {
         turnCurrentFrame_++;
         float t = static_cast<float>(turnCurrentFrame_) / turnTotalFrames_;
-        float easedT = t * t * (3.0f - 2.0f * t); // 平滑插值
+        float easedT = t * t * (3.0f - 2.0f * t);
         currentRotationY_ = turnStartRotationY_ + (turnTargetRotationY_ - turnStartRotationY_) * easedT;
         model_->SetRotate({ 0.0f, currentRotationY_, 0.0f });
     }
-    // 更新模型
+
+    // ========= 更新模型 =========
     model_->SetTranslate(position_);
     model_->Update();
 }
@@ -198,14 +216,14 @@ void Player::Draw() {
         model_->Draw();
     }
 }
+
 void Player::HandleMapCollision(const MapChipField& mapChipField) {
-    const float deltaTime = 1.0f / 60.0f; // 如果你之后传参，可以去掉
     const float kHalfW = width_ / 2.0f;
     const float kHalfH = height_ / 2.0f;
 
     bool onGround = false;
 
-    // ---------- 先处理 X ----------
+    // ---- 先处理 X ----
     {
         float nextX = position_.x + velocity_.x;
 
@@ -229,7 +247,7 @@ void Player::HandleMapCollision(const MapChipField& mapChipField) {
                 bool overlapX = !(right <= r.left || left >= r.right);
                 if (overlapX && overlapY) {
                     hitX = true;
-                    if (velocity_.x > 0) fixX = r.left - kHalfW;
+                    if (velocity_.x > 0)      fixX = r.left  - kHalfW;
                     else if (velocity_.x < 0) fixX = r.right + kHalfW;
                 }
             }
@@ -239,7 +257,7 @@ void Player::HandleMapCollision(const MapChipField& mapChipField) {
         if (hitX) velocity_.x = 0.0f;
     }
 
-    // ---------- 再处理 Y ----------
+    // ---- 再处理 Y ----
     {
         float nextY = position_.y + velocity_.y;
 
@@ -265,12 +283,12 @@ void Player::HandleMapCollision(const MapChipField& mapChipField) {
                     hitY = true;
                     if (velocity_.y > 0) { // 顶头
                         fixY = r.bottom - kHalfH;
-                        velocity_.y = 0;
+                        velocity_.y = 0.0f;
                         isJumping_ = false;
-                        headBonkTimer_ = kHeadBonkLock_; // <<=== 关键
+                        headBonkTimer_ = kHeadBonkLock_;
                     } else if (velocity_.y < 0) { // 落地
                         fixY = r.top + kHalfH;
-                        velocity_.y = 0;
+                        velocity_.y = 0.0f;
                         onGround = true;
                     }
                 }
@@ -287,7 +305,6 @@ void Player::ResetForMapTransition(bool keepFacing) {
     // 清零速度 & 动作
     velocity_ = { 0, 0, 0 };
     isJumping_ = false;
-    wasSpacePressed_ = false;
     jumpPressDuration_ = 0.0f;
     isOnGround_ = false;
     headBonkTimer_ = 0.0f;
@@ -296,12 +313,9 @@ void Player::ResetForMapTransition(bool keepFacing) {
     isDashing_ = false;
     isDashJumping_ = false;
     dashTimer_ = 0.0f;
-    dashCooldownTimer_ = 0.0f;  // 过图后冷却清零；若想保留冷却可去掉这行
+    dashCooldownTimer_ = 0.0f;  // 若想保留冷却可移除此行
     canDash_ = true;
 
-    // 重力恢复
-    gravity_ = originalGravity_;
+    // 重力“基准”恢复（与新参数体系对齐）
+    originalGravity_ = gravityBase_;
 }
-
-
-

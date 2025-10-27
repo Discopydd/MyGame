@@ -276,9 +276,6 @@
     <ClInclude Include="engine\3d\PointLight.h">
       <Filter>project\3d</Filter>
     </ClInclude>
-    <ClInclude Include="map\MapChipField.h">
-      <Filter>map</Filter>
-    </ClInclude>
     <ClInclude Include="player\Player.h">
       <Filter>player</Filter>
     </ClInclude>
@@ -287,6 +284,9 @@
     </ClInclude>
     <ClInclude Include="scene\LoadingScene.h">
       <Filter>scene</Filter>
+    </ClInclude>
+    <ClInclude Include="map\MapChipField.h">
+      <Filter>map</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

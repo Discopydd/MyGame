@@ -42,7 +42,7 @@ private:
     int   spinnerCount_ = 12;     // 点的数量
     float spinnerRadius_ = 20.0f;  // 半径(像素)
     float spinnerSize_ = 7.0f;  // 每个点的正方形尺寸(像素)
-    float spinnerSpeed_ = 5.0f;   // 角速度(弧度/秒) ~ 206度/秒
+    float spinnerSpeed_ = 10.0f;   // 角速度(弧度/秒) ~ 206度/秒
     float spinnerHeadAngle_ = 0.0f;   // 头部当前角度
     float spinnerTrailLen_ = 0.9f;   // 尾巴长度(0~π)，越大尾巴越长
     float spinnerMinAlpha_ = 0.18f;  // 尾端最小透明度

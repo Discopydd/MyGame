@@ -639,7 +639,7 @@ void GameScene::UpdateIntro_(float dt) {
     switch (introState_) {
     case IntroState::BarsIn: {
         // 黑边 0.6s 内滑入
-        float d = (std::min)(introT_ / 0.35f, 1.0f);
+        float d = (std::min)(introT_ / 0.175f, 1.0f);
         d = EaseOutCubic_(d);
         const float H = (float)WinApp::kClientHeight;
         const float barH = H * 0.25f;
@@ -661,12 +661,12 @@ void GameScene::UpdateIntro_(float dt) {
         // 暗角淡入到 0.25
         if (vignette_) vignette_->SetColor({ 1,1,1, 0.25f * d });
 
-        if (introT_ >= 0.7f) { introState_ = IntroState::OrbitZoom; introT_ = 0.0f; }
+        if (introT_ >= 0.35f) { introState_ = IntroState::OrbitZoom; introT_ = 0.0f; }
         break;
     }
     case IntroState::OrbitZoom: {
         // 1.8s 环绕+推进
-        float d = (std::min)(introT_ / 1.0f, 1.0f);
+        float d = (std::min)(introT_ / 0.5f, 1.0f);
         float e = EaseInOutSine_(d);
 
 
@@ -679,7 +679,7 @@ void GameScene::UpdateIntro_(float dt) {
         // Skip 提示闪烁
         if (skipHint_) {
             skipHint_->SetVisible(true);
-            float blink = (sinf(introT_ * 6.0f) * 0.5f + 0.5f) * 0.85f; // 0~0.85
+            float blink = (sinf(introT_ * 12.0f) * 0.5f + 0.5f) * 0.85f; // 0~0.85
             skipHint_->SetColor({ 1,1,1, blink });
         }
 
@@ -688,7 +688,7 @@ void GameScene::UpdateIntro_(float dt) {
     }
     case IntroState::TitleShow: {
         // 0.9s 标题停留，暗角稍加强到 0.35
-        float d = (std::min)(introT_ / 0.5f, 1.0f);
+        float d = (std::min)(introT_ / 0.25f, 1.0f);
         if (vignette_) vignette_->SetColor({1,1,1, 0.25f + 0.10f * d});
 
         // 轻微二段震动
@@ -698,7 +698,7 @@ void GameScene::UpdateIntro_(float dt) {
         break;
     }
     case IntroState::BarsOut: {
-        float d = (std::min)(introT_ / 0.3f, 1.0f);
+        float d = (std::min)(introT_ / 0.15f, 1.0f);
         d = EaseOutCubic_(d);
 
         const float H = (float)WinApp::kClientHeight;

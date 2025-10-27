@@ -73,7 +73,7 @@ private:
     float loadingTimer_ = 0.0f;          // 初始化加载计时
     bool loadingStarted_ = false;        // 延迟一帧标志
 
-    static constexpr float LOADING_DURATION = 1.0f; // 1秒
+    static constexpr float LOADING_DURATION = 0.5f; // 1秒
 
     Sprite* portalHintSprite_ = nullptr;    // 传送提示图标精灵
 
@@ -83,7 +83,7 @@ private:
 
     Sprite* fadeSprite_ = nullptr;   // 全屏黑幕
     float   fadeAlpha_ = 0.0f;      // 0透明 -> 1全黑
-    float   fadeSpeed_ = 0.04f;     // 淡速（可调）
+    float   fadeSpeed_ = 0.16f;     // 淡速（可调）
 
     // 传送门触发：等待到黑后再开始加载
     bool        pendingPortalLoad_ = false;
