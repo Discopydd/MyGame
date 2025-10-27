@@ -32,7 +32,7 @@ public:
     void   SetHpDrainPerSec(float v) { hpDrainPerSec_ = (std::max)(0.0f, v); }
     void   TakeDamage(float v) { hp_ = (std::max)(0.0f, hp_ - v); }
     void   Heal(float v) { hp_ = (std::min)(hp_ + v, (float)maxHP_); }
-
+    bool IsOnGround() const { return isOnGround_; }
 private:
     Object3d* model_ = nullptr;
     Object3dCommon* object3dCommon_ = nullptr;
@@ -93,7 +93,7 @@ private:
     // --- HP members ---
     int   maxHP_ = 100;
     float hp_ = 100.0f;
-    float hpDrainPerSec_ = 5.0f;   // 每秒扣 5 点
+    float hpDrainPerSec_ = 20.0f;   // 每秒扣 5 点
 
     // 兼容旧接口（现在不再直接使用外部“每帧重力值”，但保留复位逻辑）
     float originalGravity_ = -2.20f; // 与 gravityBase_ 对齐

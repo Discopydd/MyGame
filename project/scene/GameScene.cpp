@@ -322,10 +322,10 @@ void GameScene::Update() {
         return;
     }
     imguiManager_->Begin();
+    playerCamera_->Update();
     // 淡入淡出/加载/演出期间都不可操作
     player_->Update(canControl ? input_ : nullptr, mapChipField_);
 
-    playerCamera_->Update();
     camera_->Update();
 
 
