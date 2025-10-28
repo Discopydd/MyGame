@@ -33,6 +33,9 @@ public:
     void   TakeDamage(float v) { hp_ = (std::max)(0.0f, hp_ - v); }
     void   Heal(float v) { hp_ = (std::min)(hp_ + v, (float)maxHP_); }
     bool IsOnGround() const { return isOnGround_; }
+
+    bool  IsDead() const { return isDead_; }
+    void  StartDeathFall();   // 触发死亡演出（被 GameScene 调用）
 private:
     Object3d* model_ = nullptr;
     Object3dCommon* object3dCommon_ = nullptr;
@@ -97,4 +100,13 @@ private:
 
     // 兼容旧接口（现在不再直接使用外部“每帧重力值”，但保留复位逻辑）
     float originalGravity_ = -2.20f; // 与 gravityBase_ 对齐
+
+       // ---- Death (GameOver) ----
+    bool  isDead_ = false;
+    bool  deathStarted_ = false;
+    float deathTimer_ = 0.0f;
+    float deathJumpVel_ = 0.78f;     // 微跳初速度(与现有单位一致, 直接加到velocity_.y)
+    float deathRotateTime_ = 0.35f;  // 旋转到倒立所需时间(s)
+    float deathExtraGravScale_ = 2.2f; // 死亡下坠时的重力放大
+    float deathSpinZ_ = 0.0f;        // 倒立旋转Z角(0→π)
 };

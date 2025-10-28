@@ -42,13 +42,38 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
 
     // --- HP 每秒递减 ---
     if (hpDrainPerSec_ > 0.0f && hp_ > 0.0f) {
-        hp_ -= hpDrainPerSec_ * deltaTime;
+        //hp_ -= hpDrainPerSec_ * deltaTime;
         if (hp_ < 0.0f) hp_ = 0.0f;
     }
-
+    if (hp_ <= 0.0f && !deathStarted_) {
+        StartDeathFall();
+    }
     // 顶头短暂锁
     headBonkTimer_ = (std::max)(0.0f, headBonkTimer_ - deltaTime);
+    if (isDead_) {
+        const float dt = 1.0f / 60.0f;
 
+        // 旋转到倒立（绕Z轴）0→π
+        deathTimer_ += dt;
+        float t = (std::min)(1.0f, deathTimer_ / deathRotateTime_);
+        deathSpinZ_ = DirectX::XM_PI * (t * t * (3.0f - 2.0f * t)); // smoothstep
+
+        // 强化重力，下坠；跳起后的第一帧已经给了正向初速度
+        float g = gravityBase_ * deathExtraGravScale_;
+        velocity_.y += g * dt;
+
+        // 逐帧位移，**跳过碰撞**，直接坠出画面
+        position_.x += velocity_.x;
+        position_.y += velocity_.y;
+        isOnGround_ = false;
+
+        // 应用旋转：保持左右朝向Y旋转不变，只把Z转到180°
+        Vector3 rot = { 0.0f, currentRotationY_, deathSpinZ_ };
+        model_->SetRotate(rot);
+        model_->SetTranslate(position_);
+        model_->Update();
+        return; // 死亡态独立更新完毕
+    }
     // ========== 无输入（如 Intro）时：只做物理 ==========
     if (input == nullptr) {
         // 仅根据“可变重力”推进
@@ -318,4 +343,25 @@ void Player::ResetForMapTransition(bool keepFacing) {
 
     // 重力“基准”恢复（与新参数体系对齐）
     originalGravity_ = gravityBase_;
+}
+void Player::StartDeathFall() {
+    if (deathStarted_) { return; }
+    deathStarted_ = true;
+    isDead_ = true;
+
+    // 立即打断一切动作
+    isDashing_ = false; canDash_ = false;
+    isDashJumping_ = false; dashTimer_ = 0.0f;
+    isJumping_ = false; jumpPressDuration_ = maxJumpHoldTime_;
+    headBonkTimer_ = 0.0f;
+    isOnGround_ = false;
+
+
+    velocity_.x = 0.0f;          // ← 清零水平速度
+    velocity_.z = 0.0f;          // ← 并清掉Z方向
+
+    // 微跳启动 + 倒立旋转准备
+    velocity_.y = deathJumpVel_; // 给一个初速度向上跳一下
+    deathTimer_ = 0.0f;
+    deathSpinZ_ = 0.0f;
 }

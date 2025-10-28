@@ -142,4 +142,22 @@ private:
     bool overlayPushed_ = false;  // 是否已叠加 LoadingScene
     bool reachedBlack_ = false;  // 是否已达到纯黑（刚到1.0的那一帧）
     int  blackHoldFrames_ = 0;    // 纯黑保留帧数
+
+    enum class GameOverState { None, Dying, FadeOut, BlackHold, ShowTitle, Done };
+    GameOverState gameOverState_ = GameOverState::None;
+    float  gameOverT_ = 0.0f;
+
+    // Game Over 标题
+    Sprite* gameOverSprite_ = nullptr;
+    Vector2 gameOverSize_ = { 500.0f, 300.0f }; // 你这张PNG大约500x300，请按实际资源调整
+    Vector2 gameOverPos_;       // 动画中的位置（屏幕像素）
+    Vector2 gameOverStartPos_;  // y在屏幕外上方
+    Vector2 gameOverEndPos_;    // 屏幕中央
+    float   gameOverSlideTime_ = 0.65f;
+    // 启动/更新/绘制
+    void StartGameOver_();
+    void UpdateGameOver_(float dt);
+    void DrawGameOver_();
+
+    float   irisBaseHoleRadiusPx_ = 860.0f;
 };

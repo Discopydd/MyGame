@@ -195,8 +195,10 @@ void GameScene::Initialize() {
     skipHint_->SetPosition({ 0.0f, WinApp::kClientHeight * 0.42f });
     skipHint_->SetColor({ 1,1,1,0 });
     skipHint_->SetVisible(false);
-
-
+    gameOverSprite_ = new Sprite();
+    gameOverSprite_->Initialize(spriteCommon_, "Resources/GameOver.png"); // 请把图片放到 Resources/
+    gameOverSprite_->SetSize(gameOverSize_);
+    gameOverSprite_->SetVisible(false);
 }
 
 void GameScene::Update() {
@@ -206,6 +208,7 @@ void GameScene::Update() {
     const bool isFading = (fadePhase_ != FadePhase::None);
     const bool inIntro = (introStarted_ && introState_ != IntroState::Done);
     const bool canControl = !(isFading || inIntro);
+    const bool inGameOver = (gameOverState_ != GameOverState::None && gameOverState_ != GameOverState::Done);
     // ===== Intro 驱动（在加载/淡出等早退之前执行，但不盖过Loading）=====
     if (fadePhase_ == FadePhase::None) {
         UpdateIntro_(deltaTime);
@@ -327,7 +330,15 @@ void GameScene::Update() {
     player_->Update(canControl ? input_ : nullptr, mapChipField_);
 
     camera_->Update();
+    // 若尚未进入GameOver，检测HP
+if (gameOverState_ == GameOverState::None && player_->GetHP() <= 0.0f) {
+    StartGameOver_();
+}
 
+// GameOver状态机推进（会在其中屏蔽玩家操作）
+if (gameOverState_ != GameOverState::None && gameOverState_ != GameOverState::Done) {
+    UpdateGameOver_(deltaTime);
+}
 
     float hpRatio = player_ ? player_->GetHpRatio() : 1.0f;
     hpVisibleCount_ = (int)std::ceil(hpRatio * hpSegments_);
@@ -504,6 +515,7 @@ void GameScene::Draw() {
     if (fadeSprite_) {
         fadeSprite_->Draw();
     }
+    DrawGameOver_();
     // ParticleManager::GetInstance()->Draw();
     imguiManager_->Draw();
     dxCommon_->End();
@@ -537,6 +549,8 @@ void GameScene::Finalize() {
     delete skipHint_;        skipHint_ = nullptr;
     for (auto* seg : hpStrips_) delete seg;
     hpStrips_.clear();
+    if (gameOverSprite_) { delete gameOverSprite_; gameOverSprite_ = nullptr; }
+
 }
 
 void GameScene::StartLoadingMap(const std::string& mapPath, const Vector3& startPos, bool isPortal = false) {
@@ -758,4 +772,123 @@ void GameScene::ApplyScreenShake_(Vector3& camPos) {
     float ny = cosf(introT_ * 37.0f) * 0.5f + cosf(introT_ * 73.0f) * 0.5f;
     camPos.x += nx * shakeAmp_;
     camPos.y += ny * shakeAmp_ * 0.6f;
+}
+void GameScene::StartGameOver_() {
+    gameOverState_ = GameOverState::Dying;
+    gameOverT_ = 0.0f;
+
+    // 触发玩家死亡演出（微跳+倒立坠落）
+    if (player_) { player_->StartDeathFall(); }
+
+    // 关掉提示等UI
+    if (portalHintSprite_) { portalHintSprite_->SetVisible(false); }
+}
+
+void GameScene::UpdateGameOver_(float dt) {
+    gameOverT_ += dt;
+
+    switch (gameOverState_) {
+    case GameOverState::Dying: {
+        // 等待玩家跌出屏幕下方或超时，再开始黑幕淡出
+        Vector3 sp = WorldToScreen(player_->GetPosition(), camera_);
+        const float H = (float)WinApp::kClientHeight;
+        if (sp.y > H + 60.0f || gameOverT_ > 2.0f) {
+            gameOverState_ = GameOverState::FadeOut;
+            gameOverT_ = 0.0f;
+
+            // 准备黑幕：从 0 开始淡到 1
+            fadeAlpha_ = 0.0f;
+            if (fadeSprite_) {
+                fadeSprite_->SetVisible(true);
+                fadeSprite_->SetColor({ 1.0f, 1.0f, 1.0f, fadeAlpha_ });
+                fadeSprite_->Update();
+            }
+        }
+        break;
+    }
+
+    case GameOverState::FadeOut: {
+        // 0.9s 淡出到全黑（你可以调时长）
+        float d = (std::min)(1.0f, gameOverT_ / 0.9f);
+        // easeOutCubic
+        float e = 1.0f - (1.0f - d) * (1.0f - d) * (1.0f - d);
+        fadeAlpha_ = e;
+
+        if (fadeSprite_) {
+            fadeSprite_->SetVisible(true);
+            fadeSprite_->SetColor({ 1.0f, 1.0f, 1.0f, fadeAlpha_ });
+            fadeSprite_->Update();
+        }
+
+        if (d >= 1.0f) {
+            gameOverState_ = GameOverState::BlackHold;
+            gameOverT_ = 0.0f;
+        }
+        break;
+    }
+
+    case GameOverState::BlackHold: {
+        // 保持全黑 0.2s（可调）
+        if (fadeSprite_) {
+            fadeSprite_->SetVisible(true);
+            fadeSprite_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+            fadeSprite_->Update();
+        }
+
+        if (gameOverT_ > 0.2f) {
+            gameOverState_ = GameOverState::ShowTitle;
+            gameOverT_ = 0.0f;
+
+            // 计算 GameOver 精灵的起止位置（从上方滑到屏幕中央）
+            const float W = (float)WinApp::kClientWidth;
+            const float H = (float)WinApp::kClientHeight;
+            gameOverEndPos_ = { (W - gameOverSize_.x) * 0.5f, (H - gameOverSize_.y) * 0.5f };
+            gameOverStartPos_ = { gameOverEndPos_.x, -gameOverSize_.y - 40.0f };
+            gameOverPos_ = gameOverStartPos_;
+            if (gameOverSprite_) { gameOverSprite_->SetVisible(true); }
+        }
+        break;
+    }
+
+    case GameOverState::ShowTitle: {
+        // 标题从上滑入：easeOutBack
+        float d = (std::min)(1.0f, gameOverT_ / gameOverSlideTime_);
+        float s = 1.70158f, p = d - 1.0f;
+        float e = 1.0f + (p * p * ((s + 1.0f) * p + s));
+
+        gameOverPos_.x = gameOverStartPos_.x + (gameOverEndPos_.x - gameOverStartPos_.x) * e;
+        gameOverPos_.y = gameOverStartPos_.y + (gameOverEndPos_.y - gameOverStartPos_.y) * e;
+
+        if (gameOverSprite_) {
+            gameOverSprite_->SetPosition({ gameOverPos_.x, gameOverPos_.y });
+            gameOverSprite_->Update();
+        }
+
+        // 期间保持全黑
+        if (fadeSprite_) {
+            fadeSprite_->SetVisible(true);
+            fadeSprite_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+            fadeSprite_->Update();
+        }
+
+        if (d >= 1.0f) {
+            gameOverState_ = GameOverState::Done;
+            gameOverT_ = 0.0f;
+        }
+        break;
+    }
+
+    case GameOverState::Done:
+    default:
+        break;
+    }
+}
+
+void GameScene::DrawGameOver_() {
+    if (!spriteCommon_) { return; }
+    spriteCommon_->CommonDraw();
+
+    if (gameOverSprite_ && gameOverSprite_->IsVisible()) {
+        gameOverSprite_->Draw();
+    }
 }
