@@ -4,7 +4,6 @@
 #include <map>
 #include <string>
 #include "../base/DirectXCommon.h"
-
 class ModelManager
 {
 
@@ -29,10 +28,10 @@ public:
 
 	// モデル検索
 	Model* FindModel(const std::string& filePath);
-
 private:
 
 	//モデルデータ
 	std::map<std::string, std::unique_ptr < Model>> models;
 	ModelCommon* modelCommon = nullptr;
+
 };

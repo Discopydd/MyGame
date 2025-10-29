@@ -288,6 +288,9 @@
     <ClInclude Include="map\MapChipField.h">
       <Filter>map</Filter>
     </ClInclude>
+    <ClInclude Include="engine\math\Quaternion.h">
+      <Filter>project\math</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Text Include="..\externals\imgui\LICENSE.txt" />

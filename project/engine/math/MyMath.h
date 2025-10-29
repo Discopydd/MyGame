@@ -4,6 +4,7 @@
 #include "Vector3.h"
 #include "Vector4.h"
 #include <cassert>
+#include <Quaternion.h>
 namespace Math {
 	const float PI = 3.141592654f;
 
@@ -43,4 +44,23 @@ namespace Math {
 	Vector3 Multiply(const Vector3& vec, float scalar);
 	Vector3 TransformCoordLocal(const Vector3& v, const Matrix4x4& m);
 
+	float   Lerp(float a, float b, float t);
+	Vector3 Lerp(const Vector3& a, const Vector3& b, float t);
+	Vector4 Lerp(const Vector4& a, const Vector4& b, float t);
+	// 角度(度) -> 弧度(rad)
+	float ToRadian(float degrees);
+
+	// 由轴角(弧度)构造四元数；返回值为 Vector4(quat.x, quat.y, quat.z, quat.w)
+	Quaternion MakeAxisAngleQuaternion(const Vector3& axis, float angleRad);
+
+	// 线性插值（Nlerp）：默认走最短弧，并做单位化
+	Quaternion Lerp(const Quaternion& a, const Quaternion& b, float t, bool shortestPath = true);
+
+	// 球面线性插值（Slerp）：默认走最短弧，t∈[0,1]
+	Quaternion Slerp(const Quaternion& a, const Quaternion& b, float t, float eps = 1e-6f);
+
+	Vector3 QuaternionToEuler(const Quaternion& q);
+
+	// （可选）度数版
+	Vector3 QuaternionToEulerDeg(const Quaternion& q);
 }

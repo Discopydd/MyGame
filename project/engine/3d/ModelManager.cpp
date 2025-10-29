@@ -1,5 +1,4 @@
 #include "ModelManager.h"
-
 ModelManager* ModelManager::instance = nullptr;
 
 ModelManager* ModelManager::GetInstants()
