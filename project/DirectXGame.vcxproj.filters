@@ -41,6 +41,9 @@
     <Filter Include="player">
       <UniqueIdentifier>{ca2425eb-abce-4000-baef-563030d7cca7}</UniqueIdentifier>
     </Filter>
+    <Filter Include="project\action">
+      <UniqueIdentifier>{8f36072d-90f9-493a-838c-f4fa2bab66ef}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="engine\math\MyMath.cpp">
@@ -138,6 +141,9 @@
     </ClCompile>
     <ClCompile Include="scene\LoadingScene.cpp">
       <Filter>scene</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\action\SkinnedModel.cpp">
+      <Filter>project\action</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -287,6 +293,27 @@
     </ClInclude>
     <ClInclude Include="map\MapChipField.h">
       <Filter>map</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\action\Animation.h">
+      <Filter>project\action</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\action\Animator.h">
+      <Filter>project\action</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\action\Skeleton.h">
+      <Filter>project\action</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\action\SkinnedModel.h">
+      <Filter>project\action</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\action\SkinnedVertex.h">
+      <Filter>project\action</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\action\SkinningCPU.h">
+      <Filter>project\action</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\math\Quaternion.h">
+      <Filter>project\math</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
