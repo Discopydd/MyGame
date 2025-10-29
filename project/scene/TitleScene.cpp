@@ -124,7 +124,7 @@ void TitleScene::Draw() {
 
 void TitleScene::Finalize() {
     // 若 TextureManager 作为全局单例供后续场景继续使用，建议不要在这里 Finalize
-    //TextureManager::GetInstance()->Finalize();
+    TextureManager::GetInstance()->Finalize();
 
     delete spriteCommon_;  spriteCommon_ = nullptr;
     delete titleSprite_;   titleSprite_ = nullptr;

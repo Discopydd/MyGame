@@ -35,7 +35,6 @@ private:
     Input* input_ = nullptr;
     SpriteCommon* spriteCommon_ = nullptr;
     SrvManager* srvManager_ = nullptr;
-    std::vector<Sprite*> sprites_;
     Vector2 rotation_{};
 
     bool isFadingOut_ = false;       // 是否正在淡出

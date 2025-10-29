@@ -1,6 +1,6 @@
 #include "TextureManager.h"
 #include "StringUtility.h"
-
+#include <algorithm>
 TextureManager* TextureManager::instance = nullptr;
 
 //ImGuiで0盤を使用するため、1番から使用
@@ -30,49 +30,76 @@ void TextureManager::Initialize(DirectXCommon*dxCommon, SrvManager* srvManager) 
 	srvManager_ = srvManager;
 	initialized_ = true;
 }
-//テクスチャファイルの読み込み
+// テクスチャファイルの読み込み
 void TextureManager::LoadTexture(const std::string& filePath) {
-	//読み込み済みテクスチャを検索
-	if (textureDatas.contains(filePath)) {
-		return;
-	}
-	//基盤？
-	//テクスチャ枚数上限チェック
-	assert(srvManager_->Securedcheck());
+    // 既に読み込み済みなら何もしない
+    if (textureDatas.contains(filePath)) return;
 
-	DirectX::ScratchImage image{};
-	//テクスチャファイルを読んでプログラムで抑えるようにする
-	std::wstring filePathW = StringUtility::ConvertString(filePath);
-	HRESULT hr = DirectX::LoadFromWICFile(filePathW.c_str(), DirectX::WIC_FLAGS_FORCE_SRGB, nullptr, image);
-	assert(SUCCEEDED(hr));
+    // テクスチャ枚数上限チェック
+    assert(srvManager_->Securedcheck());
 
-	DirectX::ScratchImage mipImages{};
-	//ミップマップの作成
-	hr = DirectX::GenerateMipMaps(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::TEX_FILTER_SRGB, 0, mipImages);
-	assert(SUCCEEDED(hr));
+    // 拡張子（小文字）
+    std::string ext = filePath.substr(filePath.find_last_of('.') + 1);
+    std::transform(ext.begin(), ext.end(), ext.begin(),
+        [](unsigned char c) { return (char)std::tolower(c); });
 
-	//テクスチャデータを追加して書きこむ
-	TextureData& textureData = textureDatas[filePath];
+    std::wstring wfilePath = StringUtility::ConvertString(filePath);
 
-	textureData.metadata = mipImages.GetMetadata();
-	textureData.resource = dxCommon_->CreateTextureResource(textureData.metadata);
-	textureData.intermediateResource = dxCommon_->UploadTextureData(textureData.resource, mipImages);
+    // 1) 読み込み
+    DirectX::ScratchImage scratch;
+    DirectX::TexMetadata meta{};
+    HRESULT hr = S_OK;
 
-	//テクスチャデータの要素数番号をSRVのインデックスとする
-	uint32_t srvIndex = static_cast<uint32_t>(textureDatas.size() - 1) + kSRVIndexTop;
+    if (ext == "dds") {
+        // DDS: そのまま読み込み（BC圧縮やmipが来てもOK）
+        hr = DirectX::LoadFromDDSFile(wfilePath.c_str(), DirectX::DDS_FLAGS_NONE, &meta, scratch);
+    }
+    else {
+        // WIC: sRGBとして読み込む
+        hr = DirectX::LoadFromWICFile(wfilePath.c_str(), DirectX::WIC_FLAGS_FORCE_SRGB, &meta, scratch);
+    }
+    assert(SUCCEEDED(hr));
 
-	textureData.srvIndex = srvManager_->Allocate();
-	textureData.srvHandleCPU = srvManager_->GetCPUDescriptorHandle(textureData.srvIndex);
-	textureData.srvHandleGPU = srvManager_->GetGPUDescriptorHandle(textureData.srvIndex);
+    // 2) 必要な場合のみ mipmap 生成（DDS が既に mip を持っているならスキップ）
+    DirectX::ScratchImage finalImg;
+    if (meta.mipLevels <= 1) {
+        DirectX::ScratchImage mips;
+        hr = DirectX::GenerateMipMaps(
+            scratch.GetImages(), scratch.GetImageCount(), meta,
+            DirectX::TEX_FILTER_SRGB, 0, mips);
+        assert(SUCCEEDED(hr));
+        finalImg = std::move(mips);
+        meta = finalImg.GetMetadata();
+    }
+    else {
+        finalImg = std::move(scratch);
+        meta = finalImg.GetMetadata();
+    }
 
-	DXGI_FORMAT format = textureData.metadata.format;
-	if (format == DXGI_FORMAT_R8G8B8A8_UNORM) {
-		format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-	}
-	srvManager_->CreateSRVforTexture2D(textureData.srvIndex, textureData.resource.Get(),
-		format, UINT(textureData.metadata.mipLevels));
+    // 3) GPU リソース生成＆アップロード
+    TextureData& tex = textureDatas[filePath];
+    tex.metadata = meta;
+    tex.resource = dxCommon_->CreateTextureResource(tex.metadata);
+    tex.intermediateResource = dxCommon_->UploadTextureData(tex.resource, finalImg);
 
+    // 4) SRV 割り当て
+    tex.srvIndex = srvManager_->Allocate();
+    tex.srvHandleCPU = srvManager_->GetCPUDescriptorHandle(tex.srvIndex);
+    tex.srvHandleGPU = srvManager_->GetGPUDescriptorHandle(tex.srvIndex);
+
+    // 5) SRV フォーマット（色テクスチャは sRGB を優先）
+    DXGI_FORMAT srvFormat = tex.metadata.format;
+    // より安全に：どの入力でも sRGB 変種があればそれを使う
+    srvFormat = DirectX::MakeSRGB(srvFormat);
+
+    srvManager_->CreateSRVforTexture2D(
+        tex.srvIndex,
+        tex.resource.Get(),
+        srvFormat,
+        static_cast<UINT>(tex.metadata.mipLevels)
+    );
 }
+
 //SRVインデックスの開始番号
 uint32_t TextureManager::GetTextureIndexByFilePath(const std::string& filePath) {
 	//読み込み済みテクスチャデータを検索
