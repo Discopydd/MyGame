@@ -129,7 +129,7 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
             isDashJumping_ = true;
             velocity_.y = 0.0f;   // 立即切断上升
             isJumping_ = false;   // 结束可控上升
-            jumpPressDuration_ = maxJumpHoldTime_; // 关闭长按窗口
+            jumpPressDuration_ = currentMaxJumpHoldTime_; // 关闭长按窗口
         }
     }
 
@@ -172,22 +172,45 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
     const bool isSpacePressed   = input->PushKey(DIK_SPACE);
     const bool justPressedJump  = input->TriggerKey(DIK_SPACE);
 
-    // 起跳：仅地面
-    if (isOnGround_ && justPressedJump) {
-        isOnGround_ = false;
-        isJumping_ = true;
-        jumpPressDuration_ = 0.0f;
-        velocity_.y = jumpVelInit_;
+ // 起跳 & 二段跳
+    if (justPressedJump) {
 
-        // 冲刺中起跳的水平保持
-        if (isDashing_) {
-            velocity_.x = dashDirection_.x * (moveSpeed_ * dashSpeedMultiplier_);
+        // ① 地面起跳（重置跳跃次数）
+        if (isOnGround_) {
+            isOnGround_ = false;
+
+            isJumping_ = true;
+            jumpPressDuration_ = 0.0f;
+            currentMaxJumpHoldTime_ = maxJumpHoldTimeFirst_;   // ☆ 一段跳用自己的时间上限
+
+            velocity_.y = jumpVelInit_;
+            jumpCount_ = 1; // 已经用掉第一段
+
+            if (isDashing_) {
+                velocity_.x = dashDirection_.x * (moveSpeed_ * dashSpeedMultiplier_);
+            }
+        }
+        // ② 空中二段跳
+        else if (!isOnGround_ && jumpCount_ < maxJumpCount_) {
+
+            isJumping_ = true;
+            jumpPressDuration_ = 0.0f;
+            currentMaxJumpHoldTime_ = maxJumpHoldTimeSecond_;  // ☆ 二段跳单独算自己的蓄力时间
+
+            // 打断冲刺，避免乱飞
+            isDashing_ = false;
+            isDashJumping_ = false;
+
+            velocity_.y = jumpVelInit_;
+            jumpCount_++;
+
+            // TODO: 二段跳特效 / 音效
         }
     }
 
     // 长按小加速度：在“可控上升”窗口内且仍在上升
     if (isJumping_) {
-        if (isSpacePressed && jumpPressDuration_ < maxJumpHoldTime_) {
+        if (isSpacePressed && jumpPressDuration_ < currentMaxJumpHoldTime_) {
             jumpPressDuration_ += deltaTime;
 
             if (velocity_.y > 0.0f) {
@@ -324,6 +347,13 @@ void Player::HandleMapCollision(const MapChipField& mapChipField) {
     }
 
     isOnGround_ = onGround;
+    if (isOnGround_) {
+        // 落地后重置跳跃状态
+        jumpCount_ = 0;
+        isJumping_ = false;
+        jumpPressDuration_ = 0.0f;
+        currentMaxJumpHoldTime_ = 0.0f;
+    }
 }
 
 void Player::ResetForMapTransition(bool keepFacing) {
@@ -332,7 +362,9 @@ void Player::ResetForMapTransition(bool keepFacing) {
     isJumping_ = false;
     jumpPressDuration_ = 0.0f;
     isOnGround_ = false;
+    jumpCount_ = 0;
     headBonkTimer_ = 0.0f;
+    currentMaxJumpHoldTime_ = 0.0f;
 
     // 冲刺状态复位
     isDashing_ = false;
@@ -352,10 +384,10 @@ void Player::StartDeathFall() {
     // 立即打断一切动作
     isDashing_ = false; canDash_ = false;
     isDashJumping_ = false; dashTimer_ = 0.0f;
-    isJumping_ = false; jumpPressDuration_ = maxJumpHoldTime_;
+    isJumping_ = false; jumpPressDuration_ = currentMaxJumpHoldTime_;
     headBonkTimer_ = 0.0f;
     isOnGround_ = false;
-
+    currentMaxJumpHoldTime_ = 0.0f;
 
     velocity_.x = 0.0f;          // ← 清零水平速度
     velocity_.z = 0.0f;          // ← 并清掉Z方向
@@ -364,4 +396,5 @@ void Player::StartDeathFall() {
     velocity_.y = deathJumpVel_; // 给一个初速度向上跳一下
     deathTimer_ = 0.0f;
     deathSpinZ_ = 0.0f;
+    jumpCount_ = 0;
 }

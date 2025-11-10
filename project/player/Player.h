@@ -49,18 +49,21 @@ private:
 
     // ===== Jump tuning =====
     // 起跳瞬间给一次“初速度”；长按在限定时窗内给予少量“向上加速度”，并对上升速度设上限
-    float jumpVelInit_      = 0.56f;   // 起跳初速度
-    float jumpVelMax_       = 1.05f;   // 上升速度上限
-    float jumpHoldAccel_    = 2.15f;   // 长按时的额外向上加速度（单位：世界单位/秒^2）
-    float maxJumpHoldTime_  = 0.18f;   // 长按生效的最大时长（秒）
-    bool  isOnGround_       = false;
-    bool  isJumping_        = false;   // “可控上升”阶段（在 hold 窗口内且还在上升）
+    float jumpVelInit_ = 0.56f;   // 起跳初速度
+    float jumpVelMax_ = 1.05f;   // 上升速度上限
+    float jumpHoldAccel_ = 1.5f;   // 长按时的额外向上加速度（单位：世界单位/秒^2）
+    float maxJumpHoldTimeFirst_ = 0.15f;   // 长按生效的最大时长（秒）
+    float maxJumpHoldTimeSecond_ = 0.13f;   // 二段跳可蓄力时间
+    bool  isOnGround_ = false;
+    bool  isJumping_ = false;   // “可控上升”阶段（在 hold 窗口内且还在上升）
     float jumpPressDuration_ = 0.0f;   // 已长按时长（秒）
-
+    
+    // 当前这一跳实际使用的最大蓄力时间（根据是第几段跳赋值）
+    float currentMaxJumpHoldTime_ = 0.0f;
     // 可变重力：让“早松手/下落”更利落
-    float gravityBase_           = -2.20f; // 基础重力（向下为负）
-    float lowJumpGravityScale_   = 1.60f;  // 早松手仍在上升时的额外下拉倍率
-    float fallGravityScale_      = 2.20f;  // 下落期的额外下拉倍率
+    float gravityBase_ = -2.20f; // 基础重力（向下为负）
+    float lowJumpGravityScale_ = 1.60f;  // 早松手仍在上升时的额外下拉倍率
+    float fallGravityScale_ = 2.20f;  // 下落期的额外下拉倍率
 
     // 朝向 / 转身
     enum class LRDirection { kRight, kLeft };
@@ -101,7 +104,7 @@ private:
     // 兼容旧接口（现在不再直接使用外部“每帧重力值”，但保留复位逻辑）
     float originalGravity_ = -2.20f; // 与 gravityBase_ 对齐
 
-       // ---- Death (GameOver) ----
+    // ---- Death (GameOver) ----
     bool  isDead_ = false;
     bool  deathStarted_ = false;
     float deathTimer_ = 0.0f;
@@ -109,4 +112,8 @@ private:
     float deathRotateTime_ = 0.35f;  // 旋转到倒立所需时间(s)
     float deathExtraGravScale_ = 2.2f; // 死亡下坠时的重力放大
     float deathSpinZ_ = 0.0f;        // 倒立旋转Z角(0→π)
+
+    // ---- Jump / Double Jump ----
+    int   jumpCount_ = 0;        // 已使用的跳跃次数
+    int   maxJumpCount_ = 2;     // 最大跳跃次数（2 = 二段跳）
 };

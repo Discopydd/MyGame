@@ -160,4 +160,13 @@ private:
     void DrawGameOver_();
 
     float   irisBaseHoleRadiusPx_ = 860.0f;
+
+    struct HintSprite {
+        Sprite* sprite = nullptr;
+        Vector3 worldPos{};
+    };
+
+    HintSprite spaceHint_;
+    HintSprite upHint_;
+
 };

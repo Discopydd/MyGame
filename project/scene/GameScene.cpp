@@ -364,7 +364,17 @@ if (gameOverState_ != GameOverState::None && gameOverState_ != GameOverState::Do
     for (auto* block : mapBlocks_) {
         block->Update();
     }
+     if (spaceHint_.sprite) {
+        Vector3 screen = WorldToScreen(spaceHint_.worldPos, camera_);
+        spaceHint_.sprite->SetPosition({ screen.x, screen.y });
+        spaceHint_.sprite->Update();
+    }
 
+    if (upHint_.sprite) {
+        Vector3 screen = WorldToScreen(upHint_.worldPos, camera_);
+        upHint_.sprite->SetPosition({ screen.x, screen.y });
+        upHint_.sprite->Update();
+    }
     MapChipField::IndexSet playerIndex = mapChipField_.GetMapChipIndexByPosition(player_->GetPosition());
 
     bool onAnyPortal = false;
@@ -498,7 +508,17 @@ void GameScene::Draw() {
     for (int i = 0; i < hpVisibleCount_; ++i) {
         hpStrips_[i]->Draw();
     }
+    if (spaceHint_.sprite) {
+        Vector3 screen = WorldToScreen(spaceHint_.worldPos, camera_);
+        spaceHint_.sprite->SetPosition({ screen.x, screen.y });
+        spaceHint_.sprite->Draw();
+    }
 
+    if (upHint_.sprite) {
+        Vector3 screen = WorldToScreen(upHint_.worldPos, camera_);
+        upHint_.sprite->SetPosition({ screen.x, screen.y });
+        upHint_.sprite->Draw();
+    }
     player_->Draw();
     spriteCommon_->CommonDraw();
     skillSprite_->Draw();
@@ -550,6 +570,14 @@ void GameScene::Finalize() {
     for (auto* seg : hpStrips_) delete seg;
     hpStrips_.clear();
     if (gameOverSprite_) { delete gameOverSprite_; gameOverSprite_ = nullptr; }
+    if (spaceHint_.sprite) {
+        delete spaceHint_.sprite;
+        spaceHint_.sprite = nullptr;
+    }
+    if (upHint_.sprite) {
+        delete upHint_.sprite;
+        upHint_.sprite = nullptr;
+    }
 
 }
 
@@ -577,6 +605,15 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
     for (auto* block : mapBlocks_) delete block;
     mapBlocks_.clear();
 
+     if (spaceHint_.sprite) {
+        delete spaceHint_.sprite;
+        spaceHint_.sprite = nullptr;
+    }
+    if (upHint_.sprite) {
+        delete upHint_.sprite;
+        upHint_.sprite = nullptr;
+    }
+
     mapChipField_.LoadMapChipCsv(mapPath);
     GenerateBlocks();
      // --- 判断是否播放演出 ---
@@ -588,6 +625,27 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
     } else {
         playIntroOnThisMap_ = false;
     }
+     // === 只在 map 生成 Space / Up 提示 ===
+     if (mapPath == "Resources/map/map.csv") {
+
+        // (5,2) → space.png
+        spaceHint_.sprite = new Sprite();
+        spaceHint_.sprite->Initialize(spriteCommon_, "Resources/space2.png");
+        spaceHint_.sprite->SetSize({ 64.0f, 64.0f });
+        spaceHint_.worldPos = mapChipField_.GetMapChipPositionByIndex(5, 2);
+
+        // (6,2) → up.png
+        upHint_.sprite = new Sprite();
+        upHint_.sprite->Initialize(spriteCommon_, "Resources/up.png");
+        upHint_.sprite->SetSize({ 64.0f, 64.0f });
+        upHint_.worldPos = mapChipField_.GetMapChipPositionByIndex(6, 2);
+    }
+    else {
+        // 不是 map：确保不画提示
+        spaceHint_.worldPos = { 0,0,0 };
+        upHint_.worldPos = { 0,0,0 };
+    }
+
     // 设置玩家起点
     player_->SetPosition(startPos);
     player_->ResetForMapTransition(true);
@@ -597,10 +655,10 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
     // 根据当前地图更新传送门列表
     portals_.clear();
     if (mapPath == "Resources/map/map.csv") {
-        portals_.push_back({ {26,11}, "Resources/map/map2.csv", mapChipField_.GetMapChipPositionByIndex(24,8) });
+        portals_.push_back({ {26,11}, "Resources/map/map2.csv", mapChipField_.GetMapChipPositionByIndex(3,3) });
     }
     else if (mapPath == "Resources/map/map2.csv") {
-        portals_.push_back({ {24,8}, "Resources/map/map.csv", mapChipField_.GetMapChipPositionByIndex(26,11) });
+        portals_.push_back({ {3,3}, "Resources/map/map.csv", mapChipField_.GetMapChipPositionByIndex(26,11) });
     }
     wasOnPortal_ = false;
 
