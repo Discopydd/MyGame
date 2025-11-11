@@ -39,7 +39,7 @@ public:
 	void Begin();
 	//描画後処理
 	void End();
-
+	void ClearDepthBuffer();
 	void Finalize();
 
 

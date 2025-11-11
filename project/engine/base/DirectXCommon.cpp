@@ -365,6 +365,17 @@ void DirectXCommon::End()
 
 }
 
+void DirectXCommon::ClearDepthBuffer()
+{
+	auto dsvHandle = dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+	commandList->ClearDepthStencilView(
+		dsvHandle,
+		D3D12_CLEAR_FLAG_DEPTH,
+		1.0f, 0,
+		0, nullptr
+	);
+}
+
 void DirectXCommon::BeginImGui() {
     ImGui_ImplDX12_NewFrame();
     ImGui_ImplWin32_NewFrame();

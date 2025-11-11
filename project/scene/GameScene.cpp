@@ -25,13 +25,14 @@ Vector3 WorldToScreen(const Vector3& worldPos, Camera* camera)
     {
         clipX /= clipW;
         clipY /= clipW;
+        clipZ /= clipW;
     }
 
     // NDC (-1~1) -> 屏幕坐标
     float screenX = (clipX * 0.5f + 0.5f) * float(WinApp::kClientWidth);
     float screenY = (1.0f - (clipY * 0.5f + 0.5f)) * float(WinApp::kClientHeight);
-
-    return { screenX, screenY, 0.0f };
+    float ndcZ    = clipZ * 0.5f + 0.5f;
+    return { screenX, screenY, ndcZ };
 }
 // 将屏幕像素坐标(x,y)映射到世界坐标，ndcZ∈[0,1]：0=近裁剪面, 1=远裁剪面
 static Vector3 ScreenToWorld(float screenX, float screenY, float ndcZ, Camera* camera)
@@ -203,6 +204,8 @@ void GameScene::Initialize() {
 
 void GameScene::Update() {
     const float deltaTime = 1.0f / 60.0f;
+    hintBobTime_ += deltaTime;
+    float hintBobOffset = std::sinf(hintBobTime_ * hintBobSpeed_) * hintBobAmplitude_;
     input_->Update();
     // —— 是否允许玩家操作（淡出/加载/淡入期间 & 开场演出期间都禁止）——
     const bool isFading = (fadePhase_ != FadePhase::None);
@@ -366,15 +369,28 @@ if (gameOverState_ != GameOverState::None && gameOverState_ != GameOverState::Do
     }
      if (spaceHint_.sprite) {
         Vector3 screen = WorldToScreen(spaceHint_.worldPos, camera_);
-        spaceHint_.sprite->SetPosition({ screen.x, screen.y });
+        spaceHint_.sprite->SetPosition({ screen.x, screen.y + hintBobOffset});
         spaceHint_.sprite->Update();
     }
 
-    if (upHint_.sprite) {
-        Vector3 screen = WorldToScreen(upHint_.worldPos, camera_);
-        upHint_.sprite->SetPosition({ screen.x, screen.y });
-        upHint_.sprite->Update();
-    }
+     for (auto& h : upHints_) {
+         if (!h.sprite) continue;
+         Vector3 s = WorldToScreen(h.worldPos, camera_);
+         h.sprite->SetPosition({ s.x, s.y + hintBobOffset});
+         h.sprite->Update();
+     }
+     if (shiftHint_.sprite) {
+         Vector3 screen = WorldToScreen(shiftHint_.worldPos, camera_);
+         shiftHint_.sprite->SetPosition({ screen.x, screen.y + hintBobOffset});
+         shiftHint_.sprite->Update();
+     }
+
+     if (sprintHint_.sprite) {
+         Vector3 screen = WorldToScreen(sprintHint_.worldPos, camera_);
+         sprintHint_.sprite->SetPosition({ screen.x, screen.y + hintBobOffset});
+         sprintHint_.sprite->Update();
+     }
+
     MapChipField::IndexSet playerIndex = mapChipField_.GetMapChipIndexByPosition(player_->GetPosition());
 
     bool onAnyPortal = false;
@@ -499,47 +515,84 @@ if (gameOverState_ != GameOverState::None && gameOverState_ != GameOverState::Do
 
 void GameScene::Draw() {
     dxCommon_->Begin();
+
+    // ================== 1) 3D 场景（地图、HP 3D条等） ==================
     srvManager_->PreDraw();
     object3dCommon_->CommonDraw();
 
+    // 地图方块
     for (auto* block : mapBlocks_) {
         block->Draw();
     }
+
+    // HP 3D 条段（如果你想永远最上，可以挪到玩家后面，这里先保持原样）
     for (int i = 0; i < hpVisibleCount_; ++i) {
         hpStrips_[i]->Draw();
     }
+
+    // ================== 2) 中间层：交互提示 Sprite ==================
+    spriteCommon_->CommonDraw();
+
     if (spaceHint_.sprite) {
-        Vector3 screen = WorldToScreen(spaceHint_.worldPos, camera_);
-        spaceHint_.sprite->SetPosition({ screen.x, screen.y });
         spaceHint_.sprite->Draw();
     }
 
-    if (upHint_.sprite) {
-        Vector3 screen = WorldToScreen(upHint_.worldPos, camera_);
-        upHint_.sprite->SetPosition({ screen.x, screen.y });
-        upHint_.sprite->Draw();
+    // 所有 Up
+    for (auto& h : upHints_) {
+        if (h.sprite) {
+            h.sprite->Draw();
+        }
     }
+    if (shiftHint_.sprite) {
+        shiftHint_.sprite->Draw();
+    }
+    if (sprintHint_.sprite) {
+        sprintHint_.sprite->Draw();
+    }
+
+
+    dxCommon_->ClearDepthBuffer();
+    // ================== 3) 前景 3D：玩家（盖住提示） ==================
+    // 再次切回 3D PSO（如果需要的话）
+    srvManager_->PreDraw();
+    object3dCommon_->CommonDraw();
     player_->Draw();
+
+    // ================== 4) 最前景 UI Sprite ==================
     spriteCommon_->CommonDraw();
-    skillSprite_->Draw();
-    if (!player_->CanDash()) {
+
+    // 技能图标
+    if (skillSprite_) {
+        skillSprite_->Draw();
+    }
+
+    // 冲刺CD灰罩
+    if (!player_->CanDash() && grayOverlaySprite_) {
         grayOverlaySprite_->Draw();
     }
+
+    // 传送门提示
     if (portalHintSprite_ && portalHintSprite_->IsVisible()) {
         portalHintSprite_->Draw();
     }
-    // ===== Intro 覆盖绘制（电影黑边、暗角、标题、Skip）=====
+
+    // Intro / 黑边 / 暗角 / 标题 / Skip 提示
     DrawIntro_();
 
-    // 叠加绘制黑幕（位于最上层）
+    // 黑幕淡入淡出
     if (fadeSprite_) {
         fadeSprite_->Draw();
     }
+
+    // GameOver
     DrawGameOver_();
-    // ParticleManager::GetInstance()->Draw();
+
+    // ImGui（debug UI）
     imguiManager_->Draw();
+
     dxCommon_->End();
 }
+
 
 void GameScene::Finalize() {
     SoundManager::GetInstance()->Finalize();
@@ -574,9 +627,20 @@ void GameScene::Finalize() {
         delete spaceHint_.sprite;
         spaceHint_.sprite = nullptr;
     }
-    if (upHint_.sprite) {
-        delete upHint_.sprite;
-        upHint_.sprite = nullptr;
+    for (auto& h : upHints_) {
+        if (h.sprite) {
+            delete h.sprite;
+            h.sprite = nullptr;
+        }
+    }
+    upHints_.clear();
+    if (shiftHint_.sprite) {
+        delete shiftHint_.sprite;
+        shiftHint_.sprite = nullptr;
+    }
+    if (sprintHint_.sprite) {
+        delete sprintHint_.sprite;
+        sprintHint_.sprite = nullptr;
     }
 
 }
@@ -605,45 +669,82 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
     for (auto* block : mapBlocks_) delete block;
     mapBlocks_.clear();
 
-     if (spaceHint_.sprite) {
+    if (spaceHint_.sprite) {
         delete spaceHint_.sprite;
         spaceHint_.sprite = nullptr;
     }
-    if (upHint_.sprite) {
-        delete upHint_.sprite;
-        upHint_.sprite = nullptr;
+    for (auto& h : upHints_) {
+        if (h.sprite) {
+            delete h.sprite;
+            h.sprite = nullptr;
+        }
+    }
+    upHints_.clear();
+    if (shiftHint_.sprite) {
+        delete shiftHint_.sprite;
+        shiftHint_.sprite = nullptr;
+    }
+    if (sprintHint_.sprite) {
+        delete sprintHint_.sprite;
+        sprintHint_.sprite = nullptr;
     }
 
     mapChipField_.LoadMapChipCsv(mapPath);
     GenerateBlocks();
-     // --- 判断是否播放演出 ---
+    // --- 判断是否播放演出 ---
     if (mapPath == "Resources/map/map.csv" || mapPath == "Resources/map/map2.csv") {
         playIntroOnThisMap_ = true;
         // 重置 Intro 状态
         introStarted_ = false;
         introState_ = IntroState::None;
-    } else {
+        introSkippable_ = true;
+    }
+    else {
         playIntroOnThisMap_ = false;
     }
-     // === 只在 map 生成 Space / Up 提示 ===
-     if (mapPath == "Resources/map/map.csv") {
+    // === 只在 map 生成 Space / Up 提示 ===
+    if (mapPath == "Resources/map/map.csv") {
 
         // (5,2) → space.png
         spaceHint_.sprite = new Sprite();
         spaceHint_.sprite->Initialize(spriteCommon_, "Resources/space2.png");
         spaceHint_.sprite->SetSize({ 64.0f, 64.0f });
         spaceHint_.worldPos = mapChipField_.GetMapChipPositionByIndex(5, 2);
-
+        spaceHint_.worldPos.y += 0.4f;
+        // (19,6) → shift.png
+        shiftHint_.sprite = new Sprite();
+        shiftHint_.sprite->Initialize(spriteCommon_, "Resources/shift.png");
+        shiftHint_.sprite->SetSize({ 64.0f, 48.0f });
+        shiftHint_.worldPos = mapChipField_.GetMapChipPositionByIndex(19, 6);
+        shiftHint_.worldPos.x -= 0.2f;
+        shiftHint_.worldPos.y += 0.5f;
+        // (20,6) → sprint.png
+        sprintHint_.sprite = new Sprite();
+        sprintHint_.sprite->Initialize(spriteCommon_, "Resources/sprint.png");
+        sprintHint_.sprite->SetSize({ 48.0f, 48.0f });
+        sprintHint_.worldPos = mapChipField_.GetMapChipPositionByIndex(20, 6);
+        sprintHint_.worldPos.x -= 0.3f;
+        sprintHint_.worldPos.y += 0.5f;
         // (6,2) → up.png
-        upHint_.sprite = new Sprite();
-        upHint_.sprite->Initialize(spriteCommon_, "Resources/up.png");
-        upHint_.sprite->SetSize({ 64.0f, 64.0f });
-        upHint_.worldPos = mapChipField_.GetMapChipPositionByIndex(6, 2);
+        auto makeUpHint = [&](int x, int y) {
+            HintSprite h;
+            h.sprite = new Sprite();
+            h.sprite->Initialize(spriteCommon_, "Resources/up.png");
+            h.sprite->SetSize({ 32.0f, 32.0f });
+            h.worldPos = mapChipField_.GetMapChipPositionByIndex(x, y);
+            upHints_.push_back(h);
+            };
+
+        // (6,2), (11,4), (12,4)
+        makeUpHint(6, 2);
+        makeUpHint(11, 4);
+        makeUpHint(12, 4);
     }
     else {
         // 不是 map：确保不画提示
         spaceHint_.worldPos = { 0,0,0 };
-        upHint_.worldPos = { 0,0,0 };
+        shiftHint_.worldPos = { 0,0,0 };
+        sprintHint_.worldPos = { 0,0,0 };
     }
 
     // 设置玩家起点
@@ -655,10 +756,10 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
     // 根据当前地图更新传送门列表
     portals_.clear();
     if (mapPath == "Resources/map/map.csv") {
-        portals_.push_back({ {26,11}, "Resources/map/map2.csv", mapChipField_.GetMapChipPositionByIndex(3,3) });
+        portals_.push_back({ {26,11}, "Resources/map/map2.csv", mapChipField_.GetMapChipPositionByIndex(3,1) });
     }
     else if (mapPath == "Resources/map/map2.csv") {
-        portals_.push_back({ {3,3}, "Resources/map/map.csv", mapChipField_.GetMapChipPositionByIndex(26,11) });
+        portals_.push_back({ {3,1}, "Resources/map/map.csv", mapChipField_.GetMapChipPositionByIndex(26,11) });
     }
     wasOnPortal_ = false;
 
@@ -675,7 +776,7 @@ void GameScene::StartIntro_() {
     introStarted_ = true;
     introState_ = IntroState::BarsIn;
     introT_ = 0.0f;
-
+    introSkippable_ = true;
     // 以玩家当前位置为环绕中心
     camPivot_ = player_->GetPosition();
 
@@ -700,10 +801,12 @@ void GameScene::UpdateIntro_(float dt) {
 
     // 跳过
     if (introSkippable_ && input_ && (input_->TriggerKey(DIK_SPACE) || input_->TriggerKey(DIK_RETURN) || input_->TriggerKey(DIK_E))) {
+        introSkippable_ = false;
         introState_ = IntroState::BarsOut;
         introT_ = 0.0f;
         shakeTime_ = 0.0f;
         shakeAmp_ = 0.0f;
+        return;
     }
 
     introT_ += dt;
@@ -755,7 +858,7 @@ void GameScene::UpdateIntro_(float dt) {
             skipHint_->SetColor({ 1,1,1, blink });
         }
 
-        if (introT_ >= 1.8f) { introState_ = IntroState::TitleShow; introT_ = 0.0f; }
+        if (introT_ >= 0.8f) { introState_ = IntroState::TitleShow; introT_ = 0.0f; }
         break;
     }
     case IntroState::TitleShow: {
@@ -766,7 +869,7 @@ void GameScene::UpdateIntro_(float dt) {
         // 轻微二段震动
         if (introT_ < 0.2f) { shakeTime_ = 0.2f; shakeAmp_ = 0.12f; }
 
-        if (introT_ >= 0.9f) { introState_ = IntroState::BarsOut; introT_ = 0.0f; }
+        if (introT_ >= 0.25f) { introState_ = IntroState::BarsOut; introT_ = 0.0f; }
         break;
     }
     case IntroState::BarsOut: {

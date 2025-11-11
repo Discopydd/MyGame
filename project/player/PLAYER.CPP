@@ -235,7 +235,7 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
         g *= fallGravityScale_;
     }
     // 空中冲刺 → 无重力
-    if (isDashJumping_) {
+    if (isDashing_) {
         g = 0.0f;
     }
 

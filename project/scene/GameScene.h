@@ -167,6 +167,13 @@ private:
     };
 
     HintSprite spaceHint_;
-    HintSprite upHint_;
+    HintSprite shiftHint_;
+    HintSprite sprintHint_;
+    std::vector<HintSprite> upHints_;
+
+    // 提示图标上下浮动
+    float hintBobTime_       = 0.0f;
+    float hintBobAmplitude_  = 6.0f;   // 位移像素（上下±6）
+    float hintBobSpeed_      = 3.0f;   // 频率（越大晃得越快）
 
 };
