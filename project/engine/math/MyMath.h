@@ -63,4 +63,6 @@ namespace Math {
 
 	// （可选）度数版
 	Vector3 QuaternionToEulerDeg(const Quaternion& q);
+
+	Vector3 Cross(const Vector3& a, const Vector3& b);
 }

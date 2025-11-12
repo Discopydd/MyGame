@@ -41,6 +41,7 @@ public:
 	Model* GetModel() const { return model_; }
 	PointLight* GetPointLightData() const { return pointLightData; }
     SpotLight* GetSpotLightData() const { return spotLightData; }
+	const Vector3& GetRotate() const { return transform.rotate; }
 private:
 
 	Object3dCommon* object3dCommon_ = nullptr;
