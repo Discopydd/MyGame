@@ -20,6 +20,8 @@
 #include <map/MapChipField.h>
 #include <player/Player.h>
 #include <player/PlayerCamera.h>
+#include <unordered_map>
+#include <unordered_set>
 struct PortalInfo {
     MapChipField::IndexSet index;  // 传送门格子索引
     std::string targetMap;         // 目标地图路径
@@ -176,4 +178,18 @@ private:
     float hintBobAmplitude_  = 6.0f;   // 位移像素（上下±6）
     float hintBobSpeed_      = 3.0f;   // 频率（越大晃得越快）
 
+
+    // ==== 道具渲染节点容器 ====
+    struct ItemVisual { uint32_t x, y; Object3d* obj; };
+    std::vector<ItemVisual> items_;
+
+    // ==== 当前地图路径（用于做 key） ====
+    std::string currentMapPath_;
+
+    // ==== 跨地图持久状态：每张地图被拾取过的道具格索引 ====
+    // key = 地图路径，val = 已拾取的格子集合（把 (x,y) 打包成 uint32）
+    std::unordered_map<std::string, std::unordered_set<uint32_t>> pickedItems_;
+
+    // 小工具：把 (x,y) 打包/拆包
+    static inline uint32_t PackIdx(uint32_t x, uint32_t y) { return (y << 16) | x; }
 };

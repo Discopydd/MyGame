@@ -73,6 +73,29 @@ void GameScene::GenerateBlocks() {
                 portal->SetTranslate(position);
                 mapBlocks_.push_back(portal);
             }
+            else if (type == MapChipType::kItem) {
+                // === 新增：道具 ===
+                const uint32_t key = PackIdx(x, y);
+                auto found = pickedItems_.find(currentMapPath_);
+                bool alreadyPicked = (found != pickedItems_.end() && found->second.count(key));
+
+                if (alreadyPicked) {
+                    // ★ 该格已拾取过 → 本次不生成可见体
+                    continue;
+                }
+
+                // 生成一个道具可见体（示例用 cube；你也可换成 item.obj）
+                Object3d* item = new Object3d();
+                item->Initialize(object3dCommon_);
+                item->SetModel("coin/coin.obj");         // TODO: 替换为你的 item 模型
+                item->SetCamera(camera_);
+                // 让道具略浮起一点更显眼（可选）
+                Vector3 itemPos = position;  // ← 用 position，而不是 pos
+                itemPos.y += 0.4f;
+                item->SetTranslate(itemPos);
+                item->SetTranslate(itemPos);
+                items_.push_back({ x, y, item });
+            }
         }
     }
 }
@@ -108,6 +131,7 @@ void GameScene::Initialize() {
     ModelManager::GetInstants()->LoadModel("player/player.obj");
     ModelManager::GetInstants()->LoadModel("door/Door.obj");
     ModelManager::GetInstants()->LoadModel("strip/strip.obj");        // 载入模型
+    ModelManager::GetInstants()->LoadModel("coin/coin.obj");
     hpStrips_.reserve(hpSegments_);
     for (int i = 0; i < hpSegments_; ++i) {
         auto* seg = new Object3d();
@@ -367,6 +391,16 @@ if (gameOverState_ != GameOverState::None && gameOverState_ != GameOverState::Do
     for (auto* block : mapBlocks_) {
         block->Update();
     }
+    for (auto& it : items_) {
+        if (!it.obj) continue;
+
+        // 让道具绕Y轴缓慢旋转
+        Vector3 rot = it.obj->GetRotate();
+        rot.y += 0.05f;                  // 旋转速度（弧度/帧），可调 0.02f~0.1f
+        it.obj->SetRotate(rot);
+
+        it.obj->Update();
+    }
      if (spaceHint_.sprite) {
         Vector3 screen = WorldToScreen(spaceHint_.worldPos, camera_);
         spaceHint_.sprite->SetPosition({ screen.x, screen.y + hintBobOffset});
@@ -392,7 +426,31 @@ if (gameOverState_ != GameOverState::None && gameOverState_ != GameOverState::Do
      }
 
     MapChipField::IndexSet playerIndex = mapChipField_.GetMapChipIndexByPosition(player_->GetPosition());
+    if (mapChipField_.GetMapChipTypeByIndex(playerIndex.xIndex, playerIndex.yIndex) == MapChipType::kItem) {
 
+        const uint32_t packed = PackIdx(playerIndex.xIndex, playerIndex.yIndex);
+
+        // 若从未登记过：登记“已拾取”，删除可见体 & 给予奖励
+        if (!pickedItems_[currentMapPath_].count(packed)) {
+            pickedItems_[currentMapPath_].insert(packed);
+
+            // 从 items_ 里找到同格子对象，删除
+            for (auto it = items_.begin(); it != items_.end(); ++it) {
+                if (it->x == playerIndex.xIndex && it->y == playerIndex.yIndex) {
+                    if (it->obj) delete it->obj;
+                    items_.erase(it);
+                    break;
+                }
+            }
+
+            // 奖励示例：回血+音效（按你的需要换掉）
+            // SoundManager::GetInstance()->Play("item_pick", false, 1.0f);
+            if (player_) {
+                // 假设你想加点血
+                // player_->Heal(10.0f);
+            }
+        }
+    }
     bool onAnyPortal = false;
     for (auto& portal : portals_) {
         bool isOnPortal = (playerIndex.xIndex == portal.index.xIndex &&
@@ -524,7 +582,9 @@ void GameScene::Draw() {
     for (auto* block : mapBlocks_) {
         block->Draw();
     }
-
+    for (auto& it : items_) {
+        if (it.obj) it.obj->Draw();
+    }
     // HP 3D 条段（如果你想永远最上，可以挪到玩家后面，这里先保持原样）
     for (int i = 0; i < hpVisibleCount_; ++i) {
         hpStrips_[i]->Draw();
@@ -642,6 +702,10 @@ void GameScene::Finalize() {
         delete sprintHint_.sprite;
         sprintHint_.sprite = nullptr;
     }
+    for (auto& it : items_) {
+        if (it.obj) { delete it.obj; it.obj = nullptr; }
+    }
+    items_.clear();
 
 }
 
@@ -666,6 +730,16 @@ void GameScene::StartLoadingMap(const std::string& mapPath, const Vector3& start
 
 void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
 {
+
+     // 记录本次地图路径
+    currentMapPath_ = mapPath;
+
+    // 清理旧 items 渲染对象
+    for (auto& it : items_) {
+        if (it.obj) { delete it.obj; }
+    }
+    items_.clear();
+
     for (auto* block : mapBlocks_) delete block;
     mapBlocks_.clear();
 
