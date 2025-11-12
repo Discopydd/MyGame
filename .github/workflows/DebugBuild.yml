@@ -1,0 +1,23 @@
+name: DebugBuild
+on:
+   push:
+     branches:
+        - master
+env:
+     SOLUTION_FILE_PATH: DirectXGame.sln # ソリューションファイルのパス（例）
+     CONFIGURATION: Debug # ビルド構成（Debug / Release）
+jobs: # ジョブ定義
+  build: # ジョブの名前
+    runs-on: windows-2022 # Windows 環境で実行
+    
+    steps: # ジョブ内のステップ
+    - name: Checkout # リポジトリのコードをチェックアウト
+      uses: actions/checkout@v4
+      
+    - name: Add MSBuild to PATH # MSBuild を環境に追加
+      uses: microsoft/setup-msbuild@v2
+      with:
+       msbuild-architecture: x64 # x64 環境でのビルドを設定
+    - name: Build # ソリューションのビルド
+      run: |
+        msbuild ${{ env.SOLUTION_FILE_PATH }} /p:Platform=x64 /p:Configuration=${{ env.CONFIGURATION }}
