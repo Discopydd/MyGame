@@ -99,7 +99,7 @@ private:
     // --- HP members ---
     int   maxHP_ = 100;
     float hp_ = 100.0f;
-    float hpDrainPerSec_ = 20.0f;   // 每秒扣 5 点
+    float hpDrainPerSec_ = 1.0f;   // 每秒扣 5 点
 
     // 兼容旧接口（现在不再直接使用外部“每帧重力值”，但保留复位逻辑）
     float originalGravity_ = -2.20f; // 与 gravityBase_ 对齐

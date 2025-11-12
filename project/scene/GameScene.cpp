@@ -756,10 +756,10 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
     // 根据当前地图更新传送门列表
     portals_.clear();
     if (mapPath == "Resources/map/map.csv") {
-        portals_.push_back({ {26,11}, "Resources/map/map2.csv", mapChipField_.GetMapChipPositionByIndex(3,1) });
+        portals_.push_back({ {26,11}, "Resources/map/map2.csv", mapChipField_.GetMapChipPositionByIndex(2,1) });
     }
     else if (mapPath == "Resources/map/map2.csv") {
-        portals_.push_back({ {3,1}, "Resources/map/map.csv", mapChipField_.GetMapChipPositionByIndex(26,11) });
+        portals_.push_back({ {2,1}, "Resources/map/map.csv", mapChipField_.GetMapChipPositionByIndex(26,11) });
     }
     wasOnPortal_ = false;
 
