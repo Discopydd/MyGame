@@ -1,0 +1,26 @@
+name: ReleaseBuild # ワークフローの名前
+
+on: # トリガー設定
+  push: # push イベントで実行
+    branches:
+      - master # master ブランチへの push を監視
+
+env: # 環境変数
+  SOLUTION_FILE_PATH: project/DirectXGame.sln # ソリューションファイルのパス（例）
+  CONFIGURATION: Release # ビルド構成（Release）
+
+jobs: # ジョブ定義
+  build: # ジョブの名前
+    runs-on: windows-2022 # Windows 環境で実行
+    steps: # ジョブ内のステップ
+    - name: Checkout # リポジトリのコードをチェックアウト
+      uses: actions/checkout@v4
+ 
+    - name: Add MSBuild to PATH # MSBuild を PATH に追加
+      uses: microsoft/setup-msbuild@v2
+      with:
+        msbuild-architecture: x64 # x64 環境でのビルド設定
+
+    - name: Build solution # ソリューションのビルド
+      run: |
+        msbuild ${{ env.SOLUTION_FILE_PATH }} /p:Platform=x64 /p:Configuration=${{ env.CONFIGURATION }}
