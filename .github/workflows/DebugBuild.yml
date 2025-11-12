@@ -4,7 +4,7 @@ on:
      branches:
         - master
 env:
-     SOLUTION_FILE_PATH: DirectXGame.sln # ソリューションファイルのパス（例）
+     SOLUTION_FILE_PATH: project/DirectXGame.sln # ソリューションファイルのパス（例）
      CONFIGURATION: Debug # ビルド構成（Debug / Release）
 jobs: # ジョブ定義
   build: # ジョブの名前
