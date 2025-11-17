@@ -42,6 +42,18 @@ public:
 	PointLight* GetPointLightData() const { return pointLightData; }
     SpotLight* GetSpotLightData() const { return spotLightData; }
 	const Vector3& GetRotate() const { return transform.rotate; }
+
+	// 设置平行光强度
+    void SetDirectionalLightIntensity(float intensity);
+    // 设置点光源强度
+    void SetPointLightIntensity(float intensity);
+    // 设置聚光灯强度
+    void SetSpotLightIntensity(float intensity);
+	void SetEnableLighting(bool enable) {
+		if (model_) {
+			model_->SetEnableLighting(enable);
+		}
+	}
 private:
 
 	Object3dCommon* object3dCommon_ = nullptr;

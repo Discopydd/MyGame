@@ -89,3 +89,20 @@ void Object3d::SetModel(const std::string& filepath)
 	model_ = ModelManager::GetInstants()->FindModel(filepath);
 }
 
+void Object3d::SetDirectionalLightIntensity(float intensity)
+{
+    if (!directionalLightData) { return; }
+    directionalLightData->intensity = intensity;
+}
+
+void Object3d::SetPointLightIntensity(float intensity)
+{
+    if (!pointLightData) { return; }
+    pointLightData->intensity = intensity;
+}
+
+void Object3d::SetSpotLightIntensity(float intensity)
+{
+    if (!spotLightData) { return; }
+    spotLightData->intensity = intensity;
+}

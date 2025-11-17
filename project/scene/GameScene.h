@@ -178,8 +178,8 @@ private:
     float hintBobTime_       = 0.0f;
     float hintBobAmplitude_  = 6.0f;   // 位移像素（上下±6）
     float hintBobSpeed_      = 3.0f;   // 频率（越大晃得越快）
-
-
+    // Coin UI 灯光闪烁计时
+    float coinUiLightTime_ = 0.0f;
     // ==== 道具渲染节点容器 ====
     struct ItemVisual { uint32_t x, y; Object3d* obj; };
     std::vector<ItemVisual> items_;
@@ -196,8 +196,9 @@ private:
     Sprite*   coinColonSprite_ = nullptr;    // 冒号 ":"
     Sprite*   coinDigitSprites_[3] = { nullptr, nullptr, nullptr }; // 最多 3 位数字（0~999）
 
-    int coinCount_     = 0;                  // 当前地图剩余 coin 数
-    int lastCoinCount_ = -1;                 // 上一帧的数值（检测变化）
+    int totalCoinCollected_ = 0;             // ★ 跨地图「总共拾取的 coin 数」
+    int coinCount_          = 0;             // 当前 UI 显示的数值（= totalCoinCollected_）
+    int lastCoinCount_      = -1;            // 上一帧的数值（保留给需要时使用）
 
     // 刷新 coin 剩余数量 UI（重设位置与贴图）
     void UpdateCoinCountUI_();
