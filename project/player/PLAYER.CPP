@@ -42,7 +42,7 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
 
     // --- HP 每秒递减 ---
     if (hpDrainPerSec_ > 0.0f && hp_ > 0.0f) {
-        hp_ -= hpDrainPerSec_ * deltaTime;
+        //hp_ -= hpDrainPerSec_ * deltaTime;
         if (hp_ < 0.0f) hp_ = 0.0f;
     }
     if (hp_ <= 0.0f && !deathStarted_) {
