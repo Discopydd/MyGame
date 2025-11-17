@@ -152,6 +152,13 @@ void GameScene::Initialize() {
     playerCamera_->SetFollowSpeed(0.1f);
     playerCamera_->SetConstrainToMap(true);
 
+     // ==== 右上角 Coin UI（3D 模型） ====
+    coinUiObj_ = new Object3d();
+    coinUiObj_->Initialize(object3dCommon_);
+    coinUiObj_->SetModel("coin/coin.obj");      // 已经在 ModelManager 里 Load 过
+    coinUiObj_->SetCamera(camera_);
+    coinUiObj_->SetScale({ 0.0025f, 0.0025f, 0.0025f }); // 根据模型大小自行再调
+
     //LoadMap("Resources/map/map.csv", { 3,3,0 });
     std::string textureFilePath[] = { "Resources/skill_icon.png", "Resources/gray.png" };
 
@@ -164,6 +171,17 @@ void GameScene::Initialize() {
     grayOverlaySprite_->Initialize(spriteCommon_, textureFilePath[1]);
     grayOverlaySprite_->SetPosition({ 40.0f, 80.0f });
     grayOverlaySprite_->SetSize({ 32.0f, 32.0f });
+    // ==== Coin 数字 UI (Sprite) ====
+    coinColonSprite_ = new Sprite();
+    coinColonSprite_->Initialize(spriteCommon_, "Resources/numbers/colon.png");
+    coinColonSprite_->SetSize({ 24.0f, 24.0f });
+
+     // 先全部初始化成 0.png，之后在 UpdateCoinCountUI_ 里切换贴图
+    for (int i = 0; i < 3; ++i) {
+        coinDigitSprites_[i] = new Sprite();
+        coinDigitSprites_[i]->Initialize(spriteCommon_, "Resources/numbers/0.png");
+        coinDigitSprites_[i]->SetSize({ 24.0f, 24.0f });
+    }
 
     isMapLoading_ = false;
     loadingTimer_ = 0.0f;
@@ -415,6 +433,36 @@ if (gameOverState_ != GameOverState::None && gameOverState_ != GameOverState::Do
 
         it.obj->Update();
     }
+     for (auto& it : items_) {
+        if (!it.obj) continue;
+
+        // 让道具绕Y轴缓慢旋转
+        Vector3 rot = it.obj->GetRotate();
+        rot.y += 0.05f;                  // 旋转速度（弧度/帧）
+        it.obj->SetRotate(rot);
+        it.obj->Update();
+    }
+
+    // ==== Coin UI：右上角的 3D coin 模型 ====
+     if (coinUiObj_) {
+         const float uiPad = 20.0f;
+         const float digitW = 24.0f;
+         const float digitGap = 2.0f;
+
+         // 与 UpdateCoinCountUI_ 使用同一套公式：预留 3 位数字空间
+         float colonX = (float)WinApp::kClientWidth - uiPad - 3.0f * (digitW + digitGap);
+         float colonY = uiPad + 10.0f;
+
+         // coin 放在冒号左边一点
+         float coinScreenX = colonX - 20.0f;   // 32 可以按你的模型大小再调
+         float coinScreenY = colonY + 12.0f;   // 轻微下移，让居中一点
+
+         Vector3 coinWorld = ScreenToWorld(coinScreenX, coinScreenY, hpNdcZ_, camera_);
+         coinUiObj_->SetTranslate(coinWorld);
+
+         coinUiObj_->Update();
+     }
+
      if (spaceHint_.sprite) {
         Vector3 screen = WorldToScreen(spaceHint_.worldPos, camera_);
         spaceHint_.sprite->SetPosition({ screen.x, screen.y + hintBobOffset});
@@ -464,6 +512,12 @@ if (gameOverState_ != GameOverState::None && gameOverState_ != GameOverState::Do
                 // player_->Heal(10.0f);
             }
         }
+    }
+    // ==== 检查 coin 数量是否变化，变化则刷新 UI ====
+    int nowCoinCount = static_cast<int>(items_.size());
+    if (nowCoinCount != coinCount_) {
+        coinCount_ = nowCoinCount;
+        UpdateCoinCountUI_();
     }
     bool onAnyPortal = false;
     for (auto& portal : portals_) {
@@ -648,7 +702,9 @@ void GameScene::Draw() {
     srvManager_->PreDraw();
     object3dCommon_->CommonDraw();
     player_->Draw();
-
+    if (coinUiObj_) {
+        coinUiObj_->Draw();
+    }
     // ================== 4) 最前景 UI Sprite ==================
     spriteCommon_->CommonDraw();
 
@@ -661,7 +717,15 @@ void GameScene::Draw() {
     if (!player_->CanDash() && grayOverlaySprite_) {
         grayOverlaySprite_->Draw();
     }
-
+     // Coin 数字 UI（冒号 + 数字）
+    if (coinColonSprite_) {
+        coinColonSprite_->Draw();
+    }
+    for (int i = 0; i < 3; ++i) {
+        if (coinDigitSprites_[i]) {
+            coinDigitSprites_[i]->Draw();
+        }
+    }
     // 传送门提示
     if (portalHintSprite_ && portalHintSprite_->IsVisible()) {
         portalHintSprite_->Draw();
@@ -737,6 +801,21 @@ void GameScene::Finalize() {
         if (it.obj) { delete it.obj; it.obj = nullptr; }
     }
     items_.clear();
+    // ==== Coin UI 资源释放 ====
+    if (coinUiObj_) {
+        delete coinUiObj_;
+        coinUiObj_ = nullptr;
+    }
+    if (coinColonSprite_) {
+        delete coinColonSprite_;
+        coinColonSprite_ = nullptr;
+    }
+    for (int i = 0; i < 3; ++i) {
+        if (coinDigitSprites_[i]) {
+            delete coinDigitSprites_[i];
+            coinDigitSprites_[i] = nullptr;
+        }
+    }
 
 }
 
@@ -796,6 +875,10 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
 
     mapChipField_.LoadMapChipCsv(mapPath);
     GenerateBlocks();
+    // ==== 统计当前地图剩余 coin 数并刷新右上角 UI ====
+    coinCount_     = static_cast<int>(items_.size());
+    lastCoinCount_ = -1;           // 强制刷新一次
+    UpdateCoinCountUI_();
     // --- 判断是否播放演出 ---
     if (mapPath == "Resources/map/map.csv") {
         playIntroOnThisMap_ = true;
@@ -1300,4 +1383,77 @@ void GameScene::DrawGameOver_() {
     if (gameOverSprite_ && gameOverSprite_->IsVisible()) {
         gameOverSprite_->Draw();
     }
+}
+
+void GameScene::UpdateCoinCountUI_()
+{
+    if (!coinColonSprite_) {
+        return;
+    }
+
+    const float uiPad    = 20.0f;
+    const float digitW   = 24.0f;
+    const float digitH   = 24.0f;
+    const float digitGap = 2.0f;
+
+    // 预留三位数字的空间，靠近右上角
+    float colonX = (float)WinApp::kClientWidth  - uiPad - 3.0f * (digitW + digitGap);
+    float colonY = uiPad + 10.0f;
+
+    // 冒号位置
+    coinColonSprite_->SetPosition({ colonX, colonY });
+    coinColonSprite_->SetVisible(true);
+    coinColonSprite_->Update();
+    // 规范化到 0~999
+    int c = coinCount_;
+    if (c < 0)   c = 0;
+    if (c > 999) c = 999;
+
+    // 拆成三位
+    int d0 = c / 100;
+    int d1 = (c / 10) % 10;
+    int d2 = c % 10;
+
+    int digits[3] = { d0, d1, d2 };
+    int numDigits = (c >= 100) ? 3 : (c >= 10 ? 2 : 1);
+
+    // 先全部隐藏
+    for (int i = 0; i < 3; ++i) {
+        if (coinDigitSprites_[i]) {
+            coinDigitSprites_[i]->SetVisible(false);
+        }
+    }
+
+    // 数字贴图路径（按你资源实际情况修改）
+    const char* digitTex[10] = {
+        "Resources/numbers/0.png","Resources/numbers/1.png","Resources/numbers/2.png","Resources/numbers/3.png","Resources/numbers/4.png",
+        "Resources/numbers/5.png","Resources/numbers/6.png","Resources/numbers/7.png","Resources/numbers/8.png","Resources/numbers/9.png",
+    };
+
+    // 让数字靠右（最低位靠近右侧）
+    float x = colonX + digitW + digitGap;
+    float y = colonY;
+
+    int startIndex = 3 - numDigits; // 例如 numDigits=1 -> 从 d2 开始
+
+    int spriteIdx = 0;
+    for (int i = startIndex; i < 3; ++i) {
+        int d = digits[i];
+        if (!coinDigitSprites_[spriteIdx]) {
+            ++spriteIdx;
+            continue;
+        }
+
+        // 重新初始化，切换到对应数字贴图
+        coinDigitSprites_[spriteIdx]->Initialize(spriteCommon_, digitTex[d]);
+        coinDigitSprites_[spriteIdx]->SetSize({ digitW, digitH });
+        coinDigitSprites_[spriteIdx]->SetPosition({ x, y });
+        coinDigitSprites_[spriteIdx]->SetVisible(true);
+        coinDigitSprites_[spriteIdx]->Update();
+
+        x += digitW + digitGap;
+        ++spriteIdx;
+    }
+
+    lastCoinCount_ = c;
 }
