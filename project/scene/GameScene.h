@@ -190,7 +190,17 @@ private:
     // ==== 跨地图持久状态：每张地图被拾取过的道具格索引 ====
     // key = 地图路径，val = 已拾取的格子集合（把 (x,y) 打包成 uint32）
     std::unordered_map<std::string, std::unordered_set<uint32_t>> pickedItems_;
+     // ==== Coin 计数 UI（右上角）====
+    // 使用 coin 模型 + colon.png + 0.png~9.png
+    Object3d* coinUiObj_ = nullptr;          // 右上角显示的 coin 模型
+    Sprite*   coinColonSprite_ = nullptr;    // 冒号 ":"
+    Sprite*   coinDigitSprites_[3] = { nullptr, nullptr, nullptr }; // 最多 3 位数字（0~999）
 
+    int coinCount_     = 0;                  // 当前地图剩余 coin 数
+    int lastCoinCount_ = -1;                 // 上一帧的数值（检测变化）
+
+    // 刷新 coin 剩余数量 UI（重设位置与贴图）
+    void UpdateCoinCountUI_();
     // 小工具：把 (x,y) 打包/拆包
     static inline uint32_t PackIdx(uint32_t x, uint32_t y) { return (y << 16) | x; }
 
