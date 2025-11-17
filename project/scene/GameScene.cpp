@@ -93,7 +93,9 @@ void GameScene::GenerateBlocks() {
                 Vector3 itemPos = position;  // ← 用 position，而不是 pos
                 itemPos.y += 0.4f;
                 item->SetTranslate(itemPos);
-                item->SetTranslate(itemPos);
+                item->SetEnableLighting(true);
+                item->SetDirectionalLightIntensity(2.0f);
+                item->SetPointLightIntensity(2.0f);
                 items_.push_back({ x, y, item });
             }
         }
@@ -132,6 +134,7 @@ void GameScene::Initialize() {
     ModelManager::GetInstants()->LoadModel("door/Door.obj");
     ModelManager::GetInstants()->LoadModel("strip/strip.obj");        // 载入模型
     ModelManager::GetInstants()->LoadModel("coin/coin.obj");
+    ModelManager::GetInstants()->LoadModel("coin_ui/coin_ui.obj");
     hpStrips_.reserve(hpSegments_);
     for (int i = 0; i < hpSegments_; ++i) {
         auto* seg = new Object3d();
@@ -155,10 +158,10 @@ void GameScene::Initialize() {
      // ==== 右上角 Coin UI（3D 模型） ====
     coinUiObj_ = new Object3d();
     coinUiObj_->Initialize(object3dCommon_);
-    coinUiObj_->SetModel("coin/coin.obj");      // 已经在 ModelManager 里 Load 过
+    coinUiObj_->SetModel("coin_ui/coin_ui.obj");
     coinUiObj_->SetCamera(camera_);
-    coinUiObj_->SetScale({ 0.0025f, 0.0025f, 0.0025f }); // 根据模型大小自行再调
-
+    coinUiObj_->SetScale({ 0.0025f, 0.0025f, 0.0025f });
+    coinUiObj_->SetEnableLighting(true);
     //LoadMap("Resources/map/map.csv", { 3,3,0 });
     std::string textureFilePath[] = { "Resources/skill_icon.png", "Resources/gray.png" };
 
@@ -261,6 +264,7 @@ void GameScene::Initialize() {
 void GameScene::Update() {
     const float deltaTime = 1.0f / 60.0f;
     hintBobTime_ += deltaTime;
+    coinUiLightTime_  += deltaTime;
     float hintBobOffset = std::sinf(hintBobTime_ * hintBobSpeed_) * hintBobAmplitude_;
     input_->Update();
     // —— 是否允许玩家操作（淡出/加载/淡入期间 & 开场演出期间都禁止）——
@@ -428,7 +432,7 @@ if (gameOverState_ != GameOverState::None && gameOverState_ != GameOverState::Do
 
         // 让道具绕Y轴缓慢旋转
         Vector3 rot = it.obj->GetRotate();
-        rot.y += 0.05f;                  // 旋转速度（弧度/帧），可调 0.02f~0.1f
+        rot.y += 0.025f;                  // 旋转速度（弧度/帧），可调 0.02f~0.1f
         it.obj->SetRotate(rot);
 
         it.obj->Update();
@@ -459,7 +463,18 @@ if (gameOverState_ != GameOverState::None && gameOverState_ != GameOverState::Do
 
          Vector3 coinWorld = ScreenToWorld(coinScreenX, coinScreenY, hpNdcZ_, camera_);
          coinUiObj_->SetTranslate(coinWorld);
+         // 基础亮度（越大整体越亮）
+         const float baseI = 0.6f;
+         // 闪烁幅度（越大变化越明显）
+         const float ampI = 1.4f;
+         // 闪烁速度（越大闪得越快）
+         const float speedI = 6.0f;
 
+         // sin 波从 [-1,1] 映射到 [0,1]
+         float wave = (std::sinf(coinUiLightTime_ * speedI) + 1.0f) * 0.5f;
+         float dirIntensity = baseI + ampI * wave;  // 大概 0.6 ~ 2.0 之间变动
+
+         coinUiObj_->SetDirectionalLightIntensity(dirIntensity);
          coinUiObj_->Update();
      }
 
@@ -504,7 +519,9 @@ if (gameOverState_ != GameOverState::None && gameOverState_ != GameOverState::Do
                     break;
                 }
             }
-
+            ++totalCoinCollected_;
+            coinCount_ = totalCoinCollected_;
+            UpdateCoinCountUI_();
             // 奖励示例：回血+音效（按你的需要换掉）
             // SoundManager::GetInstance()->Play("item_pick", false, 1.0f);
             if (player_) {
@@ -512,12 +529,6 @@ if (gameOverState_ != GameOverState::None && gameOverState_ != GameOverState::Do
                 // player_->Heal(10.0f);
             }
         }
-    }
-    // ==== 检查 coin 数量是否变化，变化则刷新 UI ====
-    int nowCoinCount = static_cast<int>(items_.size());
-    if (nowCoinCount != coinCount_) {
-        coinCount_ = nowCoinCount;
-        UpdateCoinCountUI_();
     }
     bool onAnyPortal = false;
     for (auto& portal : portals_) {
@@ -875,8 +886,8 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
 
     mapChipField_.LoadMapChipCsv(mapPath);
     GenerateBlocks();
-    // ==== 统计当前地图剩余 coin 数并刷新右上角 UI ====
-    coinCount_     = static_cast<int>(items_.size());
+    // ==== 刷新右上角 Coin UI：显示「总共拾取的 coin 数」 ====
+    coinCount_     = totalCoinCollected_;
     lastCoinCount_ = -1;           // 强制刷新一次
     UpdateCoinCountUI_();
     // --- 判断是否播放演出 ---
