@@ -172,7 +172,8 @@ private:
     HintSprite shiftHint_;
     HintSprite sprintHint_;
     std::vector<HintSprite> upHints_;
-
+    // Hub 指引进度：0=去 map3, 1=去 map4, 2=去 map5, 3=去 map6, 4=全部完成
+    int hubGuideStage_ = 0;
     // 提示图标上下浮动
     float hintBobTime_       = 0.0f;
     float hintBobAmplitude_  = 6.0f;   // 位移像素（上下±6）
@@ -192,4 +193,16 @@ private:
 
     // 小工具：把 (x,y) 打包/拆包
     static inline uint32_t PackIdx(uint32_t x, uint32_t y) { return (y << 16) | x; }
+
+     // ==== Hub（map2）解锁进度 ====
+    // 0: 只解锁第1关入口
+    // 1: 解锁到第2关
+    // 2: 解锁到第3关
+    // 3: 解锁到最终关入口
+    // 4: 全部关卡通关
+    int hubProgress_ = 0;
+    bool allStagesCleared_ = false;
+
+    // 每张子地图对应哪一关（0~3）
+    std::unordered_map<std::string, int> hubStageByMap_;
 };

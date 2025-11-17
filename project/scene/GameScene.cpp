@@ -224,6 +224,20 @@ void GameScene::Initialize() {
     gameOverSprite_->Initialize(spriteCommon_, "Resources/GameOver.png"); // 请把图片放到 Resources/
     gameOverSprite_->SetSize(gameOverSize_);
     gameOverSprite_->SetVisible(false);
+
+    // === Hub（map2）的关卡配置 ===
+    hubStageByMap_.clear();
+    //  第1关: map3.csv
+    //  第2关: map4.csv
+    //  第3关: map5.csv
+    //  最终关: map6.csv
+    hubStageByMap_["Resources/map/map3.csv"] = 0; // Stage 0
+    hubStageByMap_["Resources/map/map4.csv"] = 1; // Stage 1
+    hubStageByMap_["Resources/map/map5.csv"] = 2; // Stage 2
+    hubStageByMap_["Resources/map/map6.csv"] = 3; // Stage 3 (最终关)
+    hubProgress_ = 0;
+    allStagesCleared_ = false;
+
 }
 
 void GameScene::Update() {
@@ -458,6 +472,23 @@ if (gameOverState_ != GameOverState::None && gameOverState_ != GameOverState::Do
         if (isOnPortal) {
             // 如果按下E键，才触发传送
             if (canControl && input_->TriggerKey(DIK_E)) {
+
+                // ==== 如果是从子关卡回到 Hub(map2)，更新解锁进度 ====
+                auto itStage = hubStageByMap_.find(currentMapPath_);
+                if (portal.targetMap == "Resources/map/map2.csv" && itStage != hubStageByMap_.end()) {
+                    int stageIndex = itStage->second;   // 这是第几关(0~3)
+                    // 通关第 N 关 → 至少解锁到 N+1
+                    if (hubProgress_ < stageIndex + 1) {
+                        hubProgress_ = stageIndex + 1;
+                        if (hubProgress_ >= 4) {
+                            allStagesCleared_ = true;   // 所有关卡完成
+                            // 在这里你可以做 GameClear 处理
+                            // 例： if (sceneManager_) { sceneManager_->ChangeScene(new GameClearScene()); }
+                        }
+                    }
+                }
+
+                // ==== 现有的传送处理 ====
                 pendingPortalMapPath_ = portal.targetMap;
                 pendingPortalStartPos_ = portal.targetStartPos;
                 pendingPortalLoad_ = true;
@@ -731,7 +762,7 @@ void GameScene::StartLoadingMap(const std::string& mapPath, const Vector3& start
 void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
 {
 
-     // 记录本次地图路径
+    // 记录本次地图路径
     currentMapPath_ = mapPath;
 
     // 清理旧 items 渲染对象
@@ -766,7 +797,7 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
     mapChipField_.LoadMapChipCsv(mapPath);
     GenerateBlocks();
     // --- 判断是否播放演出 ---
-    if (mapPath == "Resources/map/map.csv" || mapPath == "Resources/map/map2.csv") {
+    if (mapPath == "Resources/map/map.csv") {
         playIntroOnThisMap_ = true;
         // 重置 Intro 状态
         introStarted_ = false;
@@ -814,6 +845,54 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
         makeUpHint(11, 4);
         makeUpHint(12, 4);
     }
+    // === Hub 地图（map2）：只显示一个方向箭头，指向“下一关的门” ===
+    else if (mapPath == "Resources/map/map2.csv") {
+        // 教学用的 Space/Shift 提示在 Hub 不显示
+        spaceHint_.worldPos = { 0,0,0 };
+        shiftHint_.worldPos = { 0,0,0 };
+        sprintHint_.worldPos = { 0,0,0 };
+
+        int nextX = -1;
+        int nextY = -1;
+
+        // 根据 hubProgress_ 决定箭头指向哪扇门
+        // 门索引（在 map2 内）：
+        //   map3: (11,5)
+        //   map4: (14,5)
+        //   map5: (23,1)
+        //   map6: (12,14)
+        if (hubProgress_ <= 0) {
+            // 还没通关任何一张 → 指向去 map3 的门
+            nextX = 11; nextY = 5;
+        }
+        else if (hubProgress_ == 1) {
+            // 通关了 map3 → 指向去 map4 的门
+            nextX = 14; nextY = 5;
+        }
+        else if (hubProgress_ == 2) {
+            // 通关了 map4 → 指向去 map5 的门
+            nextX = 23; nextY = 1;
+        }
+        else if (hubProgress_ == 3) {
+            // 通关了 map5 → 指向去最终关 map6 的门
+            nextX = 12; nextY = 14;     // 左边那扇门
+        }
+        else {
+            // hubProgress_ >= 4 → 所有关卡通关，不再显示方向
+        }
+
+        if (nextX >= 0) {
+            HintSprite h;
+            h.sprite = new Sprite();
+            h.sprite->Initialize(spriteCommon_, "Resources/up.png");
+            h.sprite->SetSize({ 32.0f, 32.0f });
+            h.sprite->SetRotation(std::numbers::pi_v<float>);
+            h.worldPos = mapChipField_.GetMapChipPositionByIndex(nextX, nextY);
+            h.worldPos.x += 0.4f;
+            h.worldPos.y += 2.0f;   // 稍微抬高一点，在门上方飘
+            upHints_.push_back(h);
+        }
+    }
     else {
         // 不是 map：确保不画提示
         spaceHint_.worldPos = { 0,0,0 };
@@ -829,12 +908,107 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
     playerCamera_->SetMapBounds(mapChipField_.GetMapMinPosition(), mapChipField_.GetMapMaxPosition());
     // 根据当前地图更新传送门列表
     portals_.clear();
+
+    // ========== map1（起始地图） ==========
     if (mapPath == "Resources/map/map.csv") {
-        portals_.push_back({ {26,11}, "Resources/map/map2.csv", mapChipField_.GetMapChipPositionByIndex(2,1) });
+        // map1 → 中心地图 map2
+        portals_.push_back({
+            {26,11},                           // 当前 map1 里的格子
+            "Resources/map/map2.csv",          // 目标地图（Hub）
+            mapChipField_.GetMapChipPositionByIndex(2,1) // 在 Hub 中的出生格 (2,1) = CSV(27,2)
+            });
     }
+
+    // ========== map2（中心地图 / Hub） ==========
     else if (mapPath == "Resources/map/map2.csv") {
-        portals_.push_back({ {2,1}, "Resources/map/map.csv", mapChipField_.GetMapChipPositionByIndex(26,11) });
+        // 恒常存在：Hub → 返回 map1 的门
+        portals_.push_back({
+            {2,1},                             // Hub 中的 (2,1)（就是你现在的返回门）
+            "Resources/map/map.csv",
+            mapChipField_.GetMapChipPositionByIndex(26,11) // 回 map1 的落点
+            });
+
+        // ------- 解锁顺序的 4 个关卡入口 -------
+        // 约定：所有关卡里玩家出生都在 (2,1)，你之后在关卡 csv 里对应摆好
+
+        // ① CSV (23,11) → index (11,5)：第一关，一开始就解锁（hubProgress_ >= 0）
+        if (hubProgress_ >= 0) {
+            portals_.push_back({
+                {11,5},                        // Hub 上的门位置
+                "Resources/map/map3.csv",      // 第1关
+                mapChipField_.GetMapChipPositionByIndex(2,1) // 在 map3 中出生位置
+                });
+        }
+
+        // ② CSV (23,14) → index (14,5)：第二关，需要先通关第一关（hubProgress_ >= 1）
+        if (hubProgress_ >= 1) {
+            portals_.push_back({
+                {14,5},
+                "Resources/map/map4.csv",      // 第2关
+                mapChipField_.GetMapChipPositionByIndex(2,1)
+                });
+        }
+
+        // ③ CSV (27,23) → index (23,1)：第三关，需要先通关第二关（hubProgress_ >= 2）
+        if (hubProgress_ >= 2) {
+            portals_.push_back({
+                {23,1},
+                "Resources/map/map5.csv",      // 第3关
+                mapChipField_.GetMapChipPositionByIndex(2,1)
+                });
+        }
+
+        // ④ CSV (14,12)/(14,13) → index (12,14)/(13,14)：最终关入口，需要先通关第三关（hubProgress_ >= 3）
+        if (hubProgress_ >= 3) {
+            Vector3 finalStart = mapChipField_.GetMapChipPositionByIndex(2, 1);
+            portals_.push_back({
+                {12,14},                       // 左门
+                "Resources/map/map6.csv",      // 最终关
+                finalStart
+                });
+            portals_.push_back({
+                {13,14},                       // 右门
+                "Resources/map/map6.csv",
+                finalStart
+                });
+        }
     }
+
+    // ========== 各子关卡内部：返回 Hub ==========
+    else {
+        // 这里假设你在每张关卡地图里也放了一个 '2' 当出口，
+        // 把 {x,y} 换成那张图里出口的索引即可
+
+        if (mapPath == "Resources/map/map3.csv") {
+            portals_.push_back({
+                {2,1},                         // TODO: 改成 map3 里出口的格子 index
+                "Resources/map/map2.csv",      // 回到 Hub
+                mapChipField_.GetMapChipPositionByIndex(11,5) // Hub 中出生也放在 (2,1)
+                });
+        }
+        else if (mapPath == "Resources/map/map4.csv") {
+            portals_.push_back({
+                {2,1},                         // TODO
+                "Resources/map/map2.csv",
+                mapChipField_.GetMapChipPositionByIndex(14,5)
+                });
+        }
+        else if (mapPath == "Resources/map/map5.csv") {
+            portals_.push_back({
+                {2,1},                         // TODO
+                "Resources/map/map2.csv",
+                mapChipField_.GetMapChipPositionByIndex(23,1)
+                });
+        }
+        else if (mapPath == "Resources/map/map6.csv") {
+            portals_.push_back({
+                {2,1},                         // TODO（如果最终关也要回 Hub 的话）
+                "Resources/map/map2.csv",
+                mapChipField_.GetMapChipPositionByIndex(12,14)
+                });
+        }
+    }
+
     wasOnPortal_ = false;
 
     player_->Update(input_, mapChipField_);
