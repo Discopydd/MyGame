@@ -27,19 +27,33 @@ void SrvManager::CreateSRVforTexture2D(uint32_t srvIndex, ID3D12Resource* pResou
 	directXCommon->GetDevice()->CreateShaderResourceView(pResource, &srvDesc, GetCPUDescriptorHandle(srvIndex));
 }
 
-void SrvManager::CreateSRVforStructuredBuffer(uint32_t srvIndex, ID3D12Resource* pResource, UINT numElements, UINT structureByteStride)
+void SrvManager::CreateSRVforStructuredBuffer(
+	uint32_t srvIndex,
+	ID3D12Resource* pResource,
+	UINT numElements,
+	UINT structureByteStride)
 {
+	assert(pResource);            // 安全のため
+	assert(numElements > 0);
+	assert(structureByteStride > 0);
+	// もし自分で最大数を決めているなら:
+	// assert(srvIndex < kMaxSrvCount);
+
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-	//SRVの設定
-	srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	srvDesc.Format = DXGI_FORMAT_UNKNOWN;                   // ★重要
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
 	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+
 	srvDesc.Buffer.FirstElement = 0;
+	srvDesc.Buffer.NumElements = numElements;        // 粒子数など
+	srvDesc.Buffer.StructureByteStride = structureByteStride;// 1粒子のサイズ
 	srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
-	srvDesc.Buffer.NumElements = numElements;
-	srvDesc.Buffer.StructureByteStride = structureByteStride;
-	directXCommon->GetDevice()->CreateShaderResourceView(pResource, &srvDesc, GetCPUDescriptorHandle(srvIndex));
+
+	auto cpuHandle = GetCPUDescriptorHandle(srvIndex);
+	directXCommon->GetDevice()->CreateShaderResourceView(
+		pResource, &srvDesc, cpuHandle);
 }
+
 
 void SrvManager::PreDraw()
 {
