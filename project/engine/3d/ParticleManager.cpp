@@ -124,55 +124,81 @@ void ParticleManager::Update() {
 }
 
 void ParticleManager::Draw() {
-	
-	//ルートシグネチャ
-	directxBase_->GetCommandList()->SetGraphicsRootSignature(rootSignature.Get());
-	//PSO設定
-	directxBase_->GetCommandList()->SetPipelineState(graphicsPipelineState.Get());
-	//描画形状設定
-	directxBase_->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	//VBV設定
-	directxBase_->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferView);
-	//パーティクルについて処理
-	for (auto& ParticleGroups : particleGroups) {
-		//マテリアルCBufferの場所を設定
-		directxBase_->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
-		//テクスチャのSRVのDescriptorTableを設定
-		directxBase_->GetCommandList()->SetGraphicsRootDescriptorTable(2, srvManager_->GetGPUDescriptorHandle(ParticleGroups.second.materialData.textureIndex));
-		//インスタンシングデータのSRVのDescriptorTableを設定
-		directxBase_->GetCommandList()->SetGraphicsRootDescriptorTable(1, srvManager_->GetGPUDescriptorHandle(ParticleGroups.second.SRVIndex));
-		//描画
-		directxBase_->GetCommandList()->DrawInstanced(UINT(modelData.vertices.size()), ParticleGroups.second.kNumInstance,0,0);
-	}
+
+    // ★ 粒子を描く前に SRV デスクリプタヒープを必ずバインドする
+    srvManager_->PreDraw();
+
+    // ルートシグネチャ
+    directxBase_->GetCommandList()->SetGraphicsRootSignature(rootSignature.Get());
+    // PSO 設定
+    directxBase_->GetCommandList()->SetPipelineState(graphicsPipelineState.Get());
+    // 描画形状
+    directxBase_->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    // VBV
+    directxBase_->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferView);
+
+    // パーティクルグループごとに描画
+    for (auto& ParticleGroups : particleGroups) {
+
+        // ★ 粒子が 0 個なら無駄な DrawInstanced をしない
+        if (ParticleGroups.second.kNumInstance == 0) {
+            continue;
+        }
+
+        // マテリアル CBuffer
+        directxBase_->GetCommandList()->SetGraphicsRootConstantBufferView(
+            0, materialResource->GetGPUVirtualAddress());
+
+        // テクスチャ SRV
+        directxBase_->GetCommandList()->SetGraphicsRootDescriptorTable(
+            2, srvManager_->GetGPUDescriptorHandle(
+                   ParticleGroups.second.materialData.textureIndex));
+
+        // インスタンシングデータ SRV
+        directxBase_->GetCommandList()->SetGraphicsRootDescriptorTable(
+            1, srvManager_->GetGPUDescriptorHandle(
+                   ParticleGroups.second.SRVIndex));
+
+        // 描画
+        directxBase_->GetCommandList()->DrawInstanced(
+            static_cast<UINT>(modelData.vertices.size()),
+            ParticleGroups.second.kNumInstance,
+            0, 0);
+    }
 }
 
+
 //パーティクルグループの生成
-void ParticleManager::CreateparticleGroup(const std::string name, const std::string textureFilePath) {
-	//登録済みの名前かチェック
-	assert(particleGroups.find(name) == particleGroups.end());
-	ParticleGroup newParticle;
-	//particleGroups[name] = newParticle;
-	//テクスチャファイルパスを設定
-	newParticle.materialData.textureFilePath = textureFilePath;
-	//テクスチャを読み込む
-	TextureManager::GetInstance()->LoadTexture(textureFilePath);
-	//マテリアルデータにテクスチャSRVインデックスを記録
-	newParticle.materialData.textureIndex = TextureManager::GetInstance()->GetTextureIndexByFilePath(textureFilePath);
-	//インスタンシング用のリソース生成
-	newParticle.instancingResource = directxBase_->CreateBufferResource(sizeof(ParticleForGPU) * kNumMaxInstance);
-	//アドレス取得
-	newParticle.instancingResource->Map(0, nullptr, reinterpret_cast<void**>(&newParticle.instancingData));
-	for (uint32_t index = 0; index < kNumMaxInstance; ++index) {
-		newParticle.instancingData[index].WVP = Math::MakeIdentity4x4();
-		newParticle.instancingData[index].World = Math::MakeIdentity4x4();
-		newParticle.instancingData[index].color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
-	}
-	//SRV生成
-	newParticle.SRVIndex = srvManager_->Allocate();
-	srvManager_->CreateSRVforStructuredBuffer(newParticle.SRVIndex, newParticle.
-		instancingResource.Get(), kNumMaxInstance, sizeof(ParticleForGPU));
-	
-	particleGroups[name] = newParticle;
+void ParticleManager::CreateparticleGroup(const std::string name,
+                                          const std::string textureFilePath) {
+    assert(particleGroups.find(name) == particleGroups.end());
+    ParticleGroup newParticle;
+
+    newParticle.materialData.textureFilePath = textureFilePath;
+    TextureManager::GetInstance()->LoadTexture(textureFilePath);
+    newParticle.materialData.textureIndex =
+        TextureManager::GetInstance()->GetTextureIndexByFilePath(textureFilePath);
+
+    newParticle.instancingResource =
+        directxBase_->CreateBufferResource(sizeof(ParticleForGPU) * kNumMaxInstance);
+    newParticle.instancingResource->Map(
+        0, nullptr, reinterpret_cast<void**>(&newParticle.instancingData));
+
+    for (uint32_t i = 0; i < kNumMaxInstance; ++i) {
+        newParticle.instancingData[i].WVP   = Math::MakeIdentity4x4();
+        newParticle.instancingData[i].World = Math::MakeIdentity4x4();
+        newParticle.instancingData[i].color = Vector4(1,1,1,1);
+    }
+    newParticle.kNumInstance = 0;
+
+    newParticle.SRVIndex = srvManager_->Allocate();
+    srvManager_->CreateSRVforStructuredBuffer(
+        newParticle.SRVIndex,
+        newParticle.instancingResource.Get(),
+        kNumMaxInstance,
+        sizeof(ParticleForGPU));
+
+    particleGroups[name] = newParticle;
 }
 
 //パーティクル生成関数
