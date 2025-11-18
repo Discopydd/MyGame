@@ -75,7 +75,7 @@ void GameClearManager::Start() {
 
     // 起点：屏幕左侧内（用你当前的 0.2f，你可以之后再改成屏幕外）
     Vector3 fromLeftWorld = ScreenToWorld(
-        W * 0.2f,
+        W * -0.2f,
         H * 0.6f,
         hpNdcZ_,
         camera_);
@@ -130,7 +130,7 @@ void GameClearManager::Update(float dt) {
 
         // 起点/终点（屏幕左侧 -> 屏幕中央）
         Vector3 startPos = ScreenToWorld(
-            W * 0.2f,
+            W * -0.2f,
             H * 0.6f,
             hpNdcZ_,
             camera_);
@@ -178,7 +178,6 @@ void GameClearManager::DrawTitle() {
     if (!spriteCommon_ || !titleSprite_) { return; }
     if (state_ == State::None || state_ == State::Done) { return; }
 
-    spriteCommon_->CommonDraw();
     if (titleSprite_->IsVisible()) {
         titleSprite_->Draw();
     }

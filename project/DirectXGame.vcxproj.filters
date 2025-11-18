@@ -41,6 +41,12 @@
     <Filter Include="player">
       <UniqueIdentifier>{ca2425eb-abce-4000-baef-563030d7cca7}</UniqueIdentifier>
     </Filter>
+    <Filter Include="UI">
+      <UniqueIdentifier>{53b03a86-8709-4c91-933c-5786d1f8a9ae}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="fade">
+      <UniqueIdentifier>{638131bb-0169-47e2-b94d-d2d2ef79bd17}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="engine\math\MyMath.cpp">
@@ -141,6 +147,18 @@
     </ClCompile>
     <ClCompile Include="scene\GameClearManager.cpp">
       <Filter>scene</Filter>
+    </ClCompile>
+    <ClCompile Include="UI\CoinUIManager.cpp">
+      <Filter>UI</Filter>
+    </ClCompile>
+    <ClCompile Include="scene\GameOverManager.cpp">
+      <Filter>scene</Filter>
+    </ClCompile>
+    <ClCompile Include="fade\IntroManager.cpp">
+      <Filter>fade</Filter>
+    </ClCompile>
+    <ClCompile Include="fade\FadeManager.cpp">
+      <Filter>fade</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -296,6 +314,18 @@
     </ClInclude>
     <ClInclude Include="scene\GameClearManager.h">
       <Filter>scene</Filter>
+    </ClInclude>
+    <ClInclude Include="UI\CoinUIManager.h">
+      <Filter>UI</Filter>
+    </ClInclude>
+    <ClInclude Include="scene\GameOverManager.h">
+      <Filter>scene</Filter>
+    </ClInclude>
+    <ClInclude Include="fade\IntroManager.h">
+      <Filter>fade</Filter>
+    </ClInclude>
+    <ClInclude Include="fade\FadeManager.h">
+      <Filter>fade</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

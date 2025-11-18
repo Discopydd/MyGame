@@ -25,6 +25,11 @@
 
 #include "TitleScene.h"
 #include "GameClearManager.h"
+#include "GameOverManager.h"
+#include "../UI/CoinUIManager.h"
+#include "../fade/IntroManager.h"
+#include "../fade/FadeManager.h"
+
 struct PortalInfo {
     MapChipField::IndexSet index;  // 传送门格子索引
     std::string targetMap;         // 目标地图路径
@@ -82,13 +87,6 @@ private:
 
     Sprite* portalHintSprite_ = nullptr;    // 传送提示图标精灵
 
-    // ===== 画面淡入淡出 =====
-    enum class FadePhase { None, FadingOut, LoadingHold, FadingIn };
-    FadePhase fadePhase_ = FadePhase::None;
-
-    Sprite* fadeSprite_ = nullptr;   // 全屏黑幕
-    float   fadeAlpha_ = 0.0f;      // 0透明 -> 1全黑
-    float   fadeSpeed_ = 0.16f;     // 淡速（可调）
 
     // 传送门触发：等待到黑后再开始加载
     bool        pendingPortalLoad_ = false;
@@ -98,43 +96,6 @@ private:
     // === GameClear / 回标题用的标志 ===
     bool pendingGameClear_ = false;   // 按 E 触发通关时，用来等黑幕到纯黑再进入胜利演出
     bool returnToTitle_ = false;   // 在胜利画面按 Space 后，黑幕淡出回 Title
-
-    // ====== Intro (开场演出) ======
-    enum class IntroState { None, BarsIn, OrbitZoom, TitleShow, BarsOut, Done };
-    IntroState introState_ = IntroState::None;
-    float      introT_ = 0.0f;          // 当前阶段计时
-    bool       introSkippable_ = true;  // 允许按键跳过
-    bool       introStarted_ = false;   // 防止重复启动
-
-    // 电影黑边&UI
-    Sprite* letterboxTop_ = nullptr;
-    Sprite* letterboxBottom_ = nullptr;
-    Sprite* vignette_ = nullptr;        // 暗角
-    Sprite* introTitle_ = nullptr;      // 开场大字
-    Sprite* skipHint_ = nullptr;        // "Press Any Key to Skip"
-
-    // 相机演出参数
-    Vector3 camStartPos_{ 0, 12, -85 };   // 初始远景
-    Vector3 camTargetPos_{ 0,  8, -38 };  // 结束近景
-    Vector3 camPivot_{ 0, 0, 0 };         // 围绕的中心(稍后以玩家位置为基准设定)
-    float   camOrbitDeg_ = 0.0f;          // 环绕角度
-
-    // 屏幕震动
-    float shakeTime_ = 0.0f;
-    float shakeAmp_ = 0.0f;
-    void  ApplyScreenShake_(Vector3& camPos);
-
-    // Easing
-    float EaseOutCubic_(float t) { return 1.0f - powf(1.0f - t, 3.0f); }
-    float EaseInOutSine_(float t) { return 0.5f * (1.0f - cosf(3.1415926f * t)); }
-
-    // Intro 驱动
-    void StartIntro_();
-    void UpdateIntro_(float dt);
-    void DrawIntro_();
-
-    // 是否需要播放开场演出
-    bool playIntroOnThisMap_ = false;
 
     // ===== HP 3D条段 =====
     std::vector<Object3d*> hpStrips_;
@@ -146,25 +107,6 @@ private:
     float hpGapPixel_ = 4.0f;   // 段间距（像素）
     float hpNdcZ_ = 0.08f;  // 贴近相机，避免被遮挡s
 
-    bool overlayPushed_ = false;  // 是否已叠加 LoadingScene
-    bool reachedBlack_ = false;  // 是否已达到纯黑（刚到1.0的那一帧）
-    int  blackHoldFrames_ = 0;    // 纯黑保留帧数
-
-    enum class GameOverState { None, Dying, FadeOut, BlackHold, ShowTitle, Done };
-    GameOverState gameOverState_ = GameOverState::None;
-    float  gameOverT_ = 0.0f;
-
-    // Game Over 标题
-    Sprite* gameOverSprite_ = nullptr;
-    Vector2 gameOverSize_ = { 500.0f, 300.0f }; // 你这张PNG大约500x300，请按实际资源调整
-    Vector2 gameOverPos_;       // 动画中的位置（屏幕像素）
-    Vector2 gameOverStartPos_;  // y在屏幕外上方
-    Vector2 gameOverEndPos_;    // 屏幕中央
-    float   gameOverSlideTime_ = 0.65f;
-    // 启动/更新/绘制
-    void StartGameOver_();
-    void UpdateGameOver_(float dt);
-    void DrawGameOver_();
 
     float   irisBaseHoleRadiusPx_ = 860.0f;
 
@@ -183,8 +125,6 @@ private:
     float hintBobTime_ = 0.0f;
     float hintBobAmplitude_ = 6.0f;   // 位移像素（上下±6）
     float hintBobSpeed_ = 3.0f;   // 频率（越大晃得越快）
-    // Coin UI 灯光闪烁计时
-    float coinUiLightTime_ = 0.0f;
     // ==== 道具渲染节点容器 ====
     struct ItemVisual { uint32_t x, y; Object3d* obj; };
     std::vector<ItemVisual> items_;
@@ -195,20 +135,16 @@ private:
     // ==== 跨地图持久状态：每张地图被拾取过的道具格索引 ====
     // key = 地图路径，val = 已拾取的格子集合（把 (x,y) 打包成 uint32）
     std::unordered_map<std::string, std::unordered_set<uint32_t>> pickedItems_;
-    // ==== Coin 计数 UI（右上角）====
-   // 使用 coin 模型 + colon.png + 0.png~9.png
-    Object3d* coinUiObj_ = nullptr;          // 右上角显示的 coin 模型
-    Sprite* coinColonSprite_ = nullptr;    // 冒号 ":"
-    Sprite* coinDigitSprites_[3] = { nullptr, nullptr, nullptr }; // 最多 3 位数字（0~999）
-
-    int totalCoinCollected_ = 0;             // ★ 跨地图「总共拾取的 coin 数」
-    int coinCount_ = 0;             // 当前 UI 显示的数值（= totalCoinCollected_）
-    int lastCoinCount_ = -1;            // 上一帧的数值（保留给需要时使用）
-
-    // 刷新 coin 剩余数量 UI（重设位置与贴图）
-    void UpdateCoinCountUI_();
+  
     // 小工具：把 (x,y) 打包/拆包
     static inline uint32_t PackIdx(uint32_t x, uint32_t y) { return (y << 16) | x; }
+
+    // === Coin UI 管理器 ===
+    CoinUIManager* coinUI_ = nullptr;
+
+    // 总共拾取的 coin 数保持在 GameScene（逻辑用）
+    int totalCoinCollected_ = 0;
+
 
     // ==== Hub（map2）解锁进度 ====
    // 0: 只解锁第1关入口
@@ -224,4 +160,11 @@ private:
 
     // === GameClear 管理器 ===
     GameClearManager* gameClear_ = nullptr;
+    // === GameOver 管理器 ===
+    GameOverManager* gameOver_ = nullptr;
+    // === Intro 管理器 ===
+    IntroManager* intro_ = nullptr;
+    // === Fade 管理器 ===
+    FadeManager* fade_ = nullptr;
+
 };

@@ -190,6 +190,8 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="engine\base\WinApp.cpp" />
     <ClCompile Include="engine\input\Input.cpp" />
     <ClCompile Include="engine\math\MyMath.cpp" />
+    <ClCompile Include="fade\FadeManager.cpp" />
+    <ClCompile Include="fade\IntroManager.cpp" />
     <ClCompile Include="logger\Logger.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="map\MapChipField.cpp" />
@@ -198,9 +200,11 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="player\PlayerCamera.cpp" />
     <ClCompile Include="scene\Framework.cpp" />
     <ClCompile Include="scene\GameClearManager.cpp" />
+    <ClCompile Include="scene\GameOverManager.cpp" />
     <ClCompile Include="scene\GameScene.cpp" />
     <ClCompile Include="scene\LoadingScene.cpp" />
     <ClCompile Include="scene\TitleScene.cpp" />
+    <ClCompile Include="UI\CoinUIManager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="D3DResourceLeakChecker.h" />
@@ -244,6 +248,8 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="engine\math\Vector2.h" />
     <ClInclude Include="engine\math\Vector3.h" />
     <ClInclude Include="engine\math\Vector4.h" />
+    <ClInclude Include="fade\FadeManager.h" />
+    <ClInclude Include="fade\IntroManager.h" />
     <ClInclude Include="logger\Logger.h" />
     <ClInclude Include="map\MapChipField.h" />
     <ClInclude Include="MyGame.h" />
@@ -251,9 +257,11 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="player\PlayerCamera.h" />
     <ClInclude Include="scene\Framework.h" />
     <ClInclude Include="scene\GameClearManager.h" />
+    <ClInclude Include="scene\GameOverManager.h" />
     <ClInclude Include="scene\GameScene.h" />
     <ClInclude Include="scene\LoadingScene.h" />
     <ClInclude Include="scene\TitleScene.h" />
+    <ClInclude Include="UI\CoinUIManager.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="..\externals\imgui\LICENSE.txt" />
