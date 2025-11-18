@@ -22,6 +22,8 @@
 #include <player/PlayerCamera.h>
 #include <unordered_map>
 #include <unordered_set>
+
+#include "TitleScene.h"
 struct PortalInfo {
     MapChipField::IndexSet index;  // 传送门格子索引
     std::string targetMap;         // 目标地图路径
@@ -92,7 +94,9 @@ private:
     std::string pendingPortalMapPath_;
     Vector3     pendingPortalStartPos_;
 
-
+    // === GameClear / 回标题用的标志 ===
+    bool pendingGameClear_ = false;   // 按 E 触发通关时，用来等黑幕到纯黑再进入胜利演出
+    bool returnToTitle_ = false;   // 在胜利画面按 Space 后，黑幕淡出回 Title
 
     // ====== Intro (开场演出) ======
     enum class IntroState { None, BarsIn, OrbitZoom, TitleShow, BarsOut, Done };
@@ -161,6 +165,29 @@ private:
     void UpdateGameOver_(float dt);
     void DrawGameOver_();
 
+    // ===== Game Clear =====
+    enum class GameClearState { None, SlideTitle, PlayerShow, Done };
+    GameClearState gameClearState_ = GameClearState::None;
+    float  gameClearT_ = 0.0f;
+
+    // Game Clear 标题
+    Sprite* gameClearSprite_ = nullptr;
+    Vector2 gameClearSize_ = { 1280.0f, 720.0f };   // 先和 GameOver 一样，有需要再改
+    Vector2 gameClearPos_;
+    Vector2 gameClearStartPos_;
+    Vector2 gameClearEndPos_;
+    float   gameClearSlideTime_ = 0.65f;
+
+    // GameClear 用的玩家模型（独立于实际玩家，用来在画面中翻跟头）
+    Vector3   clearPlayerStartPos_{};
+    Object3d* clearPlayerObj_ = nullptr;
+    Vector3   clearPlayerBasePos_{};
+    float     clearPlayerSpinT_ = 0.0f;
+
+    void StartGameClear_();
+    void UpdateGameClear_(float dt);
+    void DrawGameClear_();
+
     float   irisBaseHoleRadiusPx_ = 860.0f;
 
     struct HintSprite {
@@ -175,9 +202,9 @@ private:
     // Hub 指引进度：0=去 map3, 1=去 map4, 2=去 map5, 3=去 map6, 4=全部完成
     int hubGuideStage_ = 0;
     // 提示图标上下浮动
-    float hintBobTime_       = 0.0f;
-    float hintBobAmplitude_  = 6.0f;   // 位移像素（上下±6）
-    float hintBobSpeed_      = 3.0f;   // 频率（越大晃得越快）
+    float hintBobTime_ = 0.0f;
+    float hintBobAmplitude_ = 6.0f;   // 位移像素（上下±6）
+    float hintBobSpeed_ = 3.0f;   // 频率（越大晃得越快）
     // Coin UI 灯光闪烁计时
     float coinUiLightTime_ = 0.0f;
     // ==== 道具渲染节点容器 ====
@@ -190,27 +217,27 @@ private:
     // ==== 跨地图持久状态：每张地图被拾取过的道具格索引 ====
     // key = 地图路径，val = 已拾取的格子集合（把 (x,y) 打包成 uint32）
     std::unordered_map<std::string, std::unordered_set<uint32_t>> pickedItems_;
-     // ==== Coin 计数 UI（右上角）====
-    // 使用 coin 模型 + colon.png + 0.png~9.png
+    // ==== Coin 计数 UI（右上角）====
+   // 使用 coin 模型 + colon.png + 0.png~9.png
     Object3d* coinUiObj_ = nullptr;          // 右上角显示的 coin 模型
-    Sprite*   coinColonSprite_ = nullptr;    // 冒号 ":"
-    Sprite*   coinDigitSprites_[3] = { nullptr, nullptr, nullptr }; // 最多 3 位数字（0~999）
+    Sprite* coinColonSprite_ = nullptr;    // 冒号 ":"
+    Sprite* coinDigitSprites_[3] = { nullptr, nullptr, nullptr }; // 最多 3 位数字（0~999）
 
     int totalCoinCollected_ = 0;             // ★ 跨地图「总共拾取的 coin 数」
-    int coinCount_          = 0;             // 当前 UI 显示的数值（= totalCoinCollected_）
-    int lastCoinCount_      = -1;            // 上一帧的数值（保留给需要时使用）
+    int coinCount_ = 0;             // 当前 UI 显示的数值（= totalCoinCollected_）
+    int lastCoinCount_ = -1;            // 上一帧的数值（保留给需要时使用）
 
     // 刷新 coin 剩余数量 UI（重设位置与贴图）
     void UpdateCoinCountUI_();
     // 小工具：把 (x,y) 打包/拆包
     static inline uint32_t PackIdx(uint32_t x, uint32_t y) { return (y << 16) | x; }
 
-     // ==== Hub（map2）解锁进度 ====
-    // 0: 只解锁第1关入口
-    // 1: 解锁到第2关
-    // 2: 解锁到第3关
-    // 3: 解锁到最终关入口
-    // 4: 全部关卡通关
+    // ==== Hub（map2）解锁进度 ====
+   // 0: 只解锁第1关入口
+   // 1: 解锁到第2关
+   // 2: 解锁到第3关
+   // 3: 解锁到最终关入口
+   // 4: 全部关卡通关
     int hubProgress_ = 0;
     bool allStagesCleared_ = false;
 

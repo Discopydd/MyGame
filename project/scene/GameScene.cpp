@@ -242,9 +242,15 @@ void GameScene::Initialize() {
     skipHint_->SetColor({ 1,1,1,0 });
     skipHint_->SetVisible(false);
     gameOverSprite_ = new Sprite();
-    gameOverSprite_->Initialize(spriteCommon_, "Resources/GameOver.png"); // 请把图片放到 Resources/
+    gameOverSprite_->Initialize(spriteCommon_, "Resources/GameOver.png");
     gameOverSprite_->SetSize(gameOverSize_);
     gameOverSprite_->SetVisible(false);
+        // GameClear 标题
+    gameClearSprite_ = new Sprite();
+    // 路径你可以按自己资源改，比如 Resources/GameClear.png
+    gameClearSprite_->Initialize(spriteCommon_, "Resources/GameClear.png");
+    gameClearSprite_->SetSize(gameClearSize_);
+    gameClearSprite_->SetVisible(false);
 
     // === Hub（map2）的关卡配置 ===
     hubStageByMap_.clear();
@@ -264,14 +270,15 @@ void GameScene::Initialize() {
 void GameScene::Update() {
     const float deltaTime = 1.0f / 60.0f;
     hintBobTime_ += deltaTime;
-    coinUiLightTime_  += deltaTime;
+    coinUiLightTime_ += deltaTime;
     float hintBobOffset = std::sinf(hintBobTime_ * hintBobSpeed_) * hintBobAmplitude_;
     input_->Update();
     // —— 是否允许玩家操作（淡出/加载/淡入期间 & 开场演出期间都禁止）——
     const bool isFading = (fadePhase_ != FadePhase::None);
     const bool inIntro = (introStarted_ && introState_ != IntroState::Done);
-    const bool canControl = !(isFading || inIntro);
     const bool inGameOver = (gameOverState_ != GameOverState::None && gameOverState_ != GameOverState::Done);
+    const bool inGameClear = (gameClearState_ != GameClearState::None && gameClearState_ != GameClearState::Done);
+    const bool canControl = !(isFading || inIntro || inGameOver || inGameClear);
     // ===== Intro 驱动（在加载/淡出等早退之前执行，但不盖过Loading）=====
     if (fadePhase_ == FadePhase::None) {
         UpdateIntro_(deltaTime);
@@ -310,10 +317,22 @@ void GameScene::Update() {
                 return;
             }
 
+            // === 1) 从 GameClear 回标题：纯黑后直接切回 TitleScene ===
+            if (returnToTitle_) {
+                returnToTitle_ = false;
+                if (sceneManager_) {
+                    sceneManager_->ClearOverlayScene();
+                    sceneManager_->SetNextScene(new TitleScene());
+                }
+                return;
+            }
             // 保留帧结束 → 叠加 Loading 叠层（仅一次）
             if (!overlayPushed_) {
-                if (sceneManager_) {
-                    sceneManager_->SetOverlayScene(new LoadingScene());
+                // 只有真正“要加载地图”的情况才需要 LoadingScene
+                if (!pendingGameClear_ && !returnToTitle_) {
+                    if (sceneManager_) {
+                        sceneManager_->SetOverlayScene(new LoadingScene());
+                    }
                 }
                 overlayPushed_ = true;
             }
@@ -322,10 +341,27 @@ void GameScene::Update() {
             if (pendingPortalLoad_) {
                 pendingPortalLoad_ = false;
                 StartLoadingMap(pendingPortalMapPath_, pendingPortalStartPos_, true);
+                // 进入 LoadingHold 等待加载完成
+                fadePhase_ = FadePhase::LoadingHold;
+                return;
             }
-
-            // 进入 LoadingHold 等待加载完成
-            fadePhase_ = FadePhase::LoadingHold;
+            // === 4) 通关：黑幕后启动 GameClear 演出，再从黑幕淡入 ===
+            if (pendingGameClear_) {
+                pendingGameClear_ = false;
+                if (sceneManager_) {
+                    sceneManager_->ClearOverlayScene();
+                }
+                StartGameClear_();                // 创建胜利标题+玩家演出
+                fadePhase_ = FadePhase::None;
+                fadeAlpha_ = 1.0f;
+                if (fadeSprite_) {
+                    fadeSprite_->SetVisible(true);
+                    fadeSprite_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f }); // 完全不透明黑
+                    fadeSprite_->Update();
+                }
+                return;
+            }
+            fadePhase_ = FadePhase::FadingIn;
             return;
         }
 
@@ -368,7 +404,7 @@ void GameScene::Update() {
         portalLoadingTimer_ += deltaTime;
         if (portalLoadingTimer_ >= LOADING_DURATION) {
             isPortalLoading_ = false;
-            
+
 
             // 真正加载地图
             LoadMap(portalMapPath_, portalStartPos_);
@@ -394,14 +430,18 @@ void GameScene::Update() {
 
     camera_->Update();
     // 若尚未进入GameOver，检测HP
-if (gameOverState_ == GameOverState::None && player_->GetHP() <= 0.0f) {
-    StartGameOver_();
-}
+    if (gameOverState_ == GameOverState::None && player_->GetHP() <= 0.0f) {
+        StartGameOver_();
+    }
 
-// GameOver状态机推进（会在其中屏蔽玩家操作）
-if (gameOverState_ != GameOverState::None && gameOverState_ != GameOverState::Done) {
-    UpdateGameOver_(deltaTime);
-}
+    // GameOver状态机推进（会在其中屏蔽玩家操作）
+    if (gameOverState_ != GameOverState::None && gameOverState_ != GameOverState::Done) {
+        UpdateGameOver_(deltaTime);
+    }
+    // GameClear 状态机推进
+    if (gameClearState_ != GameClearState::None && gameClearState_ != GameClearState::Done) {
+        UpdateGameClear_(deltaTime);
+    }
 
     float hpRatio = player_ ? player_->GetHpRatio() : 1.0f;
     hpVisibleCount_ = (int)std::ceil(hpRatio * hpSegments_);
@@ -432,75 +472,65 @@ if (gameOverState_ != GameOverState::None && gameOverState_ != GameOverState::Do
 
         // 让道具绕Y轴缓慢旋转
         Vector3 rot = it.obj->GetRotate();
-        rot.y += 0.025f;                  // 旋转速度（弧度/帧），可调 0.02f~0.1f
-        it.obj->SetRotate(rot);
-
-        it.obj->Update();
-    }
-     for (auto& it : items_) {
-        if (!it.obj) continue;
-
-        // 让道具绕Y轴缓慢旋转
-        Vector3 rot = it.obj->GetRotate();
         rot.y += 0.05f;                  // 旋转速度（弧度/帧）
         it.obj->SetRotate(rot);
         it.obj->Update();
     }
 
     // ==== Coin UI：右上角的 3D coin 模型 ====
-     if (coinUiObj_) {
-         const float uiPad = 20.0f;
-         const float digitW = 24.0f;
-         const float digitGap = 2.0f;
+    if (coinUiObj_) {
+        const float uiPad = 20.0f;
+        const float digitW = 24.0f;
+        const float digitGap = 2.0f;
 
-         // 与 UpdateCoinCountUI_ 使用同一套公式：预留 3 位数字空间
-         float colonX = (float)WinApp::kClientWidth - uiPad - 3.0f * (digitW + digitGap);
-         float colonY = uiPad + 10.0f;
+        // 与 UpdateCoinCountUI_ 使用同一套公式：预留 3 位数字空间
+        float colonX = (float)WinApp::kClientWidth - uiPad - 3.0f * (digitW + digitGap);
+        float colonY = uiPad + 10.0f;
 
-         // coin 放在冒号左边一点
-         float coinScreenX = colonX - 20.0f;   // 32 可以按你的模型大小再调
-         float coinScreenY = colonY + 12.0f;   // 轻微下移，让居中一点
+        // coin 放在冒号左边一点
+        float coinScreenX = colonX - 20.0f;   // 32 可以按你的模型大小再调
+        float coinScreenY = colonY + 12.0f;   // 轻微下移，让居中一点
 
-         Vector3 coinWorld = ScreenToWorld(coinScreenX, coinScreenY, hpNdcZ_, camera_);
-         coinUiObj_->SetTranslate(coinWorld);
-         // 基础亮度（越大整体越亮）
-         const float baseI = 0.6f;
-         // 闪烁幅度（越大变化越明显）
-         const float ampI = 1.4f;
-         // 闪烁速度（越大闪得越快）
-         const float speedI = 6.0f;
+        Vector3 coinWorld = ScreenToWorld(coinScreenX, coinScreenY, hpNdcZ_, camera_);
+        coinUiObj_->SetTranslate(coinWorld);
+        // 基础亮度（越大整体越亮）
+        const float baseI = 0.6f;
+        // 闪烁幅度（越大变化越明显）
+        const float ampI = 1.4f;
+        // 闪烁速度（越大闪得越快）
+        const float speedI = 6.0f;
 
-         // sin 波从 [-1,1] 映射到 [0,1]
-         float wave = (std::sinf(coinUiLightTime_ * speedI) + 1.0f) * 0.5f;
-         float dirIntensity = baseI + ampI * wave;  // 大概 0.6 ~ 2.0 之间变动
+        // sin 波从 [-1,1] 映射到 [0,1]
+        float wave = (std::sinf(coinUiLightTime_ * speedI) + 1.0f) * 0.5f;
+        float dirIntensity = baseI + ampI * wave;  // 大概 0.6 ~ 2.0 之间变动
 
-         coinUiObj_->SetDirectionalLightIntensity(dirIntensity);
-         coinUiObj_->Update();
-     }
+        coinUiObj_->SetDirectionalLightIntensity(dirIntensity);
+        coinUiObj_->Update();
+    }
 
-     if (spaceHint_.sprite) {
+    if (spaceHint_.sprite) {
         Vector3 screen = WorldToScreen(spaceHint_.worldPos, camera_);
-        spaceHint_.sprite->SetPosition({ screen.x, screen.y + hintBobOffset});
+        spaceHint_.sprite->SetPosition({ screen.x, screen.y + hintBobOffset });
         spaceHint_.sprite->Update();
     }
 
-     for (auto& h : upHints_) {
-         if (!h.sprite) continue;
-         Vector3 s = WorldToScreen(h.worldPos, camera_);
-         h.sprite->SetPosition({ s.x, s.y + hintBobOffset});
-         h.sprite->Update();
-     }
-     if (shiftHint_.sprite) {
-         Vector3 screen = WorldToScreen(shiftHint_.worldPos, camera_);
-         shiftHint_.sprite->SetPosition({ screen.x, screen.y + hintBobOffset});
-         shiftHint_.sprite->Update();
-     }
+    for (auto& h : upHints_) {
+        if (!h.sprite) continue;
+        Vector3 s = WorldToScreen(h.worldPos, camera_);
+        h.sprite->SetPosition({ s.x, s.y + hintBobOffset });
+        h.sprite->Update();
+    }
+    if (shiftHint_.sprite) {
+        Vector3 screen = WorldToScreen(shiftHint_.worldPos, camera_);
+        shiftHint_.sprite->SetPosition({ screen.x, screen.y + hintBobOffset });
+        shiftHint_.sprite->Update();
+    }
 
-     if (sprintHint_.sprite) {
-         Vector3 screen = WorldToScreen(sprintHint_.worldPos, camera_);
-         sprintHint_.sprite->SetPosition({ screen.x, screen.y + hintBobOffset});
-         sprintHint_.sprite->Update();
-     }
+    if (sprintHint_.sprite) {
+        Vector3 screen = WorldToScreen(sprintHint_.worldPos, camera_);
+        sprintHint_.sprite->SetPosition({ screen.x, screen.y + hintBobOffset });
+        sprintHint_.sprite->Update();
+    }
 
     MapChipField::IndexSet playerIndex = mapChipField_.GetMapChipIndexByPosition(player_->GetPosition());
     if (mapChipField_.GetMapChipTypeByIndex(playerIndex.xIndex, playerIndex.yIndex) == MapChipType::kItem) {
@@ -540,6 +570,10 @@ if (gameOverState_ != GameOverState::None && gameOverState_ != GameOverState::Do
 
                 // ==== 如果是从子关卡回到 Hub(map2)，更新解锁进度 ====
                 auto itStage = hubStageByMap_.find(currentMapPath_);
+                bool triggerGameClear = false;
+                if (currentMapPath_ == "Resources/map/map.csv") {
+                    triggerGameClear = true;
+                }
                 if (portal.targetMap == "Resources/map/map2.csv" && itStage != hubStageByMap_.end()) {
                     int stageIndex = itStage->second;   // 这是第几关(0~3)
                     // 通关第 N 关 → 至少解锁到 N+1
@@ -549,25 +583,45 @@ if (gameOverState_ != GameOverState::None && gameOverState_ != GameOverState::Do
                             allStagesCleared_ = true;   // 所有关卡完成
                             // 在这里你可以做 GameClear 处理
                             // 例： if (sceneManager_) { sceneManager_->ChangeScene(new GameClearScene()); }
+                            triggerGameClear = true;
                         }
                     }
                 }
+                if (triggerGameClear) {
+                    // 通关：不再传送，而是先黑幕淡出，再进入 GameClear
+                    if (gameClearState_ == GameClearState::None && !pendingGameClear_) {
+                        pendingGameClear_ = true;
 
-                // ==== 现有的传送处理 ====
-                pendingPortalMapPath_ = portal.targetMap;
-                pendingPortalStartPos_ = portal.targetStartPos;
-                pendingPortalLoad_ = true;
+                        // 重置黑幕参数
+                        fadeAlpha_ = 0.0f;
+                        reachedBlack_ = false;
+                        blackHoldFrames_ = 0;
+                        overlayPushed_ = false;
 
-                fadeAlpha_ = 0.0f;
-                reachedBlack_ = false;
-                blackHoldFrames_ = 0;
-                overlayPushed_ = false;
-                // 开始淡出到全黑
-                fadePhase_ = FadePhase::FadingOut;
-                if (fadeSprite_) {
-                    fadeSprite_->SetVisible(true);
-                    fadeSprite_->SetColor({ 1,1,1,fadeAlpha_ });
+                        fadePhase_ = FadePhase::FadingOut;
+                        if (fadeSprite_) {
+                            fadeSprite_->SetVisible(true);
+                            fadeSprite_->SetColor({ 1,1,1, fadeAlpha_ });
+                        }
+                    }
                 }
+                 else {
+                     // ==== 现有的传送处理 ====
+                     pendingPortalMapPath_ = portal.targetMap;
+                     pendingPortalStartPos_ = portal.targetStartPos;
+                     pendingPortalLoad_ = true;
+
+                     fadeAlpha_ = 0.0f;
+                     reachedBlack_ = false;
+                     blackHoldFrames_ = 0;
+                     overlayPushed_ = false;
+                     // 开始淡出到全黑
+                     fadePhase_ = FadePhase::FadingOut;
+                     if (fadeSprite_) {
+                         fadeSprite_->SetVisible(true);
+                         fadeSprite_->SetColor({ 1,1,1,fadeAlpha_ });
+                     }
+                 }
             }
             onAnyPortal = true;
             break;
@@ -617,7 +671,9 @@ if (gameOverState_ != GameOverState::None && gameOverState_ != GameOverState::Do
             fadeAlpha_ = 0.0f;
             fadePhase_ = FadePhase::None; // 淡入完成
             // ★ 淡入完成→启动开场演出
-            if (!introStarted_) {
+            if (!introStarted_ &&
+                gameOverState_ == GameOverState::None &&
+                gameClearState_ == GameClearState::None) {
                 StartIntro_();
             }
         }
@@ -670,6 +726,11 @@ if (gameOverState_ != GameOverState::None && gameOverState_ != GameOverState::Do
 void GameScene::Draw() {
     dxCommon_->Begin();
 
+    // 是否处于 GameClear 演出中
+    const bool inGameClear =
+        (gameClearState_ != GameClearState::None &&
+         gameClearState_ != GameClearState::Done);
+
     // ================== 1) 3D 场景（地图、HP 3D条等） ==================
     srvManager_->PreDraw();
     object3dCommon_->CommonDraw();
@@ -678,87 +739,115 @@ void GameScene::Draw() {
     for (auto* block : mapBlocks_) {
         block->Draw();
     }
+    // 道具
     for (auto& it : items_) {
-        if (it.obj) it.obj->Draw();
+        if (it.obj) {
+            it.obj->Draw();
+        }
     }
-    // HP 3D 条段（如果你想永远最上，可以挪到玩家后面，这里先保持原样）
+    // HP 3D 条段
     for (int i = 0; i < hpVisibleCount_; ++i) {
         hpStrips_[i]->Draw();
     }
 
+    // ================== 1.5) GameClear 用全屏黑背景 ==================
+    // 盖住上面的地图、道具等，让背景变成纯黑
+    if (inGameClear && fadeSprite_) {
+        spriteCommon_->CommonDraw();
+        fadeSprite_->SetVisible(true);
+        // 纹理是黑色贴图，RGB=1, A=1 就是纯黑
+        fadeSprite_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+        fadeSprite_->Draw();
+    }
+
     // ================== 2) 中间层：交互提示 Sprite ==================
     spriteCommon_->CommonDraw();
+    if (!inGameClear) {
+        if (spaceHint_.sprite) {
+            spaceHint_.sprite->Draw();
+        }
 
-    if (spaceHint_.sprite) {
-        spaceHint_.sprite->Draw();
-    }
+        // 所有 Up 提示
+        for (auto& h : upHints_) {
+            if (h.sprite) {
+                h.sprite->Draw();
+            }
+        }
+        if (shiftHint_.sprite) {
+            shiftHint_.sprite->Draw();
+        }
+        if (sprintHint_.sprite) {
+            sprintHint_.sprite->Draw();
+        }
+        // 技能图标
+        if (skillSprite_) {
+            skillSprite_->Draw();
+        }
 
-    // 所有 Up
-    for (auto& h : upHints_) {
-        if (h.sprite) {
-            h.sprite->Draw();
+        // 冲刺CD灰罩
+        if (!player_->CanDash() && grayOverlaySprite_) {
+            grayOverlaySprite_->Draw();
+        }
+
+        // Coin 数字 UI（冒号 + 数字）
+        if (coinColonSprite_) {
+            coinColonSprite_->Draw();
+        }
+        for (int i = 0; i < 3; ++i) {
+            if (coinDigitSprites_[i]) {
+                coinDigitSprites_[i]->Draw();
+            }
+        }
+
+        // 传送门提示
+        if (portalHintSprite_ && portalHintSprite_->IsVisible()) {
+            portalHintSprite_->Draw();
         }
     }
-    if (shiftHint_.sprite) {
-        shiftHint_.sprite->Draw();
-    }
-    if (sprintHint_.sprite) {
-        sprintHint_.sprite->Draw();
-    }
-
-
-    dxCommon_->ClearDepthBuffer();
     // ================== 3) 前景 3D：玩家（盖住提示） ==================
-    // 再次切回 3D PSO（如果需要的话）
+    dxCommon_->ClearDepthBuffer();
+
     srvManager_->PreDraw();
     object3dCommon_->CommonDraw();
-    player_->Draw();
-    if (coinUiObj_) {
-        coinUiObj_->Draw();
-    }
-    // ================== 4) 最前景 UI Sprite ==================
-    spriteCommon_->CommonDraw();
 
-    // 技能图标
-    if (skillSprite_) {
-        skillSprite_->Draw();
-    }
-
-    // 冲刺CD灰罩
-    if (!player_->CanDash() && grayOverlaySprite_) {
-        grayOverlaySprite_->Draw();
-    }
-     // Coin 数字 UI（冒号 + 数字）
-    if (coinColonSprite_) {
-        coinColonSprite_->Draw();
-    }
-    for (int i = 0; i < 3; ++i) {
-        if (coinDigitSprites_[i]) {
-            coinDigitSprites_[i]->Draw();
+    // GameClear 时只画 clearPlayerObj_，不画正常玩家
+    if (inGameClear) {
+        if (clearPlayerObj_) {
+            clearPlayerObj_->Draw();
         }
     }
-    // 传送门提示
-    if (portalHintSprite_ && portalHintSprite_->IsVisible()) {
-        portalHintSprite_->Draw();
+    else {
+        if (player_) {
+            player_->Draw();
+        }
+        // Coin 3D UI
+        if (coinUiObj_) {
+            coinUiObj_->Draw();
+        }
     }
+
+    // ================== 4) 最前景 UI Sprite ==================
+    spriteCommon_->CommonDraw();
 
     // Intro / 黑边 / 暗角 / 标题 / Skip 提示
     DrawIntro_();
 
-    // 黑幕淡入淡出
-    if (fadeSprite_) {
+    // 黑幕淡入淡出（GameClear 时不用这个黑幕，避免挡住胜利画面）
+    if (fadeSprite_ && !inGameClear) {
         fadeSprite_->Draw();
     }
 
     // GameOver
     DrawGameOver_();
 
+    // GameClear（只画标题 / 文字，不再在这里画黑幕）
+    DrawGameClear_();
+
     // ImGui（debug UI）
     imguiManager_->Draw();
 
     dxCommon_->End();
 }
-
 
 void GameScene::Finalize() {
     SoundManager::GetInstance()->Finalize();
@@ -827,6 +916,8 @@ void GameScene::Finalize() {
             coinDigitSprites_[i] = nullptr;
         }
     }
+    if (gameClearSprite_) { delete gameClearSprite_; gameClearSprite_ = nullptr; }
+    if (clearPlayerObj_) { delete clearPlayerObj_; clearPlayerObj_ = nullptr; }
 
 }
 
@@ -1110,6 +1201,7 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
     playerCamera_->Update();
     camera_->Update();
 }
+
 void GameScene::StartIntro_() {
     if (player_) {
         player_->ResetForMapTransition(true);  // 停止移动、跳跃、冲刺等
@@ -1276,6 +1368,7 @@ void GameScene::ApplyScreenShake_(Vector3& camPos) {
     camPos.x += nx * shakeAmp_;
     camPos.y += ny * shakeAmp_ * 0.6f;
 }
+
 void GameScene::StartGameOver_() {
     gameOverState_ = GameOverState::Dying;
     gameOverT_ = 0.0f;
@@ -1467,4 +1560,187 @@ void GameScene::UpdateCoinCountUI_()
     }
 
     lastCoinCount_ = c;
+}
+
+void GameScene::StartGameClear_() {
+    if (gameClearState_ != GameClearState::None) { return; }
+
+    gameClearState_ = GameClearState::SlideTitle;
+    gameClearT_ = 0.0f;
+
+    // 计算 GameClear 标题起止位置（和 GameOver 一样：从屏幕上方滑到中央）
+    const float W = (float)WinApp::kClientWidth;
+    const float H = (float)WinApp::kClientHeight;
+
+    gameClearEndPos_   = { (W - gameClearSize_.x) * 0.5f, (H - gameClearSize_.y) * 0.5f };
+    gameClearStartPos_ = { gameClearEndPos_.x, -gameClearSize_.y - 40.0f };
+    gameClearPos_      = gameClearStartPos_;
+
+    if (gameClearSprite_) {
+        gameClearSprite_->SetVisible(true);
+        gameClearSprite_->SetPosition({ gameClearPos_.x, gameClearPos_.y });
+        gameClearSprite_->Update();
+    }
+
+    // === 创建独立的 GameClear 玩家模型 ===
+    if (!clearPlayerObj_) {
+        clearPlayerObj_ = new Object3d();
+        clearPlayerObj_->Initialize(object3dCommon_);
+        clearPlayerObj_->SetModel("player/player.obj");  // 和玩家同一模型
+        clearPlayerObj_->SetCamera(camera_);
+    }
+
+    // 稍微小一点
+    clearPlayerObj_->SetScale({ 0.004f, 0.004f, 0.004f });
+    clearPlayerObj_->SetRotate({ 0.0f, 0.0f, 0.0f });
+
+    // 用屏幕坐标算「目标位置：画面中央偏下」
+    Vector3 centerWorld = ScreenToWorld(
+        W * 0.5f,
+        H * 0.6f,    // 略偏下
+        hpNdcZ_,
+        camera_);
+    clearPlayerBasePos_ = centerWorld;
+
+    // 初始让玩家在屏幕左侧（20% 宽度）位置，之后再滑到中间
+    Vector3 fromLeftWorld = ScreenToWorld(
+        W * -0.1f,    // 屏幕左侧
+        H * 0.8f,
+        hpNdcZ_,
+        camera_);
+
+    clearPlayerObj_->SetTranslate(fromLeftWorld);
+    clearPlayerObj_->Update();
+
+    // 计时器归零，用来控制移动+旋转
+    clearPlayerSpinT_ = 0.0f;
+}
+
+void GameScene::UpdateGameClear_(float dt) {
+    gameClearT_ += dt;
+
+    switch (gameClearState_) {
+    case GameClearState::SlideTitle: {
+        // 标题从上滑入：沿用 GameOver 的 easeOutBack
+        float d = (std::min)(1.0f, gameClearT_ / gameClearSlideTime_);
+        float s = 1.70158f;
+        float p = d - 1.0f;
+        float e = 1.0f + (p * p * ((s + 1.0f) * p + s));
+
+        gameClearPos_.x = gameClearStartPos_.x + (gameClearEndPos_.x - gameClearStartPos_.x) * e;
+        gameClearPos_.y = gameClearStartPos_.y + (gameClearEndPos_.y - gameClearStartPos_.y) * e;
+
+        if (gameClearSprite_) {
+            gameClearSprite_->SetPosition({ gameClearPos_.x, gameClearPos_.y });
+            gameClearSprite_->Update();
+        }
+
+        if (d >= 1.0f) {
+            gameClearState_ = GameClearState::PlayerShow;
+            gameClearT_ = 0.0f;
+            clearPlayerSpinT_ = 0.0f;   // 同时重置玩家演出计时
+        }
+        break;
+    }
+
+    case GameClearState::PlayerShow: {
+        if (clearPlayerObj_) {
+            clearPlayerSpinT_ += dt;
+
+            // 阶段时间：先移动，再转头
+            const float moveDuration = 1.2f; // 从左滑到中间
+            const float rotateDuration = 1.0f; // 原地转头所用时间
+
+            const float W = (float)WinApp::kClientWidth;
+            const float H = (float)WinApp::kClientHeight;
+
+            // 每帧根据屏幕位置算「起点(左侧)」和「终点(中央)」
+            Vector3 startPos = ScreenToWorld(
+                W * -0.1f,    // 左侧
+                H * 0.8f,
+                hpNdcZ_,
+                camera_);
+
+            Vector3 endPos = ScreenToWorld(
+                W * 0.5f,    // 中央
+                H * 0.8f,
+                hpNdcZ_,
+                camera_);
+
+            Vector3 pos{};
+            float yaw = 0.0f;
+
+            if (clearPlayerSpinT_ < moveDuration) {
+                // === 阶段1：从左边滑到屏幕中央 ===
+                float u = clearPlayerSpinT_ / moveDuration; // 0~1
+                float e = EaseOutCubic_(u);
+
+                pos.x = startPos.x + (endPos.x - startPos.x) * e;
+                pos.y = startPos.y + (endPos.y - startPos.y) * e;
+                pos.z = startPos.z + (endPos.z - startPos.z) * e;
+
+                yaw = 0.0f;
+            }
+            else {
+                // === 阶段2：已经在中央，慢慢转头面对镜头 ===
+                pos = endPos;
+
+                float rTime = clearPlayerSpinT_ - moveDuration;
+                if (rTime > rotateDuration) {
+                    rTime = rotateDuration;
+                }
+                float v = rotateDuration > 0.0f ? (rTime / rotateDuration) : 1.0f;
+                float e = EaseOutCubic_(v);
+
+                const float startYaw = 0.0f;                     // 从默认朝向开始
+                const float endYaw = 3.14159265f * 0.5f;       // 转到 +90°（向右转）
+                yaw = startYaw + (endYaw - startYaw) * e;
+            }
+
+            clearPlayerObj_->SetTranslate(pos);
+            clearPlayerObj_->SetRotate({ 0.0f, yaw, 0.0f });
+            clearPlayerObj_->Update();
+        }
+        break;
+    }
+
+    case GameClearState::None:
+    case GameClearState::Done:
+    default:
+        break;
+    }
+    // === 在 GameClear 期间按 Space → 黑幕淡出回 Title ===
+    if (gameClearState_ != GameClearState::None &&
+        gameClearState_ != GameClearState::Done &&
+        input_ && input_->TriggerKey(DIK_SPACE)) {
+
+        if (!returnToTitle_) {
+            returnToTitle_ = true;
+            fadeAlpha_ = 0.0f;
+            reachedBlack_ = false;
+            blackHoldFrames_ = 0;
+            overlayPushed_ = false;
+
+            fadePhase_ = FadePhase::FadingOut;
+            if (fadeSprite_) {
+                fadeSprite_->SetVisible(true);
+                fadeSprite_->SetColor({ 1.0f, 1.0f, 1.0f, fadeAlpha_ });
+            }
+        }
+    }
+}
+
+void GameScene::DrawGameClear_() {
+    if (!spriteCommon_) return;
+    if (gameClearState_ == GameClearState::None ||
+        gameClearState_ == GameClearState::Done) return;
+
+    spriteCommon_->CommonDraw();
+
+    // 只画标题，不画黑幕
+    if (gameClearSprite_ && gameClearSprite_->IsVisible()) {
+        gameClearSprite_->Draw();
+    }
+
+    // 金币 UI 本身已经在普通 Draw 里画了，所以这里不需要额外处理
 }
