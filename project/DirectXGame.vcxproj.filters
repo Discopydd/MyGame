@@ -139,6 +139,9 @@
     <ClCompile Include="scene\LoadingScene.cpp">
       <Filter>scene</Filter>
     </ClCompile>
+    <ClCompile Include="scene\GameClearManager.cpp">
+      <Filter>scene</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="engine\math\Matrix3x3.h">
@@ -290,6 +293,9 @@
     </ClInclude>
     <ClInclude Include="engine\math\Quaternion.h">
       <Filter>project\math</Filter>
+    </ClInclude>
+    <ClInclude Include="scene\GameClearManager.h">
+      <Filter>scene</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

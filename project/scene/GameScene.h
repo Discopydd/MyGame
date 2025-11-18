@@ -24,6 +24,7 @@
 #include <unordered_set>
 
 #include "TitleScene.h"
+#include "GameClearManager.h"
 struct PortalInfo {
     MapChipField::IndexSet index;  // 传送门格子索引
     std::string targetMap;         // 目标地图路径
@@ -165,29 +166,6 @@ private:
     void UpdateGameOver_(float dt);
     void DrawGameOver_();
 
-    // ===== Game Clear =====
-    enum class GameClearState { None, SlideTitle, PlayerShow, Done };
-    GameClearState gameClearState_ = GameClearState::None;
-    float  gameClearT_ = 0.0f;
-
-    // Game Clear 标题
-    Sprite* gameClearSprite_ = nullptr;
-    Vector2 gameClearSize_ = { 1280.0f, 720.0f };   // 先和 GameOver 一样，有需要再改
-    Vector2 gameClearPos_;
-    Vector2 gameClearStartPos_;
-    Vector2 gameClearEndPos_;
-    float   gameClearSlideTime_ = 0.65f;
-
-    // GameClear 用的玩家模型（独立于实际玩家，用来在画面中翻跟头）
-    Vector3   clearPlayerStartPos_{};
-    Object3d* clearPlayerObj_ = nullptr;
-    Vector3   clearPlayerBasePos_{};
-    float     clearPlayerSpinT_ = 0.0f;
-
-    void StartGameClear_();
-    void UpdateGameClear_(float dt);
-    void DrawGameClear_();
-
     float   irisBaseHoleRadiusPx_ = 860.0f;
 
     struct HintSprite {
@@ -243,4 +221,7 @@ private:
 
     // 每张子地图对应哪一关（0~3）
     std::unordered_map<std::string, int> hubStageByMap_;
+
+    // === GameClear 管理器 ===
+    GameClearManager* gameClear_ = nullptr;
 };
