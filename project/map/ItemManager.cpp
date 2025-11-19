@@ -2,9 +2,9 @@
 
 void ItemManager::Initialize(Object3dCommon* objCommon, Camera* camera)
 {
+    ClearVisuals();
     object3dCommon_ = objCommon;
     camera_         = camera;
-    items_.clear();
 }
 
 void ItemManager::Finalize()

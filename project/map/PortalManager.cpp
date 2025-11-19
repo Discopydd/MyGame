@@ -2,6 +2,12 @@
 
 void PortalManager::Initialize(SpriteCommon* spriteCommon, Camera* camera)
 {
+
+    if (hintSprite_) {
+        delete hintSprite_;
+        hintSprite_ = nullptr;
+    }
+    portals_.clear();
     spriteCommon_ = spriteCommon;
     camera_       = camera;
 
@@ -9,9 +15,8 @@ void PortalManager::Initialize(SpriteCommon* spriteCommon, Camera* camera)
     hintSprite_->Initialize(spriteCommon_, "Resources/letterE.png");
     hintSprite_->SetPosition({ 0.0f, 0.0f });
     hintSprite_->SetSize({ 32.0f, 32.0f });
-    hintSprite_->SetVisible(false);
+    hintSprite_->SetVisible(false); 
 
-    portals_.clear();
 }
 
 void PortalManager::Finalize()

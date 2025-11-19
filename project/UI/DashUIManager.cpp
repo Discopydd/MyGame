@@ -2,6 +2,15 @@
 
 void DashUIManager::Initialize(SpriteCommon* spriteCommon, Player* player)
 {
+
+     if (icon_) {
+        delete icon_;
+        icon_ = nullptr;
+    }
+    if (overlay_) {
+        delete overlay_;
+        overlay_ = nullptr;
+    }
     spriteCommon_ = spriteCommon;
     player_       = player;
 

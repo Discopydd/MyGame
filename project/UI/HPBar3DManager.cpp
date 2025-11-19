@@ -10,13 +10,16 @@ void HPBar3DManager::Initialize(Object3dCommon* objCommon,
                                 Player* player,
                                 float hpNdcZ)
 {
+    for (auto* seg : strips_) {
+        delete seg;
+    }
+    strips_.clear();
+    strips_.reserve(segments_);
+
     object3dCommon_ = objCommon;
     camera_         = camera;
     player_         = player;
     hpNdcZ_         = hpNdcZ;
-
-    strips_.clear();
-    strips_.reserve(segments_);
 
     // 假设 "strip/strip.obj" 模型已经在外面由 ModelManager 加载过
     for (int i = 0; i < segments_; ++i) {

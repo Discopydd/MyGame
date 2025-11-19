@@ -210,12 +210,6 @@ void GameScene::Initialize() {
 
 void GameScene::Update() {
     const float deltaTime = 1.0f / 60.0f;
-    if (hintUI_) {
-        hintUI_->Update(deltaTime);
-    }
-    if (coinUI_) {
-        coinUI_->Update(deltaTime);
-    }
     input_->Update();
     // —— 是否允许玩家操作（淡出/加载/淡入期间 & 开场演出期间都禁止）——
     const bool isFading = (fade_ && fade_->GetPhase() != FadePhase::None);
@@ -371,7 +365,12 @@ void GameScene::Update() {
             gameOver_->Start();
         }
     }
-
+    if (hintUI_) {
+        hintUI_->Update(deltaTime);
+    }
+    if (coinUI_) {
+        coinUI_->Update(deltaTime);
+    }
     // GameOver 状态机推进（交给管理器）
     if (gameOver_) {
         gameOver_->Update(deltaTime);
@@ -669,7 +668,6 @@ void GameScene::Draw() {
 
 void GameScene::Finalize() {
     SoundManager::GetInstance()->Finalize();
-    ParticleManager::GetInstance()->Finalize();
     TextureManager::GetInstance()->Finalize();
     ModelManager::GetInstants()->Finalize();
     imguiManager_->Finalize();
