@@ -160,6 +160,21 @@
     <ClCompile Include="fade\FadeManager.cpp">
       <Filter>fade</Filter>
     </ClCompile>
+    <ClCompile Include="UI\HPBar3DManager.cpp">
+      <Filter>UI</Filter>
+    </ClCompile>
+    <ClCompile Include="UI\HintUIManager.cpp">
+      <Filter>UI</Filter>
+    </ClCompile>
+    <ClCompile Include="map\ItemManager.cpp">
+      <Filter>map</Filter>
+    </ClCompile>
+    <ClCompile Include="UI\DashUIManager.cpp">
+      <Filter>UI</Filter>
+    </ClCompile>
+    <ClCompile Include="map\PortalManager.cpp">
+      <Filter>map</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="engine\math\Matrix3x3.h">
@@ -233,9 +248,6 @@
     </ClInclude>
     <ClInclude Include="engine\base\SrvManager.h">
       <Filter>project\base</Filter>
-    </ClInclude>
-    <ClInclude Include="engine\3d\Particle.h">
-      <Filter>project\3d</Filter>
     </ClInclude>
     <ClInclude Include="engine\3d\ParticleEmitter.h">
       <Filter>project\3d</Filter>
@@ -326,6 +338,21 @@
     </ClInclude>
     <ClInclude Include="fade\FadeManager.h">
       <Filter>fade</Filter>
+    </ClInclude>
+    <ClInclude Include="UI\HPBar3DManager.h">
+      <Filter>UI</Filter>
+    </ClInclude>
+    <ClInclude Include="UI\HintUIManager.h">
+      <Filter>UI</Filter>
+    </ClInclude>
+    <ClInclude Include="map\ItemManager.h">
+      <Filter>map</Filter>
+    </ClInclude>
+    <ClInclude Include="UI\DashUIManager.h">
+      <Filter>UI</Filter>
+    </ClInclude>
+    <ClInclude Include="map\PortalManager.h">
+      <Filter>map</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

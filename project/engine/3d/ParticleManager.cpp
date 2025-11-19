@@ -87,7 +87,8 @@ void ParticleManager::Update() {
 				float distance = Math::Length(Math::Subtract(particlePos, cameraPos));
 
 				// 根据距离缩放（你可以调整 5.0f 是越小看起来越大）
-				float scaleFactor = 5.0f / max(distance, 0.1f); // 避免除以0
+				float scaleFactor = 5.0f / (std::max)(distance, 0.1f);
+				scaleFactor = std::clamp(scaleFactor, 0.2f, 3.0f);
 				Vector3 scaled = {
 					(*particleIterator).transform.scale.x * scaleFactor,
 					(*particleIterator).transform.scale.y * scaleFactor,
@@ -100,9 +101,6 @@ void ParticleManager::Update() {
 				Matrix4x4 translateMatrix = Math::MakeTranslateMatrix((*particleIterator).transform.translate);
 				Matrix4x4 worldMatrix = Math::Multiply(Math::Multiply(billboardMatrix, scaleMatrix), translateMatrix);
 				Matrix4x4 worldViewProjectionMatrix = Math::Multiply(worldMatrix, viewprojectionMatrix);
-				ParticleGroups.second.instancingData[ParticleGroups.second.kNumInstance].WVP = worldViewProjectionMatrix;
-				ParticleGroups.second.instancingData[ParticleGroups.second.kNumInstance].World = worldMatrix;
-				ParticleGroups.second.instancingData[ParticleGroups.second.kNumInstance].color = (*particleIterator).color;
 				//Fieldの範囲内のParticleには加速度を適用する
 				if (IsCollision(accelerationfield_.area, (*particleIterator).transform.translate)) {
 					(*particleIterator).velocity = Math::Add((*particleIterator).velocity,
@@ -205,15 +203,11 @@ void ParticleManager::Emit(const std::string name, const Vector3& position, uint
 
 //ParticleがFieldの範囲内か判定
 bool ParticleManager::IsCollision(const AABB& aabb, const Vector3& point) {
-	if ((aabb_.min.x <= point.x && aabb_.max.x >= point.x) &&
-		(aabb_.min.y <= point.y && aabb.max.y >= point.y) &&
-		(aabb.min.z <= point.z && aabb.max.z >= point.z)) {
-		return true;
-	}
-	else {
-		return false;
-	}
+    return (aabb.min.x <= point.x && aabb.max.x >= point.x) &&
+           (aabb.min.y <= point.y && aabb.max.y >= point.y) &&
+           (aabb.min.z <= point.z && aabb.max.z >= point.z);
 }
+
 
 //ルートシグネチャの作成
 void ParticleManager::GenerateRootSignature() {

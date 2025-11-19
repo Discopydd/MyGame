@@ -29,12 +29,12 @@
 #include "../UI/CoinUIManager.h"
 #include "../fade/IntroManager.h"
 #include "../fade/FadeManager.h"
+#include "../UI/HPBar3DManager.h" 
+#include "../UI/HintUIManager.h"
+#include "../map/ItemManager.h"
+#include "../UI/DashUIManager.h"
+#include "../map/PortalManager.h"
 
-struct PortalInfo {
-    MapChipField::IndexSet index;  // 传送门格子索引
-    std::string targetMap;         // 目标地图路径
-    Vector3 targetStartPos;        // 玩家在目标地图的起点
-};
 class GameScene : public BaseScene {
 public:
     void Initialize() override;
@@ -64,13 +64,14 @@ private:
     void LoadMap(const std::string& mapPath, const Vector3& startPos);
     Player* player_ = nullptr;
 
-    Sprite* skillSprite_ = nullptr;          // 技能图标精灵
-    Sprite* grayOverlaySprite_ = nullptr;    // 灰色遮罩精灵
+    // 冲刺技能 UI 管理器
+    DashUIManager* dashUI_ = nullptr;
 
-    std::vector<PortalInfo> portals_;
-    bool wasOnPortal_ = false;
-    std::string nextMapToLoad_;    // 记录下一帧要加载的地图路径
-    Vector3 nextMapStartPos_;      // 记录玩家在新地图的起点
+   // 传送门管理器
+    PortalManager* portalMgr_ = nullptr;
+
+    std::string nextMapToLoad_;    // （目前没用到，先保留不动）
+    Vector3 nextMapStartPos_;
 
     // ================== 加载相关 ==================
     bool shouldStartLoading_ = true;     // 延迟初始化加载
@@ -85,8 +86,6 @@ private:
 
     static constexpr float LOADING_DURATION = 0.5f; // 1秒
 
-    Sprite* portalHintSprite_ = nullptr;    // 传送提示图标精灵
-
 
     // 传送门触发：等待到黑后再开始加载
     bool        pendingPortalLoad_ = false;
@@ -97,47 +96,25 @@ private:
     bool pendingGameClear_ = false;   // 按 E 触发通关时，用来等黑幕到纯黑再进入胜利演出
     bool returnToTitle_ = false;   // 在胜利画面按 Space 后，黑幕淡出回 Title
 
-    // ===== HP 3D条段 =====
-    std::vector<Object3d*> hpStrips_;
-    int   hpSegments_ = 10;     // 总段数（10格血）
-    int   hpVisibleCount_ = 10;     // 本帧可见段数（随HP变化）
-    float hpInsetX_ = 40.0f;  // 屏幕左侧内边距（像素）
-    float hpInsetY_ = 50.0f; // 屏幕上侧内边距（像素）→数值越大越靠下
-    float hpSegPixelW_ = 45.0f;  // 每段在屏幕横向占用（像素）
-    float hpGapPixel_ = 4.0f;   // 段间距（像素）
-    float hpNdcZ_ = 0.08f;  // 贴近相机，避免被遮挡s
+     // ===== HP 3D条管理器 =====
+    HPBar3DManager* hpBar_ = nullptr;
+    float hpNdcZ_ = 0.08f;  // 贴近相机，避免被遮挡
 
 
-    float   irisBaseHoleRadiusPx_ = 860.0f;
-
-    struct HintSprite {
-        Sprite* sprite = nullptr;
-        Vector3 worldPos{};
-    };
-
-    HintSprite spaceHint_;
+     HintSprite spaceHint_;
     HintSprite shiftHint_;
     HintSprite sprintHint_;
     std::vector<HintSprite> upHints_;
-    // Hub 指引进度：0=去 map3, 1=去 map4, 2=去 map5, 3=去 map6, 4=全部完成
+    // Hub 指引进度：0=去 map3, 1=map4, 2=map5, 3=map6, 4=全部完成
     int hubGuideStage_ = 0;
-    // 提示图标上下浮动
-    float hintBobTime_ = 0.0f;
-    float hintBobAmplitude_ = 6.0f;   // 位移像素（上下±6）
-    float hintBobSpeed_ = 3.0f;   // 频率（越大晃得越快）
-    // ==== 道具渲染节点容器 ====
-    struct ItemVisual { uint32_t x, y; Object3d* obj; };
-    std::vector<ItemVisual> items_;
 
-    // ==== 当前地图路径（用于做 key） ====
+    // 提示图标管理器
+    HintUIManager* hintUI_ = nullptr;
+    // ==== 道具管理器 ====
+    ItemManager* itemMgr_ = nullptr;
+
+    // ==== 当前地图路径（用于做 key / Hub 逻辑）====
     std::string currentMapPath_;
-
-    // ==== 跨地图持久状态：每张地图被拾取过的道具格索引 ====
-    // key = 地图路径，val = 已拾取的格子集合（把 (x,y) 打包成 uint32）
-    std::unordered_map<std::string, std::unordered_set<uint32_t>> pickedItems_;
-  
-    // 小工具：把 (x,y) 打包/拆包
-    static inline uint32_t PackIdx(uint32_t x, uint32_t y) { return (y << 16) | x; }
 
     // === Coin UI 管理器 ===
     CoinUIManager* coinUI_ = nullptr;

@@ -74,29 +74,26 @@ void GameScene::GenerateBlocks() {
                 mapBlocks_.push_back(portal);
             }
             else if (type == MapChipType::kItem) {
-                // === 新增：道具 ===
-                const uint32_t key = PackIdx(x, y);
-                auto found = pickedItems_.find(currentMapPath_);
-                bool alreadyPicked = (found != pickedItems_.end() && found->second.count(key));
+                if (!itemMgr_) { continue; }
 
-                if (alreadyPicked) {
-                    // ★ 该格已拾取过 → 本次不生成可见体
+                // 若该格在此地图已经被拾取过，则不再生成
+                if (!itemMgr_->CanSpawnItem(currentMapPath_, x, y)) {
                     continue;
                 }
 
-                // 生成一个道具可见体（示例用 cube；你也可换成 item.obj）
                 Object3d* item = new Object3d();
                 item->Initialize(object3dCommon_);
-                item->SetModel("coin/coin.obj");         // TODO: 替换为你的 item 模型
+                item->SetModel("coin/coin.obj");
                 item->SetCamera(camera_);
-                // 让道具略浮起一点更显眼（可选）
-                Vector3 itemPos = position;  // ← 用 position，而不是 pos
+
+                Vector3 itemPos = position;
                 itemPos.y += 0.4f;
                 item->SetTranslate(itemPos);
                 item->SetEnableLighting(true);
                 item->SetDirectionalLightIntensity(2.0f);
                 item->SetPointLightIntensity(2.0f);
-                items_.push_back({ x, y, item });
+
+                itemMgr_->RegisterItem(currentMapPath_, x, y, item);
             }
         }
     }
@@ -135,16 +132,7 @@ void GameScene::Initialize() {
     ModelManager::GetInstants()->LoadModel("strip/strip.obj");        // 载入模型
     ModelManager::GetInstants()->LoadModel("coin/coin.obj");
     ModelManager::GetInstants()->LoadModel("coin_ui/coin_ui.obj");
-    hpStrips_.reserve(hpSegments_);
-    for (int i = 0; i < hpSegments_; ++i) {
-        auto* seg = new Object3d();
-        seg->Initialize(object3dCommon_);
-        seg->SetModel("strip/strip.obj");
-        seg->SetCamera(camera_);
-        // 体感缩放：根据你的 strip 模型大小微调
-        seg->SetScale({ 0.001f, 0.001f, 0.001f });
-        hpStrips_.push_back(seg);
-    }
+
     player_ = new Player();
     player_->Initialize(object3dCommon_, camera_);
 
@@ -155,19 +143,13 @@ void GameScene::Initialize() {
     playerCamera_->SetFollowSpeed(0.1f);
     playerCamera_->SetConstrainToMap(true);
 
-    //LoadMap("Resources/map/map.csv", { 3,3,0 });
-    std::string textureFilePath[] = { "Resources/skill_icon.png", "Resources/gray.png" };
+     // === 冲刺技能 UI 管理器 ===
+    dashUI_ = new DashUIManager();
+    dashUI_->Initialize(spriteCommon_, player_);
 
-    skillSprite_ = new Sprite();
-    skillSprite_->Initialize(spriteCommon_, textureFilePath[0]);
-    skillSprite_->SetPosition({ 40.0f, 80.0f }); // 左上角
-    skillSprite_->SetSize({ 32.0f, 32.0f });
-
-    grayOverlaySprite_ = new Sprite();
-    grayOverlaySprite_->Initialize(spriteCommon_, textureFilePath[1]);
-    grayOverlaySprite_->SetPosition({ 40.0f, 80.0f });
-    grayOverlaySprite_->SetSize({ 32.0f, 32.0f });
-
+    // === HP 3D 条管理器 ===
+    hpBar_ = new HPBar3DManager();
+    hpBar_->Initialize(object3dCommon_, camera_, player_, hpNdcZ_);
      // === Coin UI 管理器 ===
     coinUI_ = new CoinUIManager();
     coinUI_->Initialize(spriteCommon_, object3dCommon_, camera_, hpNdcZ_);
@@ -175,15 +157,25 @@ void GameScene::Initialize() {
     // 一开始显示当前总金币数（通常是 0）
     coinUI_->SetTotalCoin(totalCoinCollected_);
 
+        // === Hint UI 管理器 ===
+    hintUI_ = new HintUIManager();
+    hintUI_->Initialize(spriteCommon_, camera_);
+
+    // 把 GameScene 里的 HintSprite 指针交给管理器
+    hintUI_->SetSpaceHint(&spaceHint_);
+    hintUI_->SetShiftHint(&shiftHint_);
+    hintUI_->SetSprintHint(&sprintHint_);
+    hintUI_->SetUpHints(&upHints_);
+        // === Item 管理器 ===
+    itemMgr_ = new ItemManager();
+    itemMgr_->Initialize(object3dCommon_, camera_);
 
     isMapLoading_ = false;
     loadingTimer_ = 0.0f;
 
-    portalHintSprite_ = new Sprite();
-    portalHintSprite_->Initialize(spriteCommon_, "Resources/letterE.png"); // 你的提示图
-    portalHintSprite_->SetPosition({ 0.0f, 0.0f }); // 初始位置，稍后动态更新
-    portalHintSprite_->SetSize({ 32.0f, 32.0f });
-    portalHintSprite_->SetVisible(false); // 默认隐藏
+   // === Portal 管理器 ===
+    portalMgr_ = new PortalManager();
+    portalMgr_->Initialize(spriteCommon_, camera_);
 
        // === Fade 管理器 ===
     fade_ = new FadeManager();
@@ -218,26 +210,27 @@ void GameScene::Initialize() {
 
 void GameScene::Update() {
     const float deltaTime = 1.0f / 60.0f;
-    hintBobTime_ += deltaTime;
+    if (hintUI_) {
+        hintUI_->Update(deltaTime);
+    }
     if (coinUI_) {
         coinUI_->Update(deltaTime);
     }
-    float hintBobOffset = std::sinf(hintBobTime_ * hintBobSpeed_) * hintBobAmplitude_;
     input_->Update();
     // —— 是否允许玩家操作（淡出/加载/淡入期间 & 开场演出期间都禁止）——
     const bool isFading = (fade_ && fade_->GetPhase() != FadePhase::None);
-    const bool inIntro    = (intro_ && intro_->IsPlaying());
-    const bool inGameOver  = (gameOver_ && gameOver_->IsPlaying());
+    const bool inIntro = (intro_ && intro_->IsPlaying());
+    const bool inGameOver = (gameOver_ && gameOver_->IsPlaying());
     const bool inGameClear = (gameClear_ && gameClear_->IsPlaying());
     const bool canControl = !(isFading || inIntro || inGameOver || inGameClear);
-   
-       // ===== Intro 驱动（在加载/淡出等早退之前执行，但不盖过Loading）=====
+
+    // ===== Intro 驱动（在加载/淡出等早退之前执行，但不盖过Loading）=====
     if (fade_ && fade_->GetPhase() == FadePhase::None && intro_) {
         intro_->Update(deltaTime);
         // Intro 自己会更新内部 sprite 的属性，这里不用再手动 Update
     }
 
-      // ===== 画面淡入淡出状态机（优先执行）=====
+    // ===== 画面淡入淡出状态机（优先执行）=====
     if (fade_ && fade_->GetPhase() == FadePhase::FadingOut) {
         // 1) alpha 逐帧增加
         float a = fade_->GetAlpha();
@@ -252,7 +245,8 @@ void GameScene::Update() {
                 fade_->SetReachedBlack(true);
                 // 第一次到纯黑，先 return，让这一帧只显示纯黑
                 return;
-            } else if (fade_->GetBlackHoldFrames() > 0) {
+            }
+            else if (fade_->GetBlackHoldFrames() > 0) {
                 fade_->SetBlackHoldFrames(fade_->GetBlackHoldFrames() - 1);
                 return;
             }
@@ -378,7 +372,7 @@ void GameScene::Update() {
         }
     }
 
-     // GameOver 状态机推进（交给管理器）
+    // GameOver 状态机推进（交给管理器）
     if (gameOver_) {
         gameOver_->Update(deltaTime);
     }
@@ -386,7 +380,7 @@ void GameScene::Update() {
     if (gameClear_) {
         gameClear_->Update(deltaTime);
     }
-        // === 在 GameClear 演出期间按 Space → 回标题 ===
+    // === 在 GameClear 演出期间按 Space → 回标题 ===
     if (gameClear_ && gameClear_->IsPlaying() && input_ && input_->TriggerKey(DIK_SPACE)) {
 
         if (sceneManager_) {
@@ -414,197 +408,92 @@ void GameScene::Update() {
         }
     }
 
-
-    float hpRatio = player_ ? player_->GetHpRatio() : 1.0f;
-    hpVisibleCount_ = (int)std::ceil(hpRatio * hpSegments_);
-    hpVisibleCount_ = (std::max)(0, (std::min)(hpVisibleCount_, hpSegments_));
-
-
-    // ===== 屏幕基点（左上向内偏移） =====
-    const float pad = 16.0f;
-    float baseX = pad + hpInsetX_;
-    float baseY = pad + hpInsetY_;
-
-    // ===== 给每一段计算屏幕坐标 → 反投到世界 → Update =====
-    for (int i = 0; i < hpSegments_; ++i) {
-        float sx = baseX + i * (hpSegPixelW_ + hpGapPixel_);
-        float sy = baseY;
-        Vector3 world = ScreenToWorld(sx, sy, hpNdcZ_, camera_);
-        hpStrips_[i]->SetTranslate(world);
-
-        // 可选：轻微缩放衰减/高亮首段等，这里先保持一致
-        // 可选：若你的 Object3d 支持朝向/关闭剔除，可在此设置
-        hpStrips_[i]->Update();
+    if (hpBar_) {
+        hpBar_->Update(deltaTime);
     }
+
     for (auto* block : mapBlocks_) {
         block->Update();
     }
-    for (auto& it : items_) {
-        if (!it.obj) continue;
-
-        // 让道具绕Y轴缓慢旋转
-        Vector3 rot = it.obj->GetRotate();
-        rot.y += 0.05f;                  // 旋转速度（弧度/帧）
-        it.obj->SetRotate(rot);
-        it.obj->Update();
-    }
-
-    if (spaceHint_.sprite) {
-        Vector3 screen = WorldToScreen(spaceHint_.worldPos, camera_);
-        spaceHint_.sprite->SetPosition({ screen.x, screen.y + hintBobOffset });
-        spaceHint_.sprite->Update();
-    }
-
-    for (auto& h : upHints_) {
-        if (!h.sprite) continue;
-        Vector3 s = WorldToScreen(h.worldPos, camera_);
-        h.sprite->SetPosition({ s.x, s.y + hintBobOffset });
-        h.sprite->Update();
-    }
-    if (shiftHint_.sprite) {
-        Vector3 screen = WorldToScreen(shiftHint_.worldPos, camera_);
-        shiftHint_.sprite->SetPosition({ screen.x, screen.y + hintBobOffset });
-        shiftHint_.sprite->Update();
-    }
-
-    if (sprintHint_.sprite) {
-        Vector3 screen = WorldToScreen(sprintHint_.worldPos, camera_);
-        sprintHint_.sprite->SetPosition({ screen.x, screen.y + hintBobOffset });
-        sprintHint_.sprite->Update();
+    if (itemMgr_) {
+        itemMgr_->Update(deltaTime);
     }
 
     MapChipField::IndexSet playerIndex = mapChipField_.GetMapChipIndexByPosition(player_->GetPosition());
-    if (mapChipField_.GetMapChipTypeByIndex(playerIndex.xIndex, playerIndex.yIndex) == MapChipType::kItem) {
-
-        const uint32_t packed = PackIdx(playerIndex.xIndex, playerIndex.yIndex);
-
-        // 若从未登记过：登记“已拾取”，删除可见体 & 给予奖励
-        if (!pickedItems_[currentMapPath_].count(packed)) {
-            pickedItems_[currentMapPath_].insert(packed);
-
-            // 从 items_ 里找到同格子对象，删除
-            for (auto it = items_.begin(); it != items_.end(); ++it) {
-                if (it->x == playerIndex.xIndex && it->y == playerIndex.yIndex) {
-                    if (it->obj) delete it->obj;
-                    items_.erase(it);
-                    break;
-                }
-            }
+    const PortalInfo* currentPortal = nullptr;
+    if (portalMgr_) {
+        portalMgr_->UpdateHint(playerIndex, player_->GetPosition(), canControl);
+        currentPortal = portalMgr_->GetPortalAt(playerIndex);
+    }
+    if (itemMgr_) {
+        bool picked = itemMgr_->OnPlayerStepOnTile(currentMapPath_, playerIndex, mapChipField_, player_);
+        if (picked) {
             ++totalCoinCollected_;
             if (coinUI_) {
                 coinUI_->SetTotalCoin(totalCoinCollected_);
             }
-            // 奖励示例：回血+音效（按你的需要换掉）
-            // SoundManager::GetInstance()->Play("item_pick", false, 1.0f);
-            if (player_) {
-                // 假设你想加点血
-                // player_->Heal(10.0f);
-            }
         }
     }
     bool onAnyPortal = false;
-    for (auto& portal : portals_) {
-        bool isOnPortal = (playerIndex.xIndex == portal.index.xIndex &&
-            playerIndex.yIndex == portal.index.yIndex);
-        if (isOnPortal) {
-            // 如果按下E键，才触发传送
-            if (canControl && input_->TriggerKey(DIK_E)) {
-
-                // ==== 如果是从子关卡回到 Hub(map2)，更新解锁进度 ====
-                auto itStage = hubStageByMap_.find(currentMapPath_);
-                bool triggerGameClear = false;
-                if (currentMapPath_ == "Resources/map/map.csv") {
-                    triggerGameClear = true;
-                }
-                if (portal.targetMap == "Resources/map/map2.csv" && itStage != hubStageByMap_.end()) {
-                    int stageIndex = itStage->second;   // 这是第几关(0~3)
-                    // 通关第 N 关 → 至少解锁到 N+1
-                    if (hubProgress_ < stageIndex + 1) {
-                        hubProgress_ = stageIndex + 1;
-                        if (hubProgress_ >= 4) {
-                            allStagesCleared_ = true;   // 所有关卡完成
-                            // 在这里你可以做 GameClear 处理
-                            // 例： if (sceneManager_) { sceneManager_->ChangeScene(new GameClearScene()); }
-                            triggerGameClear = true;
-                        }
-                    }
-                }
-                if (triggerGameClear) {
-                    // 通关：不再直接开始 GameClear，而是：
-                    // 1) 先黑幕淡出到全黑
-                    // 2) 在 FadingOut 逻辑里 pendingGameClear_ 分支中启动 GameClear
-                    if (!pendingGameClear_ && gameClear_ && !gameClear_->IsPlaying() && fade_) {
-                        pendingGameClear_ = true;
-
-                        fade_->SetAlpha(0.0f);
-                        fade_->SetReachedBlack(false);
-                        fade_->SetBlackHoldFrames(0);
-                        fade_->SetOverlayPushed(false);
-
-                        // 开始淡出到全黑
-                        fade_->SetPhase(FadePhase::FadingOut);
-                        if (Sprite* s = fade_->GetSprite()) {
-                            s->SetVisible(true);
-                        }
-                    }
-                }
-                else {
-                    // ==== 现有的传送处理 ====
-                    pendingPortalMapPath_ = portal.targetMap;
-                    pendingPortalStartPos_ = portal.targetStartPos;
-                    pendingPortalLoad_ = true;
-
-                    if (fade_) {
-                        fade_->SetAlpha(0.0f);
-                        fade_->SetReachedBlack(false);
-                        fade_->SetBlackHoldFrames(0);
-                        fade_->SetOverlayPushed(false);
-
-                        fade_->SetPhase(FadePhase::FadingOut);
-                        if (Sprite* s = fade_->GetSprite()) {
-                            s->SetVisible(true);
-                        }
+    if (currentPortal) {
+        // 玩家正站在某个门格子上
+        if (canControl && input_->TriggerKey(DIK_E)) {
+            // ==== 如果是从子关卡回到 Hub(map2)，更新解锁进度 ====
+            auto itStage = hubStageByMap_.find(currentMapPath_);
+            bool triggerGameClear = false;
+            if (currentPortal->targetMap == "Resources/map/map2.csv" && itStage != hubStageByMap_.end()) {
+                int stageIndex = itStage->second;   // 这是第几关(0~3)
+                if (hubProgress_ < stageIndex + 1) {
+                    hubProgress_ = stageIndex + 1;
+                    if (hubProgress_ >= 4) {
+                        allStagesCleared_ = true;
+                        triggerGameClear = true;
                     }
                 }
             }
-            onAnyPortal = true;
-            break;
-        }
-    }
-    wasOnPortal_ = onAnyPortal;
-    if (portalHintSprite_) {
-        if (onAnyPortal && canControl) {
-            portalHintSprite_->SetVisible(true);
-            Vector3 playerPos = player_->GetPosition();
-            playerPos.x -= 0.25f;
-            playerPos.y += 2.0f; // 玩家头顶偏移
-            Vector3 screenPos = WorldToScreen(playerPos, camera_);
-            portalHintSprite_->SetPosition({ screenPos.x, screenPos.y });
-        }
-        else {
-            portalHintSprite_->SetVisible(false);
+
+            if (triggerGameClear) {
+                if (!pendingGameClear_ && gameClear_ && !gameClear_->IsPlaying() && fade_) {
+                    pendingGameClear_ = true;
+
+                    fade_->SetAlpha(0.0f);
+                    fade_->SetReachedBlack(false);
+                    fade_->SetBlackHoldFrames(0);
+                    fade_->SetOverlayPushed(false);
+
+                    fade_->SetPhase(FadePhase::FadingOut);
+                    if (Sprite* s = fade_->GetSprite()) {
+                        s->SetVisible(true);
+                    }
+                }
+            }
+            else {
+                // ==== 普通传送处理 ====
+                pendingPortalMapPath_ = currentPortal->targetMap;
+                pendingPortalStartPos_ = currentPortal->targetStartPos;
+                pendingPortalLoad_ = true;
+
+                if (fade_) {
+                    fade_->SetAlpha(0.0f);
+                    fade_->SetReachedBlack(false);
+                    fade_->SetBlackHoldFrames(0);
+                    fade_->SetOverlayPushed(false);
+
+                    fade_->SetPhase(FadePhase::FadingOut);
+                    if (Sprite* s = fade_->GetSprite()) {
+                        s->SetVisible(true);
+                    }
+                }
+            }
         }
     }
     if (!nextMapToLoad_.empty()) {
         LoadMap(nextMapToLoad_, nextMapStartPos_);
         nextMapToLoad_.clear();
     }
-    float cooldownRatio = 0.0f;
-    if (!player_->CanDash()) {
-        cooldownRatio = player_->GetDashCooldown() / player_->GetDashCooldownDuration();
-        cooldownRatio = (std::max)(0.0f, (std::min)(cooldownRatio, 1.0f)); // 限制在0~1
+    if (dashUI_) {
+        dashUI_->Update(deltaTime);
     }
-
-    if (cooldownRatio > 0.0f) {
-        float fullHeight = 32.0f;
-        float visibleHeight = fullHeight * cooldownRatio;
-        grayOverlaySprite_->SetTextureLeftTop({ 0.0f, 0.0f });
-        grayOverlaySprite_->SetTextureSize({ 32.0f, visibleHeight });
-        grayOverlaySprite_->SetSize({ 32.0f, visibleHeight });
-    }
-    skillSprite_->Update();
-    grayOverlaySprite_->Update();
-    portalHintSprite_->Update();
     if (input_->TriggerKey(DIK_P)) {
         SoundManager::GetInstance()->Play("fanfare", false, 1.0f);
     }
@@ -689,14 +578,12 @@ void GameScene::Draw() {
         block->Draw();
     }
     // 道具
-    for (auto& it : items_) {
-        if (it.obj) {
-            it.obj->Draw();
-        }
+    if (itemMgr_) {
+        itemMgr_->Draw3D();
     }
     // HP 3D 条段
-    for (int i = 0; i < hpVisibleCount_; ++i) {
-        hpStrips_[i]->Draw();
+    if (hpBar_) {
+        hpBar_->Draw3D();
     }
 
     // ================== 1.5) GameClear 用全屏黑背景 ==================
@@ -714,30 +601,14 @@ void GameScene::Draw() {
     // ================== 2) 中间层：交互提示 Sprite ==================
     spriteCommon_->CommonDraw();
     if (!inGameClear) {
-        if (spaceHint_.sprite) {
-            spaceHint_.sprite->Draw();
+        // 提示图标
+        if (hintUI_) {
+            hintUI_->Draw();
         }
 
-        // 所有 Up 提示
-        for (auto& h : upHints_) {
-            if (h.sprite) {
-                h.sprite->Draw();
-            }
-        }
-        if (shiftHint_.sprite) {
-            shiftHint_.sprite->Draw();
-        }
-        if (sprintHint_.sprite) {
-            sprintHint_.sprite->Draw();
-        }
-        // 技能图标
-        if (skillSprite_) {
-            skillSprite_->Draw();
-        }
-
-        // 冲刺CD灰罩
-        if (!player_->CanDash() && grayOverlaySprite_) {
-            grayOverlaySprite_->Draw();
+         // 冲刺技能 UI
+        if (dashUI_) {
+            dashUI_->Draw();
         }
 
         // Coin 数字 UI（冒号 + 数字）
@@ -746,8 +617,8 @@ void GameScene::Draw() {
         }
 
         // 传送门提示
-        if (portalHintSprite_ && portalHintSprite_->IsVisible()) {
-            portalHintSprite_->Draw();
+       if (portalMgr_) {
+            portalMgr_->DrawHint();
         }
     }
     // ================== 3) 前景 3D：玩家（盖住提示） ==================
@@ -813,9 +684,16 @@ void GameScene::Finalize() {
     mapBlocks_.clear();
     delete player_;
     delete imguiManager_;
-    delete skillSprite_;
-    delete grayOverlaySprite_;
-    delete portalHintSprite_;
+    if (dashUI_) {
+        dashUI_->Finalize();
+        delete dashUI_;
+        dashUI_ = nullptr;
+    }
+    if (portalMgr_) {
+        portalMgr_->Finalize();
+        delete portalMgr_;
+        portalMgr_ = nullptr;
+    }
     if (fade_) {
         fade_->Finalize();
         delete fade_;
@@ -828,13 +706,12 @@ void GameScene::Finalize() {
         intro_ = nullptr;
     }
 
-    for (auto* seg : hpStrips_) delete seg;
-    hpStrips_.clear();
-    if (gameOver_) {
-        gameOver_->Finalize();
-        delete gameOver_;
-        gameOver_ = nullptr;
+    if (hpBar_) {
+        hpBar_->Finalize();
+        delete hpBar_;
+        hpBar_ = nullptr;
     }
+
 
     if (spaceHint_.sprite) {
         delete spaceHint_.sprite;
@@ -855,10 +732,12 @@ void GameScene::Finalize() {
         delete sprintHint_.sprite;
         sprintHint_.sprite = nullptr;
     }
-    for (auto& it : items_) {
-        if (it.obj) { delete it.obj; it.obj = nullptr; }
+    if (itemMgr_) {
+        itemMgr_->Finalize();
+        delete itemMgr_;
+        itemMgr_ = nullptr;
     }
-    items_.clear();
+
     // ==== Coin UI 资源释放 ====
     if (coinUI_) {
         coinUI_->Finalize();
@@ -870,7 +749,11 @@ void GameScene::Finalize() {
         delete gameClear_;
         gameClear_ = nullptr;
     }
-
+    if (hintUI_) {
+        hintUI_->Finalize();
+        delete hintUI_;
+        hintUI_ = nullptr;
+    }
 }
 
 void GameScene::StartLoadingMap(const std::string& mapPath, const Vector3& startPos, bool isPortal = false) {
@@ -899,10 +782,9 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
     currentMapPath_ = mapPath;
 
     // 清理旧 items 渲染对象
-    for (auto& it : items_) {
-        if (it.obj) { delete it.obj; }
+    if (itemMgr_) {
+        itemMgr_->ClearVisuals();
     }
-    items_.clear();
 
     for (auto* block : mapBlocks_) delete block;
     mapBlocks_.clear();
@@ -1033,109 +915,94 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
     camera_->SetTranslate(startPos + Vector3{ 0,0,-40 });
     playerCamera_->SetMapBounds(mapChipField_.GetMapMinPosition(), mapChipField_.GetMapMaxPosition());
     // 根据当前地图更新传送门列表
-    portals_.clear();
+    if (portalMgr_) {
+        portalMgr_->ClearPortals();
+    }
 
     // ========== map1（起始地图） ==========
     if (mapPath == "Resources/map/map.csv") {
         // map1 → 中心地图 map2
-        portals_.push_back({
-            {26,11},                           // 当前 map1 里的格子
-            "Resources/map/map2.csv",          // 目标地图（Hub）
-            mapChipField_.GetMapChipPositionByIndex(2,1) // 在 Hub 中的出生格 (2,1) = CSV(27,2)
-            });
+        if (portalMgr_) {
+            portalMgr_->AddPortal(
+                { 26, 11 },                                    // 当前 map1 里的格子
+                "Resources/map/map2.csv",                      // 目标地图（Hub）
+                mapChipField_.GetMapChipPositionByIndex(2, 1)  // 在 Hub 中的出生格
+            );
+        }
     }
 
     // ========== map2（中心地图 / Hub） ==========
     else if (mapPath == "Resources/map/map2.csv") {
-        // 恒常存在：Hub → 返回 map1 的门
-        portals_.push_back({
-            {2,1},                             // Hub 中的 (2,1)（就是你现在的返回门）
-            "Resources/map/map.csv",
-            mapChipField_.GetMapChipPositionByIndex(26,11) // 回 map1 的落点
-            });
+        if (portalMgr_) {
+            // Hub → 返回 map1 的门
+            portalMgr_->AddPortal(
+                { 2, 1 },
+                "Resources/map/map.csv",
+                mapChipField_.GetMapChipPositionByIndex(26, 11)
+            );
 
-        // ------- 解锁顺序的 4 个关卡入口 -------
-        // 约定：所有关卡里玩家出生都在 (2,1)，你之后在关卡 csv 里对应摆好
-
-        // ① CSV (23,11) → index (11,5)：第一关，一开始就解锁（hubProgress_ >= 0）
-        if (hubProgress_ >= 0) {
-            portals_.push_back({
-                {11,5},                        // Hub 上的门位置
-                "Resources/map/map3.csv",      // 第1关
-                mapChipField_.GetMapChipPositionByIndex(2,1) // 在 map3 中出生位置
-                });
-        }
-
-        // ② CSV (23,14) → index (14,5)：第二关，需要先通关第一关（hubProgress_ >= 1）
-        if (hubProgress_ >= 1) {
-            portals_.push_back({
-                {14,5},
-                "Resources/map/map4.csv",      // 第2关
-                mapChipField_.GetMapChipPositionByIndex(2,1)
-                });
-        }
-
-        // ③ CSV (27,23) → index (23,1)：第三关，需要先通关第二关（hubProgress_ >= 2）
-        if (hubProgress_ >= 2) {
-            portals_.push_back({
-                {23,1},
-                "Resources/map/map5.csv",      // 第3关
-                mapChipField_.GetMapChipPositionByIndex(2,1)
-                });
-        }
-
-        // ④ CSV (14,12)/(14,13) → index (12,14)/(13,14)：最终关入口，需要先通关第三关（hubProgress_ >= 3）
-        if (hubProgress_ >= 3) {
-            Vector3 finalStart = mapChipField_.GetMapChipPositionByIndex(2, 1);
-            portals_.push_back({
-                {12,14},                       // 左门
-                "Resources/map/map6.csv",      // 最终关
-                finalStart
-                });
-            portals_.push_back({
-                {13,14},                       // 右门
-                "Resources/map/map6.csv",
-                finalStart
-                });
+            if (hubProgress_ >= 0) {
+                portalMgr_->AddPortal(
+                    { 11, 5 },
+                    "Resources/map/map3.csv",
+                    mapChipField_.GetMapChipPositionByIndex(2, 1)
+                );
+            }
+            if (hubProgress_ >= 1) {
+                portalMgr_->AddPortal(
+                    { 14, 5 },
+                    "Resources/map/map4.csv",
+                    mapChipField_.GetMapChipPositionByIndex(2, 1)
+                );
+            }
+            if (hubProgress_ >= 2) {
+                portalMgr_->AddPortal(
+                    { 23, 1 },
+                    "Resources/map/map5.csv",
+                    mapChipField_.GetMapChipPositionByIndex(2, 1)
+                );
+            }
+            if (hubProgress_ >= 3) {
+                Vector3 finalStart = mapChipField_.GetMapChipPositionByIndex(2, 1);
+                portalMgr_->AddPortal({ 12, 14 }, "Resources/map/map6.csv", finalStart);
+                portalMgr_->AddPortal({ 13, 14 }, "Resources/map/map6.csv", finalStart);
+            }
         }
     }
 
     // ========== 各子关卡内部：返回 Hub ==========
     else {
-        // 这里假设你在每张关卡地图里也放了一个 '2' 当出口，
-        // 把 {x,y} 换成那张图里出口的索引即可
-
-        if (mapPath == "Resources/map/map3.csv") {
-            portals_.push_back({
-                {2,1},                         // TODO: 改成 map3 里出口的格子 index
-                "Resources/map/map2.csv",      // 回到 Hub
-                mapChipField_.GetMapChipPositionByIndex(11,5) // Hub 中出生也放在 (2,1)
-                });
-        }
-        else if (mapPath == "Resources/map/map4.csv") {
-            portals_.push_back({
-                {2,1},                         // TODO
-                "Resources/map/map2.csv",
-                mapChipField_.GetMapChipPositionByIndex(14,5)
-                });
-        }
-        else if (mapPath == "Resources/map/map5.csv") {
-            portals_.push_back({
-                {2,1},                         // TODO
-                "Resources/map/map2.csv",
-                mapChipField_.GetMapChipPositionByIndex(23,1)
-                });
-        }
-        else if (mapPath == "Resources/map/map6.csv") {
-            portals_.push_back({
-                {2,1},                         // TODO（如果最终关也要回 Hub 的话）
-                "Resources/map/map2.csv",
-                mapChipField_.GetMapChipPositionByIndex(12,14)
-                });
+        if (portalMgr_) {
+            if (mapPath == "Resources/map/map3.csv") {
+                portalMgr_->AddPortal(
+                    { 2, 1 },
+                    "Resources/map/map2.csv",
+                    mapChipField_.GetMapChipPositionByIndex(11, 5)
+                );
+            }
+            else if (mapPath == "Resources/map/map4.csv") {
+                portalMgr_->AddPortal(
+                    { 2, 1 },
+                    "Resources/map/map2.csv",
+                    mapChipField_.GetMapChipPositionByIndex(14, 5)
+                );
+            }
+            else if (mapPath == "Resources/map/map5.csv") {
+                portalMgr_->AddPortal(
+                    { 2, 1 },
+                    "Resources/map/map2.csv",
+                    mapChipField_.GetMapChipPositionByIndex(23, 1)
+                );
+            }
+            else if (mapPath == "Resources/map/map6.csv") {
+                portalMgr_->AddPortal(
+                    { 2, 1 },
+                    "Resources/map/map2.csv",
+                    mapChipField_.GetMapChipPositionByIndex(12, 14)
+                );
+            }
         }
     }
-
-    wasOnPortal_ = false;
 
     player_->Update(input_, mapChipField_);
     for (auto* block : mapBlocks_) block->Update();
