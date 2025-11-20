@@ -194,6 +194,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="fade\IntroManager.cpp" />
     <ClCompile Include="logger\Logger.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="map\ItemManager.cpp" />
     <ClCompile Include="map\MapChipField.cpp" />
     <ClCompile Include="MyGame.cpp" />
     <ClCompile Include="player\Player.cpp" />
@@ -205,6 +206,9 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="scene\LoadingScene.cpp" />
     <ClCompile Include="scene\TitleScene.cpp" />
     <ClCompile Include="UI\CoinUIManager.cpp" />
+    <ClCompile Include="UI\DashUIManager.cpp" />
+    <ClCompile Include="UI\HintUIManager.cpp" />
+    <ClCompile Include="UI\HPBar3DManager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="D3DResourceLeakChecker.h" />
@@ -251,6 +255,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="fade\FadeManager.h" />
     <ClInclude Include="fade\IntroManager.h" />
     <ClInclude Include="logger\Logger.h" />
+    <ClInclude Include="map\ItemManager.h" />
     <ClInclude Include="map\MapChipField.h" />
     <ClInclude Include="MyGame.h" />
     <ClInclude Include="player\Player.h" />
@@ -262,6 +267,9 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="scene\LoadingScene.h" />
     <ClInclude Include="scene\TitleScene.h" />
     <ClInclude Include="UI\CoinUIManager.h" />
+    <ClInclude Include="UI\DashUIManager.h" />
+    <ClInclude Include="UI\HintUIManager.h" />
+    <ClInclude Include="UI\HPBar3DManager.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="..\externals\imgui\LICENSE.txt" />
