@@ -33,11 +33,7 @@
 #include "../UI/HintUIManager.h"
 #include "../map/ItemManager.h"
 #include "../UI/DashUIManager.h" 
-struct PortalInfo {
-    MapChipField::IndexSet index;  // 传送门格子索引
-    std::string targetMap;         // 目标地图路径
-    Vector3 targetStartPos;        // 玩家在目标地图的起点
-};
+#include "../map/PortalManager.h" 
 class GameScene : public BaseScene {
 public:
     void Initialize() override;
@@ -69,10 +65,11 @@ private:
 
     DashUIManager* dashUI_ = nullptr;
 
-    std::vector<PortalInfo> portals_;
-    bool wasOnPortal_ = false;
-    std::string nextMapToLoad_;    // 记录下一帧要加载的地图路径
-    Vector3 nextMapStartPos_;      // 记录玩家在新地图的起点
+     // 传送门管理器
+    PortalManager* portalMgr_ = nullptr;
+
+    std::string nextMapToLoad_;
+    Vector3 nextMapStartPos_;
 
     // ================== 加载相关 ==================
     bool shouldStartLoading_ = true;     // 延迟初始化加载
@@ -86,9 +83,6 @@ private:
     bool loadingStarted_ = false;        // 延迟一帧标志
 
     static constexpr float LOADING_DURATION = 0.5f; // 1秒
-
-    Sprite* portalHintSprite_ = nullptr;    // 传送提示图标精灵
-
 
     // 传送门触发：等待到黑后再开始加载
     bool        pendingPortalLoad_ = false;

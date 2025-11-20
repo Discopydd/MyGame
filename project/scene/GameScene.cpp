@@ -169,15 +169,12 @@ void GameScene::Initialize() {
         // === Item 管理器 ===
     itemMgr_ = new ItemManager();
     itemMgr_->Initialize(object3dCommon_, camera_);
+     // === Portal 管理器 ===
+    portalMgr_ = new PortalManager();
+    portalMgr_->Initialize(spriteCommon_, camera_);
 
     isMapLoading_ = false;
     loadingTimer_ = 0.0f;
-
-    portalHintSprite_ = new Sprite();
-    portalHintSprite_->Initialize(spriteCommon_, "Resources/letterE.png"); // 你的提示图
-    portalHintSprite_->SetPosition({ 0.0f, 0.0f }); // 初始位置，稍后动态更新
-    portalHintSprite_->SetSize({ 32.0f, 32.0f });
-    portalHintSprite_->SetVisible(false); // 默认隐藏
 
        // === Fade 管理器 ===
     fade_ = new FadeManager();
@@ -421,95 +418,72 @@ void GameScene::Update() {
 
     MapChipField::IndexSet playerIndex =
         mapChipField_.GetMapChipIndexByPosition(player_->GetPosition());
+        // 更新传送门提示图标（是否显示 + 位置）
+    const PortalInfo* currentPortal = nullptr;
+    if (portalMgr_) {
+        portalMgr_->UpdateHint(playerIndex, player_->GetPosition(), canControl);
+        currentPortal = portalMgr_->GetPortalAt(playerIndex);
+    }
 
-       if (itemMgr_) {
-           bool picked = itemMgr_->OnPlayerStepOnTile(currentMapPath_, playerIndex, mapChipField_, player_);
-           if (picked) {
-               ++totalCoinCollected_;
-               if (coinUI_) {
-                   coinUI_->SetTotalCoin(totalCoinCollected_);
-               }
-           }
-       }
-
-    bool onAnyPortal = false;
-    for (auto& portal : portals_) {
-        bool isOnPortal = (playerIndex.xIndex == portal.index.xIndex &&
-            playerIndex.yIndex == portal.index.yIndex);
-        if (isOnPortal) {
-            // 如果按下E键，才触发传送
-            if (canControl && input_->TriggerKey(DIK_E)) {
-
-                // ==== 如果是从子关卡回到 Hub(map2)，更新解锁进度 ====
-                auto itStage = hubStageByMap_.find(currentMapPath_);
-                bool triggerGameClear = false;
-                if (portal.targetMap == "Resources/map/map2.csv" && itStage != hubStageByMap_.end()) {
-                    int stageIndex = itStage->second;   // 这是第几关(0~3)
-                    // 通关第 N 关 → 至少解锁到 N+1
-                    if (hubProgress_ < stageIndex + 1) {
-                        hubProgress_ = stageIndex + 1;
-                        if (hubProgress_ >= 4) {
-                            allStagesCleared_ = true;   // 所有关卡完成
-                            // 在这里你可以做 GameClear 处理
-                            // 例： if (sceneManager_) { sceneManager_->ChangeScene(new GameClearScene()); }
-                            triggerGameClear = true;
-                        }
-                    }
-                }
-                if (triggerGameClear) {
-                    // 通关：不再直接开始 GameClear，而是：
-                    // 1) 先黑幕淡出到全黑
-                    // 2) 在 FadingOut 逻辑里 pendingGameClear_ 分支中启动 GameClear
-                    if (!pendingGameClear_ && gameClear_ && !gameClear_->IsPlaying() && fade_) {
-                        pendingGameClear_ = true;
-
-                        fade_->SetAlpha(0.0f);
-                        fade_->SetReachedBlack(false);
-                        fade_->SetBlackHoldFrames(0);
-                        fade_->SetOverlayPushed(false);
-
-                        // 开始淡出到全黑
-                        fade_->SetPhase(FadePhase::FadingOut);
-                        if (Sprite* s = fade_->GetSprite()) {
-                            s->SetVisible(true);
-                        }
-                    }
-                }
-                else {
-                    // ==== 现有的传送处理 ====
-                    pendingPortalMapPath_ = portal.targetMap;
-                    pendingPortalStartPos_ = portal.targetStartPos;
-                    pendingPortalLoad_ = true;
-
-                    if (fade_) {
-                        fade_->SetAlpha(0.0f);
-                        fade_->SetReachedBlack(false);
-                        fade_->SetBlackHoldFrames(0);
-                        fade_->SetOverlayPushed(false);
-
-                        fade_->SetPhase(FadePhase::FadingOut);
-                        if (Sprite* s = fade_->GetSprite()) {
-                            s->SetVisible(true);
-                        }
+    if (itemMgr_) {
+        bool picked = itemMgr_->OnPlayerStepOnTile(currentMapPath_, playerIndex, mapChipField_, player_);
+        if (picked) {
+            ++totalCoinCollected_;
+            if (coinUI_) {
+                coinUI_->SetTotalCoin(totalCoinCollected_);
+            }
+        }
+    }
+    if (currentPortal) {
+        // 玩家正站在某个门格子上
+        if (canControl && input_->TriggerKey(DIK_E)) {
+            // ==== 如果是从子关卡回到 Hub(map2)，更新解锁进度 ====
+            auto itStage = hubStageByMap_.find(currentMapPath_);
+            bool triggerGameClear = false;
+            if (currentPortal->targetMap == "Resources/map/map2.csv" && itStage != hubStageByMap_.end()) {
+                int stageIndex = itStage->second;   // 这是第几关(0~3)
+                if (hubProgress_ < stageIndex + 1) {
+                    hubProgress_ = stageIndex + 1;
+                    if (hubProgress_ >= 4) {
+                        allStagesCleared_ = true;
+                        triggerGameClear = true;
                     }
                 }
             }
-            onAnyPortal = true;
-            break;
-        }
-    }
-    wasOnPortal_ = onAnyPortal;
-    if (portalHintSprite_) {
-        if (onAnyPortal && canControl) {
-            portalHintSprite_->SetVisible(true);
-            Vector3 playerPos = player_->GetPosition();
-            playerPos.x -= 0.25f;
-            playerPos.y += 2.0f; // 玩家头顶偏移
-            Vector3 screenPos = WorldToScreen(playerPos, camera_);
-            portalHintSprite_->SetPosition({ screenPos.x, screenPos.y });
-        }
-        else {
-            portalHintSprite_->SetVisible(false);
+
+            if (triggerGameClear) {
+                if (!pendingGameClear_ && gameClear_ && !gameClear_->IsPlaying() && fade_) {
+                    pendingGameClear_ = true;
+
+                    fade_->SetAlpha(0.0f);
+                    fade_->SetReachedBlack(false);
+                    fade_->SetBlackHoldFrames(0);
+                    fade_->SetOverlayPushed(false);
+
+                    fade_->SetPhase(FadePhase::FadingOut);
+                    if (Sprite* s = fade_->GetSprite()) {
+                        s->SetVisible(true);
+                    }
+                }
+            }
+            else {
+                // ==== 普通传送处理 ====
+                pendingPortalMapPath_ = currentPortal->targetMap;
+                pendingPortalStartPos_ = currentPortal->targetStartPos;
+                pendingPortalLoad_ = true;
+
+                if (fade_) {
+                    fade_->SetAlpha(0.0f);
+                    fade_->SetReachedBlack(false);
+                    fade_->SetBlackHoldFrames(0);
+                    fade_->SetOverlayPushed(false);
+
+                    fade_->SetPhase(FadePhase::FadingOut);
+                    if (Sprite* s = fade_->GetSprite()) {
+                        s->SetVisible(true);
+                    }
+                }
+            }
         }
     }
     if (!nextMapToLoad_.empty()) {
@@ -519,7 +493,6 @@ void GameScene::Update() {
     if (dashUI_) {
         dashUI_->Update(deltaTime);
     }
-    portalHintSprite_->Update();
     if (input_->TriggerKey(DIK_P)) {
         SoundManager::GetInstance()->Play("fanfare", false, 1.0f);
     }
@@ -641,8 +614,8 @@ void GameScene::Draw() {
         }
 
         // 传送门提示
-        if (portalHintSprite_ && portalHintSprite_->IsVisible()) {
-            portalHintSprite_->Draw();
+        if (portalMgr_) {
+            portalMgr_->DrawHint();
         }
     }
     // ================== 3) 前景 3D：玩家（盖住提示） ==================
@@ -713,7 +686,11 @@ void GameScene::Finalize() {
         delete dashUI_;
         dashUI_ = nullptr;
     }
-    delete portalHintSprite_;
+    if (portalMgr_) {
+        portalMgr_->Finalize();
+        delete portalMgr_;
+        portalMgr_ = nullptr;
+    }
     if (fade_) {
         fade_->Finalize();
         delete fade_;
@@ -939,109 +916,94 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
     camera_->SetTranslate(startPos + Vector3{ 0,0,-40 });
     playerCamera_->SetMapBounds(mapChipField_.GetMapMinPosition(), mapChipField_.GetMapMaxPosition());
     // 根据当前地图更新传送门列表
-    portals_.clear();
+    if (portalMgr_) {
+        portalMgr_->ClearPortals();
+    }
 
-    // ========== map1（起始地图） ==========
+       // ========== map1（起始地图） ==========
     if (mapPath == "Resources/map/map.csv") {
-        // map1 → 中心地图 map2
-        portals_.push_back({
-            {26,11},                           // 当前 map1 里的格子
-            "Resources/map/map2.csv",          // 目标地图（Hub）
-            mapChipField_.GetMapChipPositionByIndex(2,1) // 在 Hub 中的出生格 (2,1) = CSV(27,2)
-            });
+        if (portalMgr_) {
+            portalMgr_->AddPortal(
+                { 26, 11 },                                    // 当前 map1 里的格子
+                "Resources/map/map2.csv",                      // 目标地图（Hub）
+                mapChipField_.GetMapChipPositionByIndex(2, 1)  // 在 Hub 中的出生格
+            );
+        }
     }
 
     // ========== map2（中心地图 / Hub） ==========
     else if (mapPath == "Resources/map/map2.csv") {
-        // 恒常存在：Hub → 返回 map1 的门
-        portals_.push_back({
-            {2,1},                             // Hub 中的 (2,1)（就是你现在的返回门）
-            "Resources/map/map.csv",
-            mapChipField_.GetMapChipPositionByIndex(26,11) // 回 map1 的落点
-            });
+        if (portalMgr_) {
+            // Hub → 返回 map1 的门
+            portalMgr_->AddPortal(
+                { 2, 1 },
+                "Resources/map/map.csv",
+                mapChipField_.GetMapChipPositionByIndex(26, 11)
+            );
 
-        // ------- 解锁顺序的 4 个关卡入口 -------
-        // 约定：所有关卡里玩家出生都在 (2,1)，你之后在关卡 csv 里对应摆好
-
-        // ① CSV (23,11) → index (11,5)：第一关，一开始就解锁（hubProgress_ >= 0）
-        if (hubProgress_ >= 0) {
-            portals_.push_back({
-                {11,5},                        // Hub 上的门位置
-                "Resources/map/map3.csv",      // 第1关
-                mapChipField_.GetMapChipPositionByIndex(2,1) // 在 map3 中出生位置
-                });
-        }
-
-        // ② CSV (23,14) → index (14,5)：第二关，需要先通关第一关（hubProgress_ >= 1）
-        if (hubProgress_ >= 1) {
-            portals_.push_back({
-                {14,5},
-                "Resources/map/map4.csv",      // 第2关
-                mapChipField_.GetMapChipPositionByIndex(2,1)
-                });
-        }
-
-        // ③ CSV (27,23) → index (23,1)：第三关，需要先通关第二关（hubProgress_ >= 2）
-        if (hubProgress_ >= 2) {
-            portals_.push_back({
-                {23,1},
-                "Resources/map/map5.csv",      // 第3关
-                mapChipField_.GetMapChipPositionByIndex(2,1)
-                });
-        }
-
-        // ④ CSV (14,12)/(14,13) → index (12,14)/(13,14)：最终关入口，需要先通关第三关（hubProgress_ >= 3）
-        if (hubProgress_ >= 3) {
-            Vector3 finalStart = mapChipField_.GetMapChipPositionByIndex(2, 1);
-            portals_.push_back({
-                {12,14},                       // 左门
-                "Resources/map/map6.csv",      // 最终关
-                finalStart
-                });
-            portals_.push_back({
-                {13,14},                       // 右门
-                "Resources/map/map6.csv",
-                finalStart
-                });
+            if (hubProgress_ >= 0) {
+                portalMgr_->AddPortal(
+                    { 11, 5 },
+                    "Resources/map/map3.csv",
+                    mapChipField_.GetMapChipPositionByIndex(2, 1)
+                );
+            }
+            if (hubProgress_ >= 1) {
+                portalMgr_->AddPortal(
+                    { 14, 5 },
+                    "Resources/map/map4.csv",
+                    mapChipField_.GetMapChipPositionByIndex(2, 1)
+                );
+            }
+            if (hubProgress_ >= 2) {
+                portalMgr_->AddPortal(
+                    { 23, 1 },
+                    "Resources/map/map5.csv",
+                    mapChipField_.GetMapChipPositionByIndex(2, 1)
+                );
+            }
+            if (hubProgress_ >= 3) {
+                Vector3 finalStart = mapChipField_.GetMapChipPositionByIndex(2, 1);
+                portalMgr_->AddPortal({ 12, 14 }, "Resources/map/map6.csv", finalStart);
+                portalMgr_->AddPortal({ 13, 14 }, "Resources/map/map6.csv", finalStart);
+            }
         }
     }
 
     // ========== 各子关卡内部：返回 Hub ==========
     else {
-        // 这里假设你在每张关卡地图里也放了一个 '2' 当出口，
-        // 把 {x,y} 换成那张图里出口的索引即可
-
-        if (mapPath == "Resources/map/map3.csv") {
-            portals_.push_back({
-                {2,1},                         // TODO: 改成 map3 里出口的格子 index
-                "Resources/map/map2.csv",      // 回到 Hub
-                mapChipField_.GetMapChipPositionByIndex(11,5) // Hub 中出生也放在 (2,1)
-                });
-        }
-        else if (mapPath == "Resources/map/map4.csv") {
-            portals_.push_back({
-                {2,1},                         // TODO
-                "Resources/map/map2.csv",
-                mapChipField_.GetMapChipPositionByIndex(14,5)
-                });
-        }
-        else if (mapPath == "Resources/map/map5.csv") {
-            portals_.push_back({
-                {2,1},                         // TODO
-                "Resources/map/map2.csv",
-                mapChipField_.GetMapChipPositionByIndex(23,1)
-                });
-        }
-        else if (mapPath == "Resources/map/map6.csv") {
-            portals_.push_back({
-                {2,1},                         // TODO（如果最终关也要回 Hub 的话）
-                "Resources/map/map2.csv",
-                mapChipField_.GetMapChipPositionByIndex(12,14)
-                });
+        if (portalMgr_) {
+            if (mapPath == "Resources/map/map3.csv") {
+                portalMgr_->AddPortal(
+                    { 2, 1 },
+                    "Resources/map/map2.csv",
+                    mapChipField_.GetMapChipPositionByIndex(11, 5)
+                );
+            }
+            else if (mapPath == "Resources/map/map4.csv") {
+                portalMgr_->AddPortal(
+                    { 2, 1 },
+                    "Resources/map/map2.csv",
+                    mapChipField_.GetMapChipPositionByIndex(14, 5)
+                );
+            }
+            else if (mapPath == "Resources/map/map5.csv") {
+                portalMgr_->AddPortal(
+                    { 2, 1 },
+                    "Resources/map/map2.csv",
+                    mapChipField_.GetMapChipPositionByIndex(23, 1)
+                );
+            }
+            else if (mapPath == "Resources/map/map6.csv") {
+                portalMgr_->AddPortal(
+                    { 2, 1 },
+                    "Resources/map/map2.csv",
+                    mapChipField_.GetMapChipPositionByIndex(12, 14)
+                );
+            }
         }
     }
 
-    wasOnPortal_ = false;
 
     player_->Update(input_, mapChipField_);
     for (auto* block : mapBlocks_) block->Update();

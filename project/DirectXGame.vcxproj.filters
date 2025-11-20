@@ -172,6 +172,9 @@
     <ClCompile Include="UI\DashUIManager.cpp">
       <Filter>UI</Filter>
     </ClCompile>
+    <ClCompile Include="map\PortalManager.cpp">
+      <Filter>map</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="engine\math\Matrix3x3.h">
@@ -350,6 +353,9 @@
     </ClInclude>
     <ClInclude Include="UI\DashUIManager.h">
       <Filter>UI</Filter>
+    </ClInclude>
+    <ClInclude Include="map\PortalManager.h">
+      <Filter>map</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
