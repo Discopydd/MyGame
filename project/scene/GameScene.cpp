@@ -64,7 +64,7 @@ void GameScene::GenerateBlocks() {
                 // 添加到方块列表
                 mapBlocks_.push_back(block);
             }
-            else if (type == MapChipType::kPortal) {
+             else if (type == MapChipType::kPortal) {
                 // 创建传送门可视化对象（例如使用不同颜色的方块）
                 Object3d* portal = new Object3d();
                 portal->Initialize(object3dCommon_);
@@ -74,29 +74,26 @@ void GameScene::GenerateBlocks() {
                 mapBlocks_.push_back(portal);
             }
             else if (type == MapChipType::kItem) {
-                // === 新增：道具 ===
-                const uint32_t key = PackIdx(x, y);
-                auto found = pickedItems_.find(currentMapPath_);
-                bool alreadyPicked = (found != pickedItems_.end() && found->second.count(key));
+                if (!itemMgr_) { continue; }
 
-                if (alreadyPicked) {
-                    // ★ 该格已拾取过 → 本次不生成可见体
+                // 若该格在此地图已经被拾取过，则不再生成
+                if (!itemMgr_->CanSpawnItem(currentMapPath_, x, y)) {
                     continue;
                 }
 
-                // 生成一个道具可见体（示例用 cube；你也可换成 item.obj）
                 Object3d* item = new Object3d();
                 item->Initialize(object3dCommon_);
-                item->SetModel("coin/coin.obj");         // TODO: 替换为你的 item 模型
+                item->SetModel("coin/coin.obj");
                 item->SetCamera(camera_);
-                // 让道具略浮起一点更显眼（可选）
-                Vector3 itemPos = position;  // ← 用 position，而不是 pos
+
+                Vector3 itemPos = position;
                 itemPos.y += 0.4f;
                 item->SetTranslate(itemPos);
                 item->SetEnableLighting(true);
                 item->SetDirectionalLightIntensity(2.0f);
                 item->SetPointLightIntensity(2.0f);
-                items_.push_back({ x, y, item });
+
+                itemMgr_->RegisterItem(currentMapPath_, x, y, item);
             }
         }
     }
@@ -135,19 +132,12 @@ void GameScene::Initialize() {
     ModelManager::GetInstants()->LoadModel("strip/strip.obj");        // 载入模型
     ModelManager::GetInstants()->LoadModel("coin/coin.obj");
     ModelManager::GetInstants()->LoadModel("coin_ui/coin_ui.obj");
-    hpStrips_.reserve(hpSegments_);
-    for (int i = 0; i < hpSegments_; ++i) {
-        auto* seg = new Object3d();
-        seg->Initialize(object3dCommon_);
-        seg->SetModel("strip/strip.obj");
-        seg->SetCamera(camera_);
-        // 体感缩放：根据你的 strip 模型大小微调
-        seg->SetScale({ 0.001f, 0.001f, 0.001f });
-        hpStrips_.push_back(seg);
-    }
+    
     player_ = new Player();
     player_->Initialize(object3dCommon_, camera_);
-
+    // === HP 3D 条管理器 ===
+    hpBar_ = new HPBar3DManager();
+    hpBar_->Initialize(object3dCommon_, camera_, player_, hpNdcZ_);
 
     playerCamera_ = new PlayerCamera();
     playerCamera_->Initialize(camera_, player_, &mapChipField_);
@@ -155,18 +145,9 @@ void GameScene::Initialize() {
     playerCamera_->SetFollowSpeed(0.1f);
     playerCamera_->SetConstrainToMap(true);
 
-    //LoadMap("Resources/map/map.csv", { 3,3,0 });
-    std::string textureFilePath[] = { "Resources/skill_icon.png", "Resources/gray.png" };
-
-    skillSprite_ = new Sprite();
-    skillSprite_->Initialize(spriteCommon_, textureFilePath[0]);
-    skillSprite_->SetPosition({ 40.0f, 80.0f }); // 左上角
-    skillSprite_->SetSize({ 32.0f, 32.0f });
-
-    grayOverlaySprite_ = new Sprite();
-    grayOverlaySprite_->Initialize(spriteCommon_, textureFilePath[1]);
-    grayOverlaySprite_->SetPosition({ 40.0f, 80.0f });
-    grayOverlaySprite_->SetSize({ 32.0f, 32.0f });
+     // === 冲刺技能 UI 管理器 ===
+    dashUI_ = new DashUIManager();
+    dashUI_->Initialize(spriteCommon_, player_);
 
      // === Coin UI 管理器 ===
     coinUI_ = new CoinUIManager();
@@ -175,6 +156,19 @@ void GameScene::Initialize() {
     // 一开始显示当前总金币数（通常是 0）
     coinUI_->SetTotalCoin(totalCoinCollected_);
 
+      // === Hint UI 管理器 ===
+    hintUI_ = new HintUIManager();
+    hintUI_->Initialize(spriteCommon_, camera_);
+
+    // 把 GameScene 里的 HintSprite 指针交给管理器
+    hintUI_->SetSpaceHint(&spaceHint_);
+    hintUI_->SetShiftHint(&shiftHint_);
+    hintUI_->SetSprintHint(&sprintHint_);
+    hintUI_->SetUpHints(&upHints_);
+
+        // === Item 管理器 ===
+    itemMgr_ = new ItemManager();
+    itemMgr_->Initialize(object3dCommon_, camera_);
 
     isMapLoading_ = false;
     loadingTimer_ = 0.0f;
@@ -218,11 +212,6 @@ void GameScene::Initialize() {
 
 void GameScene::Update() {
     const float deltaTime = 1.0f / 60.0f;
-    hintBobTime_ += deltaTime;
-    if (coinUI_) {
-        coinUI_->Update(deltaTime);
-    }
-    float hintBobOffset = std::sinf(hintBobTime_ * hintBobSpeed_) * hintBobAmplitude_;
     input_->Update();
     // —— 是否允许玩家操作（淡出/加载/淡入期间 & 开场演出期间都禁止）——
     const bool isFading = (fade_ && fade_->GetPhase() != FadePhase::None);
@@ -377,7 +366,12 @@ void GameScene::Update() {
             gameOver_->Start();
         }
     }
-
+     if (coinUI_) {
+        coinUI_->Update(deltaTime);
+    }
+     if (hintUI_) {
+        hintUI_->Update(deltaTime);
+    }
      // GameOver 状态机推进（交给管理器）
     if (gameOver_) {
         gameOver_->Update(deltaTime);
@@ -415,93 +409,29 @@ void GameScene::Update() {
     }
 
 
-    float hpRatio = player_ ? player_->GetHpRatio() : 1.0f;
-    hpVisibleCount_ = (int)std::ceil(hpRatio * hpSegments_);
-    hpVisibleCount_ = (std::max)(0, (std::min)(hpVisibleCount_, hpSegments_));
-
-
-    // ===== 屏幕基点（左上向内偏移） =====
-    const float pad = 16.0f;
-    float baseX = pad + hpInsetX_;
-    float baseY = pad + hpInsetY_;
-
-    // ===== 给每一段计算屏幕坐标 → 反投到世界 → Update =====
-    for (int i = 0; i < hpSegments_; ++i) {
-        float sx = baseX + i * (hpSegPixelW_ + hpGapPixel_);
-        float sy = baseY;
-        Vector3 world = ScreenToWorld(sx, sy, hpNdcZ_, camera_);
-        hpStrips_[i]->SetTranslate(world);
-
-        // 可选：轻微缩放衰减/高亮首段等，这里先保持一致
-        // 可选：若你的 Object3d 支持朝向/关闭剔除，可在此设置
-        hpStrips_[i]->Update();
+    if (hpBar_) {
+        hpBar_->Update(deltaTime);
     }
     for (auto* block : mapBlocks_) {
         block->Update();
     }
-    for (auto& it : items_) {
-        if (!it.obj) continue;
-
-        // 让道具绕Y轴缓慢旋转
-        Vector3 rot = it.obj->GetRotate();
-        rot.y += 0.05f;                  // 旋转速度（弧度/帧）
-        it.obj->SetRotate(rot);
-        it.obj->Update();
+    if (itemMgr_) {
+        itemMgr_->Update(deltaTime);
     }
 
-    if (spaceHint_.sprite) {
-        Vector3 screen = WorldToScreen(spaceHint_.worldPos, camera_);
-        spaceHint_.sprite->SetPosition({ screen.x, screen.y + hintBobOffset });
-        spaceHint_.sprite->Update();
-    }
+    MapChipField::IndexSet playerIndex =
+        mapChipField_.GetMapChipIndexByPosition(player_->GetPosition());
 
-    for (auto& h : upHints_) {
-        if (!h.sprite) continue;
-        Vector3 s = WorldToScreen(h.worldPos, camera_);
-        h.sprite->SetPosition({ s.x, s.y + hintBobOffset });
-        h.sprite->Update();
-    }
-    if (shiftHint_.sprite) {
-        Vector3 screen = WorldToScreen(shiftHint_.worldPos, camera_);
-        shiftHint_.sprite->SetPosition({ screen.x, screen.y + hintBobOffset });
-        shiftHint_.sprite->Update();
-    }
+       if (itemMgr_) {
+           bool picked = itemMgr_->OnPlayerStepOnTile(currentMapPath_, playerIndex, mapChipField_, player_);
+           if (picked) {
+               ++totalCoinCollected_;
+               if (coinUI_) {
+                   coinUI_->SetTotalCoin(totalCoinCollected_);
+               }
+           }
+       }
 
-    if (sprintHint_.sprite) {
-        Vector3 screen = WorldToScreen(sprintHint_.worldPos, camera_);
-        sprintHint_.sprite->SetPosition({ screen.x, screen.y + hintBobOffset });
-        sprintHint_.sprite->Update();
-    }
-
-    MapChipField::IndexSet playerIndex = mapChipField_.GetMapChipIndexByPosition(player_->GetPosition());
-    if (mapChipField_.GetMapChipTypeByIndex(playerIndex.xIndex, playerIndex.yIndex) == MapChipType::kItem) {
-
-        const uint32_t packed = PackIdx(playerIndex.xIndex, playerIndex.yIndex);
-
-        // 若从未登记过：登记“已拾取”，删除可见体 & 给予奖励
-        if (!pickedItems_[currentMapPath_].count(packed)) {
-            pickedItems_[currentMapPath_].insert(packed);
-
-            // 从 items_ 里找到同格子对象，删除
-            for (auto it = items_.begin(); it != items_.end(); ++it) {
-                if (it->x == playerIndex.xIndex && it->y == playerIndex.yIndex) {
-                    if (it->obj) delete it->obj;
-                    items_.erase(it);
-                    break;
-                }
-            }
-            ++totalCoinCollected_;
-            if (coinUI_) {
-                coinUI_->SetTotalCoin(totalCoinCollected_);
-            }
-            // 奖励示例：回血+音效（按你的需要换掉）
-            // SoundManager::GetInstance()->Play("item_pick", false, 1.0f);
-            if (player_) {
-                // 假设你想加点血
-                // player_->Heal(10.0f);
-            }
-        }
-    }
     bool onAnyPortal = false;
     for (auto& portal : portals_) {
         bool isOnPortal = (playerIndex.xIndex == portal.index.xIndex &&
@@ -513,9 +443,6 @@ void GameScene::Update() {
                 // ==== 如果是从子关卡回到 Hub(map2)，更新解锁进度 ====
                 auto itStage = hubStageByMap_.find(currentMapPath_);
                 bool triggerGameClear = false;
-                if (currentMapPath_ == "Resources/map/map.csv") {
-                    triggerGameClear = true;
-                }
                 if (portal.targetMap == "Resources/map/map2.csv" && itStage != hubStageByMap_.end()) {
                     int stageIndex = itStage->second;   // 这是第几关(0~3)
                     // 通关第 N 关 → 至少解锁到 N+1
@@ -589,21 +516,9 @@ void GameScene::Update() {
         LoadMap(nextMapToLoad_, nextMapStartPos_);
         nextMapToLoad_.clear();
     }
-    float cooldownRatio = 0.0f;
-    if (!player_->CanDash()) {
-        cooldownRatio = player_->GetDashCooldown() / player_->GetDashCooldownDuration();
-        cooldownRatio = (std::max)(0.0f, (std::min)(cooldownRatio, 1.0f)); // 限制在0~1
+    if (dashUI_) {
+        dashUI_->Update(deltaTime);
     }
-
-    if (cooldownRatio > 0.0f) {
-        float fullHeight = 32.0f;
-        float visibleHeight = fullHeight * cooldownRatio;
-        grayOverlaySprite_->SetTextureLeftTop({ 0.0f, 0.0f });
-        grayOverlaySprite_->SetTextureSize({ 32.0f, visibleHeight });
-        grayOverlaySprite_->SetSize({ 32.0f, visibleHeight });
-    }
-    skillSprite_->Update();
-    grayOverlaySprite_->Update();
     portalHintSprite_->Update();
     if (input_->TriggerKey(DIK_P)) {
         SoundManager::GetInstance()->Play("fanfare", false, 1.0f);
@@ -689,16 +604,13 @@ void GameScene::Draw() {
         block->Draw();
     }
     // 道具
-    for (auto& it : items_) {
-        if (it.obj) {
-            it.obj->Draw();
-        }
+    if (itemMgr_) {
+        itemMgr_->Draw3D();
     }
     // HP 3D 条段
-    for (int i = 0; i < hpVisibleCount_; ++i) {
-        hpStrips_[i]->Draw();
+    if (hpBar_) {
+        hpBar_->Draw3D();
     }
-
     // ================== 1.5) GameClear 用全屏黑背景 ==================
     // 盖住上面的地图、道具等，让背景变成纯黑
     if (inGameClear && fade_) {
@@ -714,30 +626,13 @@ void GameScene::Draw() {
     // ================== 2) 中间层：交互提示 Sprite ==================
     spriteCommon_->CommonDraw();
     if (!inGameClear) {
-        if (spaceHint_.sprite) {
-            spaceHint_.sprite->Draw();
+       if (hintUI_) {
+            hintUI_->Draw();
         }
 
-        // 所有 Up 提示
-        for (auto& h : upHints_) {
-            if (h.sprite) {
-                h.sprite->Draw();
-            }
-        }
-        if (shiftHint_.sprite) {
-            shiftHint_.sprite->Draw();
-        }
-        if (sprintHint_.sprite) {
-            sprintHint_.sprite->Draw();
-        }
-        // 技能图标
-        if (skillSprite_) {
-            skillSprite_->Draw();
-        }
-
-        // 冲刺CD灰罩
-        if (!player_->CanDash() && grayOverlaySprite_) {
-            grayOverlaySprite_->Draw();
+        // 冲刺技能 UI
+        if (dashUI_) {
+            dashUI_->Draw();
         }
 
         // Coin 数字 UI（冒号 + 数字）
@@ -813,8 +708,11 @@ void GameScene::Finalize() {
     mapBlocks_.clear();
     delete player_;
     delete imguiManager_;
-    delete skillSprite_;
-    delete grayOverlaySprite_;
+    if (dashUI_) {
+        dashUI_->Finalize();
+        delete dashUI_;
+        dashUI_ = nullptr;
+    }
     delete portalHintSprite_;
     if (fade_) {
         fade_->Finalize();
@@ -828,8 +726,11 @@ void GameScene::Finalize() {
         intro_ = nullptr;
     }
 
-    for (auto* seg : hpStrips_) delete seg;
-    hpStrips_.clear();
+    if (hpBar_) {
+        hpBar_->Finalize();
+        delete hpBar_;
+        hpBar_ = nullptr;
+    }
     if (gameOver_) {
         gameOver_->Finalize();
         delete gameOver_;
@@ -855,10 +756,11 @@ void GameScene::Finalize() {
         delete sprintHint_.sprite;
         sprintHint_.sprite = nullptr;
     }
-    for (auto& it : items_) {
-        if (it.obj) { delete it.obj; it.obj = nullptr; }
+    if (itemMgr_) {
+        itemMgr_->Finalize();
+        delete itemMgr_;
+        itemMgr_ = nullptr;
     }
-    items_.clear();
     // ==== Coin UI 资源释放 ====
     if (coinUI_) {
         coinUI_->Finalize();
@@ -869,6 +771,11 @@ void GameScene::Finalize() {
         gameClear_->Finalize();
         delete gameClear_;
         gameClear_ = nullptr;
+    }
+        if (hintUI_) {
+        hintUI_->Finalize();
+        delete hintUI_;
+        hintUI_ = nullptr;
     }
 
 }
@@ -899,10 +806,9 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
     currentMapPath_ = mapPath;
 
     // 清理旧 items 渲染对象
-    for (auto& it : items_) {
-        if (it.obj) { delete it.obj; }
+    if (itemMgr_) {
+        itemMgr_->ClearVisuals();
     }
-    items_.clear();
 
     for (auto* block : mapBlocks_) delete block;
     mapBlocks_.clear();
