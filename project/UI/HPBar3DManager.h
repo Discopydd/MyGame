@@ -38,8 +38,8 @@ private:
 
     std::vector<Object3d*> strips_;   // 每一段血条
 
-    int   segments_      = 10;        // 总段数
-    int   visibleCount_  = 10;        // 当前可见段数
+    int   segments_      = 5;        // 总段数
+    int   visibleCount_  = 5;        // 当前可见段数
     float insetX_        = 40.0f;     // 屏幕左侧内边距
     float insetY_        = 50.0f;     // 屏幕上侧内边距
     float segPixelW_     = 45.0f;     // 每段宽度（屏幕像素）

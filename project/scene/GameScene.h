@@ -68,9 +68,6 @@ private:
      // 传送门管理器
     PortalManager* portalMgr_ = nullptr;
 
-    std::string nextMapToLoad_;
-    Vector3 nextMapStartPos_;
-
     // ================== 加载相关 ==================
     bool shouldStartLoading_ = true;     // 延迟初始化加载
     bool isMapLoading_ = false;          // 初始化加载标志
@@ -80,7 +77,6 @@ private:
     Vector3 portalStartPos_;             // 传送门起点
     float portalLoadingTimer_ = 0.0f;    // 传送门计时
     float loadingTimer_ = 0.0f;          // 初始化加载计时
-    bool loadingStarted_ = false;        // 延迟一帧标志
 
     static constexpr float LOADING_DURATION = 0.5f; // 1秒
 

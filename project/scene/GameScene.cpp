@@ -486,10 +486,6 @@ void GameScene::Update() {
             }
         }
     }
-    if (!nextMapToLoad_.empty()) {
-        LoadMap(nextMapToLoad_, nextMapStartPos_);
-        nextMapToLoad_.clear();
-    }
     if (dashUI_) {
         dashUI_->Update(deltaTime);
     }
@@ -1003,10 +999,4 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
             }
         }
     }
-
-
-    player_->Update(input_, mapChipField_);
-    for (auto* block : mapBlocks_) block->Update();
-    playerCamera_->Update();
-    camera_->Update();
 }

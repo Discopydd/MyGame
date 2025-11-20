@@ -18,13 +18,14 @@ void HPBar3DManager::Initialize(Object3dCommon* objCommon,
     strips_.clear();
     strips_.reserve(segments_);
 
-    // 假设 "strip/strip.obj" 模型已经在外面由 ModelManager 加载过
     for (int i = 0; i < segments_; ++i) {
         Object3d* seg = new Object3d();
         seg->Initialize(object3dCommon_);
         seg->SetModel("strip/strip.obj");
         seg->SetCamera(camera_);
         seg->SetScale({ 0.001f, 0.001f, 0.001f });   // 和你原来的一样
+        seg->SetEnableLighting(true);
+        seg->SetDirectionalLightIntensity(2.0f);
         strips_.push_back(seg);
     }
 
