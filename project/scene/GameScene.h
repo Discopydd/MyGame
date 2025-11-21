@@ -11,8 +11,6 @@
 #include "ModelManager.h"
 #include "MyMath.h"
 #include "ImGuiManager.h"
-#include "ParticleManager.h"
-#include "ParticleEmitter.h"
 #include "SoundManager.h"
 #include "Camera.h"
 #include <vector>
@@ -34,6 +32,7 @@
 #include "../map/ItemManager.h"
 #include "../UI/DashUIManager.h" 
 #include "../map/PortalManager.h" 
+#include "../particle/ParticleManager.h" 
 class GameScene : public BaseScene {
 public:
     void Initialize() override;
@@ -135,4 +134,8 @@ private:
     // === Fade 管理器 ===
     FadeManager* fade_ = nullptr;
 
+
+    ParticleManager* particleMgr_ = nullptr;
+    ParticleEmitter* emitter2D_ = nullptr;   // 2D（Sprite）粒子发射器
+    ParticleEmitter* emitter3D_ = nullptr;   // 3D（Model）粒子发射器
 };
