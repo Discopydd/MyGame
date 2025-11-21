@@ -192,6 +192,10 @@ void GameScene::Initialize() {
     gameClear_ = new GameClearManager();
     gameClear_->Initialize(spriteCommon_, object3dCommon_, camera_, hpNdcZ_);
 
+    particleMgr_ = new ParticleManager();
+    particleMgr_->Initialize(object3dCommon_, spriteCommon_);
+    emitter2D_ = particleMgr_->CreateEmitter();  // 用来发 2D 粒子
+    emitter3D_ = particleMgr_->CreateEmitter();  // 用来发 3D 粒子
     // === Hub（map2）的关卡配置 ===
     hubStageByMap_.clear();
     //  第1关: map3.csv
@@ -377,6 +381,9 @@ void GameScene::Update() {
     if (gameClear_) {
         gameClear_->Update(deltaTime);
     }
+    if (particleMgr_) {
+        particleMgr_->Update(deltaTime);
+    }
         // === 在 GameClear 演出期间按 Space → 回标题 ===
     if (gameClear_ && gameClear_->IsPlaying() && input_ && input_->TriggerKey(DIK_SPACE)) {
 
@@ -491,6 +498,50 @@ void GameScene::Update() {
     }
     if (input_->TriggerKey(DIK_P)) {
         SoundManager::GetInstance()->Play("fanfare", false, 1.0f);
+       if (particleMgr_ && emitter2D_) {
+        // 以玩家位置为中心，在屏幕空间发射 2D 粒子
+        Vector3 playerPos = player_->GetPosition();
+        Vector3 screenPos = WorldToScreen(playerPos, camera_); // 已经在文件开头实现的工具函数
+
+        // 这里的 "Resources/particle2d.png" 请改成你自己实际有的贴图
+        emitter2D_->Emit(
+            30,                        // 粒子数量
+            ParticleType::Sprite2D,    // 2D 粒子
+            "Resources/uvChecker.png",// 2D 粒子用的纹理
+            { screenPos.x, screenPos.y, 0.0f }, // 在屏幕位置发射
+            3.0f, 6.0f,                // 速度范围
+            0.5f, 1.0f                 // 生命周期范围(秒)
+        );
+       } if (particleMgr_ && emitter2D_) {
+           // 以玩家位置为中心，在屏幕空间发射 2D 粒子
+           Vector3 playerPos = player_->GetPosition();
+           Vector3 screenPos = WorldToScreen(playerPos, camera_); // 已经在文件开头实现的工具函数
+
+           // 这里的 "Resources/particle2d.png" 请改成你自己实际有的贴图
+           emitter2D_->Emit(
+               30,                        // 粒子数量
+               ParticleType::Sprite2D,    // 2D 粒子
+               "Resources/uvChecker.png",// 2D 粒子用的纹理
+               { screenPos.x, screenPos.y, 0.0f }, // 在屏幕位置发射
+               3.0f, 6.0f,                // 速度范围
+               0.5f, 1.0f                 // 生命周期范围(秒)
+           );
+       }
+    }
+    if (input_->TriggerKey(DIK_L)) {
+        if (particleMgr_ && emitter3D_) {
+            Vector3 playerPos = player_->GetPosition();
+
+            // 这里用 cube 模型做例子，你可以换成别的模型
+            emitter3D_->Emit(
+                20,                        // 粒子数量
+                ParticleType::Model3D,     // 3D 粒子
+                "cube/cube.obj",           // 3D 粒子用的模型
+                playerPos + Vector3{ 0, 1.0f, 0 },  // 玩家头顶附近
+                2.0f, 4.0f,                // 速度范围
+                0.7f, 1.5f                 // 生命周期范围(秒)
+            );
+        }
     }
     // ===== FadingIn：从全黑淡入 =====
     if (fade_ && fade_->GetPhase() == FadePhase::FadingIn) {
@@ -630,6 +681,9 @@ void GameScene::Draw() {
         if (coinUI_) {
             coinUI_->Draw3D();
         }
+        if (particleMgr_) {
+            particleMgr_->Draw3D();
+        }
     }
     // ================== 4) 最前景 UI Sprite ==================
     spriteCommon_->CommonDraw();
@@ -653,7 +707,9 @@ void GameScene::Draw() {
     if (gameClear_) {
         gameClear_->DrawTitle();
     }
-
+    if (particleMgr_) {
+        particleMgr_->Draw2D();
+    }
     // ImGui（debug UI）
     imguiManager_->Draw();
 
@@ -662,7 +718,6 @@ void GameScene::Draw() {
 
 void GameScene::Finalize() {
     SoundManager::GetInstance()->Finalize();
-    ParticleManager::GetInstance()->Finalize();
     TextureManager::GetInstance()->Finalize();
     ModelManager::GetInstants()->Finalize();
     imguiManager_->Finalize();
@@ -745,12 +800,17 @@ void GameScene::Finalize() {
         delete gameClear_;
         gameClear_ = nullptr;
     }
-        if (hintUI_) {
+    if (hintUI_) {
         hintUI_->Finalize();
         delete hintUI_;
         hintUI_ = nullptr;
     }
-
+    if (particleMgr_) {
+        particleMgr_->Finalize();
+        delete particleMgr_;
+        particleMgr_ = nullptr;
+         emitter2D_ = nullptr;
+    }
 }
 
 void GameScene::StartLoadingMap(const std::string& mapPath, const Vector3& startPos, bool isPortal = false) {

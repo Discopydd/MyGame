@@ -177,8 +177,6 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="engine\3d\ModelManager.cpp" />
     <ClCompile Include="engine\3d\Object3d.cpp" />
     <ClCompile Include="engine\3d\Object3dCommon.cpp" />
-    <ClCompile Include="engine\3d\ParticleEmitter.cpp" />
-    <ClCompile Include="engine\3d\ParticleManager.cpp" />
     <ClCompile Include="engine\audio\SoundManager.cpp" />
     <ClCompile Include="engine\base\BaseScene.cpp" />
     <ClCompile Include="engine\base\DirectXCommon.cpp" />
@@ -198,6 +196,8 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="map\MapChipField.cpp" />
     <ClCompile Include="map\PortalManager.cpp" />
     <ClCompile Include="MyGame.cpp" />
+    <ClCompile Include="particle\ParticleEmitter.cpp" />
+    <ClCompile Include="particle\ParticleManager.cpp" />
     <ClCompile Include="player\Player.cpp" />
     <ClCompile Include="player\PlayerCamera.cpp" />
     <ClCompile Include="scene\Framework.cpp" />
@@ -227,9 +227,6 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="engine\3d\ModelManager.h" />
     <ClInclude Include="engine\3d\Object3d.h" />
     <ClInclude Include="engine\3d\Object3dCommon.h" />
-    <ClInclude Include="engine\3d\Particle.h" />
-    <ClInclude Include="engine\3d\ParticleEmitter.h" />
-    <ClInclude Include="engine\3d\ParticleManager.h" />
     <ClInclude Include="engine\3d\PointLight.h" />
     <ClInclude Include="engine\3d\SpotLight.h" />
     <ClInclude Include="engine\3d\TransformationMatrix.h" />
@@ -260,6 +257,10 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="map\MapChipField.h" />
     <ClInclude Include="map\PortalManager.h" />
     <ClInclude Include="MyGame.h" />
+    <ClInclude Include="particle\Particle.h" />
+    <ClInclude Include="particle\ParticleEmitter.h" />
+    <ClInclude Include="particle\ParticleManager.h" />
+    <ClInclude Include="particle\ParticleType.h" />
     <ClInclude Include="player\Player.h" />
     <ClInclude Include="player\PlayerCamera.h" />
     <ClInclude Include="scene\Framework.h" />

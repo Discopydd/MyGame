@@ -47,6 +47,9 @@
     <Filter Include="fade">
       <UniqueIdentifier>{638131bb-0169-47e2-b94d-d2d2ef79bd17}</UniqueIdentifier>
     </Filter>
+    <Filter Include="particle">
+      <UniqueIdentifier>{4a88276a-06d0-4ebe-8824-7a7bede89a07}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="engine\math\MyMath.cpp">
@@ -86,12 +89,6 @@
       <Filter>project\3d</Filter>
     </ClCompile>
     <ClCompile Include="engine\3d\Object3dCommon.cpp">
-      <Filter>project\3d</Filter>
-    </ClCompile>
-    <ClCompile Include="engine\3d\ParticleEmitter.cpp">
-      <Filter>project\3d</Filter>
-    </ClCompile>
-    <ClCompile Include="engine\3d\ParticleManager.cpp">
       <Filter>project\3d</Filter>
     </ClCompile>
     <ClCompile Include="engine\audio\SoundManager.cpp">
@@ -175,6 +172,12 @@
     <ClCompile Include="map\PortalManager.cpp">
       <Filter>map</Filter>
     </ClCompile>
+    <ClCompile Include="particle\ParticleEmitter.cpp">
+      <Filter>particle</Filter>
+    </ClCompile>
+    <ClCompile Include="particle\ParticleManager.cpp">
+      <Filter>particle</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="engine\math\Matrix3x3.h">
@@ -248,15 +251,6 @@
     </ClInclude>
     <ClInclude Include="engine\base\SrvManager.h">
       <Filter>project\base</Filter>
-    </ClInclude>
-    <ClInclude Include="engine\3d\Particle.h">
-      <Filter>project\3d</Filter>
-    </ClInclude>
-    <ClInclude Include="engine\3d\ParticleEmitter.h">
-      <Filter>project\3d</Filter>
-    </ClInclude>
-    <ClInclude Include="engine\3d\ParticleManager.h">
-      <Filter>project\3d</Filter>
     </ClInclude>
     <ClInclude Include="engine\3d\TransformationMatrix.h">
       <Filter>project\3d</Filter>
@@ -356,6 +350,18 @@
     </ClInclude>
     <ClInclude Include="map\PortalManager.h">
       <Filter>map</Filter>
+    </ClInclude>
+    <ClInclude Include="particle\Particle.h">
+      <Filter>particle</Filter>
+    </ClInclude>
+    <ClInclude Include="particle\ParticleEmitter.h">
+      <Filter>particle</Filter>
+    </ClInclude>
+    <ClInclude Include="particle\ParticleManager.h">
+      <Filter>particle</Filter>
+    </ClInclude>
+    <ClInclude Include="particle\ParticleType.h">
+      <Filter>particle</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

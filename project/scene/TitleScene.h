@@ -11,8 +11,6 @@
 #include "ModelManager.h"
 #include "MyMath.h"
 #include "ImGuiManager.h"
-#include "ParticleManager.h"
-#include "ParticleEmitter.h"
 #include "SoundManager.h"
 #include "Camera.h"
 #include <vector>
