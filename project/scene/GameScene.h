@@ -64,7 +64,7 @@ private:
 
     DashUIManager* dashUI_ = nullptr;
 
-     // 传送门管理器
+    // 传送门管理器
     PortalManager* portalMgr_ = nullptr;
 
     // ================== 加载相关 ==================
@@ -100,7 +100,7 @@ private:
     int hubGuideStage_ = 0;
     // 提示图标管理器
     HintUIManager* hintUI_ = nullptr;
-   // ==== 道具管理器 ====
+    // ==== 道具管理器 ====
     ItemManager* itemMgr_ = nullptr;
 
     // ==== 当前地图路径（用于做 key / Hub 逻辑）====
@@ -138,4 +138,10 @@ private:
     ParticleManager* particleMgr_ = nullptr;
     ParticleEmitter* emitter2D_ = nullptr;   // 2D（Sprite）粒子发射器
     ParticleEmitter* emitter3D_ = nullptr;   // 3D（Model）粒子发射器
+
+    // 风特效的粒子发射器
+    ParticleEmitter* windEmitter_ = nullptr;
+    // 控制风粒子生成频率的计时器
+    float windSpawnTimer_ = 0.0f;
+
 };

@@ -2,6 +2,13 @@
 #include <numbers>
 #include <scene/LoadingScene.h>
 #include "SceneManager.h"
+#include <cstdlib>
+
+static float RandRangeFloat(float a, float b)
+{
+    float t = static_cast<float>(rand()) / RAND_MAX;
+    return a + (b - a) * t;
+}
 // 将3D世界坐标转换为屏幕坐标
 Vector3 WorldToScreen(const Vector3& worldPos, Camera* camera)
 {
@@ -196,6 +203,12 @@ void GameScene::Initialize() {
     particleMgr_->Initialize(object3dCommon_, spriteCommon_);
     emitter2D_ = particleMgr_->CreateEmitter();  // 用来发 2D 粒子
     emitter3D_ = particleMgr_->CreateEmitter();  // 用来发 3D 粒子
+    windEmitter_ = particleMgr_->CreateEmitter();
+    if (windEmitter_) {
+        windEmitter_->SetWindMode(true);
+        windEmitter_->SetUseOriginalSpriteSize(true);
+        windEmitter_->SetMaxParticles(40);
+    }
     // === Hub（map2）的关卡配置 ===
     hubStageByMap_.clear();
     //  第1关: map3.csv
@@ -384,6 +397,43 @@ void GameScene::Update() {
     if (particleMgr_) {
         particleMgr_->Update(deltaTime);
     }
+   // ==== 刮风粒子效果（整屏 & 只在 map 中）====
+    if (windEmitter_ && currentMapPath_ == "Resources/map/map.csv") {
+
+        windSpawnTimer_ -= deltaTime;
+        if (windSpawnTimer_ <= 0.0f) {
+            // 发射频率稍微高一点，整个屏幕都会有风线
+            windSpawnTimer_ = 0.06f;   // 约 33 条/秒，可自行调
+
+            const float margin = 50.0f;
+
+            // 发射区域：屏幕右上角一块区域
+            // x 在 画面右侧 60% ~ 画面外一点
+            float spawnX = RandRangeFloat(
+                WinApp::kClientWidth * 0.6f,
+                WinApp::kClientWidth + margin
+            );
+            // y 在 画面上方 ~ 上半部分
+            float spawnY = RandRangeFloat(
+                -margin,
+                WinApp::kClientHeight * 0.4f
+            );
+
+            Vector3 spawnPos = { spawnX, spawnY, 0.0f };
+
+            // 这里的 min/maxSpeed 是“每秒移动的像素量”，
+            // 取 700~1200 左右，可以在 1~1.5 秒内从右上飘到左下
+            windEmitter_->Emit(
+                1,
+                ParticleType::Sprite2D,
+                "Resources/wind.png",
+                spawnPos,
+                700.0f, 1200.0f,   // 速度 (px/s)
+                1.0f, 1.5f         // 生命周期 (秒)
+            );
+        }
+    }
+
         // === 在 GameClear 演出期间按 Space → 回标题 ===
     if (gameClear_ && gameClear_->IsPlaying() && input_ && input_->TriggerKey(DIK_SPACE)) {
 
