@@ -9,6 +9,9 @@
 class ParticleEmitter
 {
 public:
+
+    ~ParticleEmitter();
+    void Finalize();  
     void Initialize(Object3dCommon* objCommon, SpriteCommon* sprCommon);
 
     void Emit(int count,

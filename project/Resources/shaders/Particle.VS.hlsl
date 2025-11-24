@@ -10,7 +10,7 @@ struct ParticleForGPU
     float32_t4x4 WVP;
     float32_t4 color;
 };
-StructuredBuffer<ParticleForGPU> gParticle : register(t0);
+StructuredBuffer<ParticleForGPU> gParticle : register(t1);
 
 struct VertexShaderInput
 {
