@@ -139,7 +139,7 @@ void GameScene::Initialize() {
     ModelManager::GetInstants()->LoadModel("strip/strip.obj");        // 载入模型
     ModelManager::GetInstants()->LoadModel("coin/coin.obj");
     ModelManager::GetInstants()->LoadModel("coin_ui/coin_ui.obj");
-    
+    ModelManager::GetInstants()->LoadModel("snow/snow.obj");
     player_ = new Player();
     player_->Initialize(object3dCommon_, camera_);
     // === HP 3D 条管理器 ===
@@ -151,6 +151,8 @@ void GameScene::Initialize() {
     playerCamera_->SetOffset({ 0, 0.0f, -40.0f });
     playerCamera_->SetFollowSpeed(0.1f);
     playerCamera_->SetConstrainToMap(true);
+
+    prevCameraPos_ = camera_->GetTransform().translate;
 
      // === 冲刺技能 UI 管理器 ===
     dashUI_ = new DashUIManager();
@@ -204,10 +206,19 @@ void GameScene::Initialize() {
     emitter2D_ = particleMgr_->CreateEmitter();  // 用来发 2D 粒子
     emitter3D_ = particleMgr_->CreateEmitter();  // 用来发 3D 粒子
     windEmitter_ = particleMgr_->CreateEmitter();
+    snowEmitter_ = particleMgr_->CreateEmitter();
     if (windEmitter_) {
         windEmitter_->SetWindMode(true);
         windEmitter_->SetUseOriginalSpriteSize(true);
         windEmitter_->SetMaxParticles(40);
+    }
+    
+    if (snowEmitter_) {
+        // 让这个发射器进入“雪花模式”，下面会在 ParticleEmitter 里实现
+        snowEmitter_->SetSnowMode(true);
+        // 同屏最多 200 片雪，别太多
+        snowEmitter_->SetMaxParticles(200);
+        snowEmitter_->SetFollowCamera(true);
     }
     // === Hub（map2）的关卡配置 ===
     hubStageByMap_.clear();
@@ -374,6 +385,16 @@ void GameScene::Update() {
     player_->Update(canControl ? input_ : nullptr, mapChipField_);
 
     camera_->Update();
+
+     {
+        Vector3 camPos   = camera_->GetTransform().translate;
+        Vector3 camDelta = camPos - prevCameraPos_;
+        prevCameraPos_   = camPos;
+
+        if (snowEmitter_) {
+            snowEmitter_->ApplyCameraMove(camDelta);
+        }
+    }
     // 若尚未进入GameOver，检测HP
     if (player_->GetHP() <= 0.0f) {
         if (gameOver_ && !gameOver_->IsPlaying()) {
@@ -393,9 +414,6 @@ void GameScene::Update() {
     // GameClear 状态机推进
     if (gameClear_) {
         gameClear_->Update(deltaTime);
-    }
-    if (particleMgr_) {
-        particleMgr_->Update(deltaTime);
     }
    // ==== 刮风粒子效果（整屏 & 只在 map 中）====
     if (windEmitter_ && currentMapPath_ == "Resources/map/map.csv") {
@@ -426,14 +444,51 @@ void GameScene::Update() {
             windEmitter_->Emit(
                 1,
                 ParticleType::Sprite2D,
-                "Resources/wind.png",
+                "Resources/wind.dds",
                 spawnPos,
                 700.0f, 1200.0f,   // 速度 (px/s)
                 1.0f, 1.5f         // 生命周期 (秒)
             );
         }
     }
+    if (snowEmitter_ && currentMapPath_ == "Resources/map/map.csv") {
 
+        // 想要的平均发射间隔（秒）
+        const float snowInterval = 0.04f;   // 约 25 次/秒，可以自己调
+
+        snowSpawnTimer_ -= deltaTime;
+
+        // 用 while 是为了兼容帧率波动，
+        // 当前你的 deltaTime 固定 1/60，也没问题
+        while (snowSpawnTimer_ <= 0.0f) {
+            snowSpawnTimer_ += snowInterval;
+
+            const float margin = 75.0f;
+
+            float screenX = RandRangeFloat(
+                -margin,
+                WinApp::kClientWidth + margin
+            );
+            float screenY = -margin;
+
+            float ndcZ = RandRangeFloat(0.45f, 0.65f);
+
+            Vector3 worldPos = ScreenToWorld(screenX, screenY, ndcZ, camera_);
+
+            // ✅ 每次只发 1 片（或者 2 片），多次累积起来就是“连续的雪”
+            snowEmitter_->Emit(
+                1,                          // 改小：1~2 片
+                ParticleType::Model3D,
+                "snow/snow.obj",
+                worldPos,
+                0.10f, 0.15f,
+                5.0f, 9.0f
+            );
+        }
+    }
+    if (particleMgr_) {
+        particleMgr_->Update(deltaTime);
+    }
         // === 在 GameClear 演出期间按 Space → 回标题 ===
     if (gameClear_ && gameClear_->IsPlaying() && input_ && input_->TriggerKey(DIK_SPACE)) {
 
@@ -1007,6 +1062,7 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
     player_->ResetForMapTransition(true);
     // 相机同步
     camera_->SetTranslate(startPos + Vector3{ 0,0,-40 });
+    prevCameraPos_ = camera_->GetTransform().translate;
     playerCamera_->SetMapBounds(mapChipField_.GetMapMinPosition(), mapChipField_.GetMapMaxPosition());
     // 根据当前地图更新传送门列表
     if (portalMgr_) {

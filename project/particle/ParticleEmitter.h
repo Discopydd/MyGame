@@ -29,6 +29,14 @@ public:
     void SetWindMode(bool enable)            { windMode_ = enable; }
     void SetUseOriginalSpriteSize(bool on)   { useOriginalSpriteSize_ = on; }
     void SetMaxParticles(size_t max) { maxParticles_ = max; }
+    void SetSnowMode(bool enable)           { snowMode_ = enable; }
+
+        // 让这个发射器的 3D 粒子跟随相机平移
+    void SetFollowCamera(bool follow) { followCamera_ = follow; }
+
+    // 每帧把相机的位移量传进来，用来修正粒子位置
+    void ApplyCameraMove(const Vector3& delta);
+
 private:
     Object3dCommon* objCommon_ = nullptr;
     SpriteCommon* sprCommon_   = nullptr;
@@ -40,4 +48,9 @@ private:
     bool windMode_ = false;
     bool useOriginalSpriteSize_ = false;
     size_t maxParticles_ = 200;
+
+    bool snowMode_              = false;
+
+    bool followCamera_   = false;
+
 };

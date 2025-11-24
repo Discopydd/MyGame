@@ -74,11 +74,11 @@ void ParticleEmitter::Emit(int count,
 
         float speed = RandRange(minSpeed, maxSpeed);
 
-          if (windMode_ && type == ParticleType::Sprite2D) {
+        if (windMode_ && type == ParticleType::Sprite2D) {
             // 屏幕坐标：x 向右为正, y 向下为正
             // 想要从右上飞到左下：dx < 0, dy > 0
             float dirX = RandRange(-1.0f, -0.6f);   // 向左一点点随机
-            float dirY = RandRange(0.3f,  0.9f);    // 向下，略有变化
+            float dirY = RandRange(0.3f, 0.9f);    // 向下，略有变化
 
             float len = std::sqrt(dirX * dirX + dirY * dirY);
             if (len > 0.0f) {
@@ -99,6 +99,44 @@ void ParticleEmitter::Emit(int count,
             // 一开始完全透明，后面在 Update 里做淡入
             p.color = { 1.0f, 1.0f, 1.0f, 0.0f };
         }
+        // ===== 雪模式：3D snow.obj，从上往下飘，略微偏斜 =====
+        else if (snowMode_ && type == ParticleType::Model3D) {
+            // 先按风的规则随机一个屏幕方向（右上 -> 左下）
+            float dirScreenX = RandRange(-1.0f, -0.6f); // 屏幕向左
+            float dirScreenY = RandRange(0.3f, 0.9f);   // 屏幕向下
+
+            float len2D = std::sqrt(dirScreenX * dirScreenX + dirScreenY * dirScreenY);
+            if (len2D > 0.0f) {
+                dirScreenX /= len2D;
+                dirScreenY /= len2D;
+            }
+
+            // 转成世界方向：
+            //   屏幕 X → 世界 X（左右）
+            //   屏幕 Y 向下 → 世界 -Y（向下）
+            float dirX = dirScreenX;
+            float dirY = -dirScreenY; // 注意取负号，世界里向下是 -Y
+            float dirZ = RandRange(-0.1f, 0.1f); // 前后给一点小扰动即可
+
+            float len3D = std::sqrt(dirX * dirX + dirY * dirY + dirZ * dirZ);
+            if (len3D > 0.0f) {
+                dirX /= len3D;
+                dirY /= len3D;
+                dirZ /= len3D;
+            }
+
+            p.velocity = { dirX * speed, dirY * speed, dirZ * speed };
+
+            // 给一点横向“风加速度”和轻微摆动
+            p.accel = {
+                RandRange(-0.15f, 0.15f),
+                0.0f,
+                RandRange(-0.10f, 0.10f)
+            };
+
+            p.scale = RandRange(0.4f, 0.8f);
+            p.rotationSpeed = RandRange(-0.5f, 0.5f);
+        }
         else {
             // ===== 普通粒子：保持你原来的随机方向逻辑 =====
             p.velocity = {
@@ -107,7 +145,7 @@ void ParticleEmitter::Emit(int count,
                 RandRange(-1, 1) * speed
             };
 
-            p.scale         = RandRange(0.2f, 0.5f);
+            p.scale = RandRange(0.2f, 0.5f);
             p.rotationSpeed = RandRange(-1, 1);
 
             if (p.type == ParticleType::Sprite2D) {
@@ -115,14 +153,8 @@ void ParticleEmitter::Emit(int count,
             }
         }
 
-        p.life    = RandRange(minLife, maxLife);
+        p.life = RandRange(minLife, maxLife);
         p.maxLife = p.life;
-        p.scale   = RandRange(0.2f, 0.5f);
-        p.rotationSpeed = RandRange(-1, 1);
-
-        if (p.type == ParticleType::Sprite2D) {
-            p.color = { 1.0f, 1.0f, 1.0f, 0.7f };  // 保持你原来的风的透明度
-        }
 
         // 3) 只在“第一次使用这个槽位”的时候创建视觉对象，
         //    以后复用同一个槽位就不再 new 新对象
@@ -131,6 +163,7 @@ void ParticleEmitter::Emit(int count,
                 Object3d* o = new Object3d();
                 o->Initialize(objCommon_);
                 o->SetModel(modelOrTex);  // 模型路径
+                o->SetCamera(objCommon_->GetDefaultCamera());
                 o->SetEnableLighting(false);
                 modelPool_.push_back(o);
             }
@@ -213,7 +246,17 @@ void ParticleEmitter::Update(float dt)
             // 非风的情况就保持原来的旋转逻辑
             p.rotation += p.rotationSpeed * dt;
         }
+        if (snowMode_ && p.type == ParticleType::Model3D) {
+            float phase = p.rotationSpeed;       // 让每片雪不同步
+            float swayX = std::sin(age * 1.8f + phase) * 0.15f; // 幅度/频率都很小
+            float swayZ = std::cos(age * 1.3f + phase) * 0.12f;
 
+            p.position.x += swayX * dt;
+            p.position.z += swayZ * dt;
+
+            // 让旋转更像“轻轻翻滚”
+            p.rotation += p.rotationSpeed * dt * 0.6f;
+        }
         if (p.type == ParticleType::Model3D)
         {
             Object3d* o = modelPool_[modelID++];
@@ -255,6 +298,31 @@ void ParticleEmitter::Draw2D()
     for (auto& p : particles_) {
         if (p.type == ParticleType::Sprite2D && p.IsAlive()) {
             spritePool_[idx++]->Draw();
+        }
+    }
+}
+
+void ParticleEmitter::ApplyCameraMove(const Vector3& delta)
+{
+    if (!followCamera_) {
+        return;
+    }
+
+    // 没有移动就不必遍历
+    if (delta.x == 0.0f && delta.y == 0.0f && delta.z == 0.0f) {
+        return;
+    }
+
+    for (auto& p : particles_) {
+        if (!p.IsAlive()) {
+            continue;
+        }
+
+        // 这里只处理“雪花”的 3D 粒子
+        if (snowMode_ && p.type == ParticleType::Model3D) {
+            p.position.x += delta.x;
+            p.position.y += delta.y;
+            p.position.z += delta.z;
         }
     }
 }
