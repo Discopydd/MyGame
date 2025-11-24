@@ -26,7 +26,9 @@ public:
     void Update(float dt);
     void Draw3D();
     void Draw2D();
-
+    void SetWindMode(bool enable)            { windMode_ = enable; }
+    void SetUseOriginalSpriteSize(bool on)   { useOriginalSpriteSize_ = on; }
+    void SetMaxParticles(size_t max) { maxParticles_ = max; }
 private:
     Object3dCommon* objCommon_ = nullptr;
     SpriteCommon* sprCommon_   = nullptr;
@@ -34,4 +36,8 @@ private:
     std::vector<Particle> particles_;
     std::vector<Object3d*> modelPool_;
     std::vector<Sprite*> spritePool_;
+
+    bool windMode_ = false;
+    bool useOriginalSpriteSize_ = false;
+    size_t maxParticles_ = 200;
 };
