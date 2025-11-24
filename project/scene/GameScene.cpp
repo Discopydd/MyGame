@@ -507,26 +507,12 @@ void GameScene::Update() {
         emitter2D_->Emit(
             30,                        // 粒子数量
             ParticleType::Sprite2D,    // 2D 粒子
-            "Resources/uvChecker.png",// 2D 粒子用的纹理
+            "Resources/circle.png",// 2D 粒子用的纹理
             { screenPos.x, screenPos.y, 0.0f }, // 在屏幕位置发射
             3.0f, 6.0f,                // 速度范围
             0.5f, 1.0f                 // 生命周期范围(秒)
         );
-       } if (particleMgr_ && emitter2D_) {
-           // 以玩家位置为中心，在屏幕空间发射 2D 粒子
-           Vector3 playerPos = player_->GetPosition();
-           Vector3 screenPos = WorldToScreen(playerPos, camera_); // 已经在文件开头实现的工具函数
-
-           // 这里的 "Resources/particle2d.png" 请改成你自己实际有的贴图
-           emitter2D_->Emit(
-               30,                        // 粒子数量
-               ParticleType::Sprite2D,    // 2D 粒子
-               "Resources/uvChecker.png",// 2D 粒子用的纹理
-               { screenPos.x, screenPos.y, 0.0f }, // 在屏幕位置发射
-               3.0f, 6.0f,                // 速度范围
-               0.5f, 1.0f                 // 生命周期范围(秒)
-           );
-       }
+       } 
     }
     if (input_->TriggerKey(DIK_L)) {
         if (particleMgr_ && emitter3D_) {
@@ -810,6 +796,7 @@ void GameScene::Finalize() {
         delete particleMgr_;
         particleMgr_ = nullptr;
          emitter2D_ = nullptr;
+         emitter3D_ = nullptr;
     }
 }
 

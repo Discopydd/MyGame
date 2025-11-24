@@ -6,7 +6,27 @@ static float RandRange(float a, float b)
     float t = (float)rand() / RAND_MAX;
     return a + (b - a)*t;
 }
+ParticleEmitter::~ParticleEmitter()
+{
+    Finalize();
+}
+void ParticleEmitter::Finalize()
+{
+    // 删除 3D 粒子对象池
+    for (auto* o : modelPool_) {
+        delete o;
+    }
+    modelPool_.clear();
 
+    // 删除 2D 粒子对象池
+    for (auto* s : spritePool_) {
+        delete s;
+    }
+    spritePool_.clear();
+
+    // 清空粒子数据
+    particles_.clear();
+}
 void ParticleEmitter::Initialize(Object3dCommon* objCommon, SpriteCommon* sprCommon)
 {
     objCommon_ = objCommon;
