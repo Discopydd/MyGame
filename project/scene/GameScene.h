@@ -144,4 +144,8 @@ private:
     // 控制风粒子生成频率的计时器
     float windSpawnTimer_ = 0.0f;
 
+    ParticleEmitter* snowEmitter_ = nullptr;
+    float snowSpawnTimer_         = 0.0f;
+
+    Vector3 prevCameraPos_{};
 };
