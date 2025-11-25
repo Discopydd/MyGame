@@ -14,7 +14,8 @@
 #include <PointLight.h>
 #include <SpotLight.h>
 
-
+#include <string>
+#include <algorithm>
 class SpriteCommon;
 class Sprite
 {
@@ -63,11 +64,18 @@ public:
 
 	void SetVisible(bool visible) { isVisible_ = visible; }
     bool IsVisible() const { return isVisible_; }
+
 private:
 
 	//テクスチャサイズをイメージに合わせる
 	void AdjustTextureSize();
-
+	static bool EndsWithGif(const std::string& s) {
+		auto pos = s.find_last_of('.');
+		if (pos == std::string::npos) return false;
+		std::string ext = s.substr(pos + 1);
+		std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+		return ext == "gif";
+	}
 	SpriteCommon* spriteCommon = nullptr;
 	SrvManager* srvManager = nullptr;
 	//頂点データ作成
@@ -127,6 +135,7 @@ private:
 	bool isFlipY_ = false;
 	//ファイルパス
  	std::string filePath;
+	bool isGif_ = false;
 	//テクスチャ左上座標
 	Vector2 textureLeftTop_ = { 0.0f,0.0f };
 	//テクスチャ切り出しサイズ
