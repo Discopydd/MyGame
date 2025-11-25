@@ -30,6 +30,15 @@ private:
 		D3D12_CPU_DESCRIPTOR_HANDLE srvHandleCPU;
 		D3D12_GPU_DESCRIPTOR_HANDLE srvHandleGPU;
 	};
+	   // ======== GIF 用アニメーションデータ ========
+	struct AnimatedTexture {
+		std::vector<TextureData> frames;   // 各フレームの TextureData
+		std::vector<float> delays;         // 各フレームの表示時間（秒）
+		bool loop = true;
+
+		size_t current = 0;
+		float timer = 0.0f;
+	};
 public:
 
 	//シングルトンインタンス
@@ -54,6 +63,14 @@ public:
 	//テクスチャ番号からCPUハンドルを取得
 	D3D12_GPU_DESCRIPTOR_HANDLE GetSrvHandleGPU(const std::string& filePath);
 
+	// ======== GIF 追加 API ========
+    void LoadGif(const std::string& filePath); // GIF 拆帧 + 上传
+    bool IsGifLoaded(const std::string& filePath) const;
+    const DirectX::TexMetadata& GetGifMetaData(const std::string& filePath) const;
+
+    // dt でアニメを進めて、現在フレームの SRV ハンドルを返す
+    D3D12_GPU_DESCRIPTOR_HANDLE GetGifSrvHandleGPU(const std::string& filePath, float dt);
+
 	static uint32_t kSRVIndexTop;
 
 private:
@@ -62,4 +79,6 @@ private:
 	std::unordered_map<std::string,TextureData>textureDatas;
 	DirectXCommon* dxCommon_ = nullptr;
 	SrvManager* srvManager_ = nullptr;
+	// GIF アニメーションデータ
+    std::unordered_map<std::string, AnimatedTexture> gifDatas_;
 };

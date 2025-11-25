@@ -8,8 +8,15 @@
 //初期化
 void Sprite::Initialize(SpriteCommon* spriteCommon, std::string textureFilePath) {
 	this->spriteCommon = spriteCommon;
-	TextureManager::GetInstance()->LoadTexture(textureFilePath);
 	filePath = textureFilePath;
+	isGif_ = EndsWithGif(filePath);
+
+	if (isGif_) {
+		TextureManager::GetInstance()->LoadGif(filePath);
+	}
+	else {
+		TextureManager::GetInstance()->LoadTexture(filePath);
+	}
 	VertexDataCreate();
 	IndexCreate();
 	MaterialCreate();
@@ -44,7 +51,9 @@ void Sprite::Update() {
 		bottom = -bottom;
 	}
 
-	const DirectX::TexMetadata& metadata = TextureManager::GetInstance()->GetMetaData(filePath);
+	const DirectX::TexMetadata& metadata =
+    isGif_ ? TextureManager::GetInstance()->GetGifMetaData(filePath)
+           : TextureManager::GetInstance()->GetMetaData(filePath);
 	float tex_left = textureLeftTop_.x / metadata.width;
 	float tex_right = (textureLeftTop_.x + textureSize_.x) / metadata.width;
 	float tex_top = textureLeftTop_.y / metadata.height;
@@ -88,7 +97,17 @@ void Sprite::Draw() {
 	//座標変換行列CBufferの場所を設定
 	spriteCommon->GetDxCommon()->GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResource->GetGPUVirtualAddress());
 	//SRVのDescriptorTableの先頭を設定
-	spriteCommon->GetDxCommon()->GetCommandList()->SetGraphicsRootDescriptorTable(2, TextureManager::GetInstance()->GetSrvHandleGPU(filePath));
+	 // ★ GIF の場合はここでフレーム更新＋SRV切替
+	if (isGif_) {
+		// 今のエンジンは Sprite::Draw が dt を受け取らないので固定値で OK
+		D3D12_GPU_DESCRIPTOR_HANDLE handle =
+			TextureManager::GetInstance()->GetGifSrvHandleGPU(filePath, 1.0f / 60.0f);
+		spriteCommon->GetDxCommon()->GetCommandList()->SetGraphicsRootDescriptorTable(2, handle);
+	}
+	else {
+		spriteCommon->GetDxCommon()->GetCommandList()->SetGraphicsRootDescriptorTable(2,
+			TextureManager::GetInstance()->GetSrvHandleGPU(filePath));
+	}
 	spriteCommon->GetDxCommon()->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());
 	spriteCommon->GetDxCommon()->GetCommandList()->SetGraphicsRootConstantBufferView(4, cameraResource->GetGPUVirtualAddress());
 	spriteCommon->GetDxCommon()->GetCommandList()->SetGraphicsRootConstantBufferView(5, pointLightResource->GetGPUVirtualAddress());
@@ -187,7 +206,10 @@ void Sprite::SpotLightCreate()
 void Sprite::AdjustTextureSize()
 {
 	//テクスチャメタデータを取得
-	const DirectX::TexMetadata& metadata = TextureManager::GetInstance()->GetMetaData(filePath);
+	const DirectX::TexMetadata& metadata =
+        isGif_ ? TextureManager::GetInstance()->GetGifMetaData(filePath)
+               : TextureManager::GetInstance()->GetMetaData(filePath);
+
 	//テクスチャ切り出しサイズ
 	textureSize_ = { static_cast<float>(metadata.width),static_cast<float>(metadata.height) };
 	//画像サイズをテクスチャサイズに合わせる
