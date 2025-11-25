@@ -991,7 +991,7 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
         auto makeUpHint = [&](int x, int y) {
             HintSprite h;
             h.sprite = new Sprite();
-            h.sprite->Initialize(spriteCommon_, "Resources/up.png");
+            h.sprite->Initialize(spriteCommon_, "Resources/up.dds");
             h.sprite->SetSize({ 32.0f, 32.0f });
             h.worldPos = mapChipField_.GetMapChipPositionByIndex(x, y);
             upHints_.push_back(h);

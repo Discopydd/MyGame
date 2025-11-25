@@ -15,7 +15,7 @@ void TitleScene::Initialize() {
     TextureManager::GetInstance()->Initialize(dxCommon_, srvManager_);
 
 
-    std::string textureFilePath[] = { "Resources/black.png", "Resources/GameTitle.png" ,"Resources/Start.png"};
+    std::string textureFilePath[] = { "Resources/black.png", "Resources/GameTitle.dds" ,"Resources/Start.dds"};
     titleSprite_ = new Sprite();
     titleSprite_->Initialize(spriteCommon_, textureFilePath[1]); // 一张纯黑/灰色贴图
     titleSprite_->SetPosition({ 0.0f, titleY_ });
