@@ -32,13 +32,13 @@ void IntroManager::Initialize(SpriteCommon* spriteCommon, Input* input)
 
     // 标题
     introTitle_ = new Sprite();
-    introTitle_->Initialize(spriteCommon_, "Resources/GameTitle.png");
+    introTitle_->Initialize(spriteCommon_, "Resources/GameTitle.dds");
     introTitle_->SetPosition({ 0.0f, H * 0.15f });
     introTitle_->SetColor({ 1,1,1,0 });
 
     // Skip 提示
     skipHint_ = new Sprite();
-    skipHint_->Initialize(spriteCommon_, "Resources/Start.png");
+    skipHint_->Initialize(spriteCommon_, "Resources/Start.dds");
     skipHint_->SetPosition({ W * 0.5f - 100.0f, H * 0.8f });
     skipHint_->SetColor({ 1,1,1,0 });
     skipHint_->SetVisible(false);
