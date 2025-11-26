@@ -33,6 +33,9 @@ void TextureManager::Initialize(DirectXCommon*dxCommon, SrvManager* srvManager) 
 }
 // テクスチャファイルの読み込み
 void TextureManager::LoadTexture(const std::string& filePath) {
+    if (filePath.empty()) {
+        return;
+    }
     // 既に読み込み済みなら何もしない
     if (textureDatas.contains(filePath)) return;
 

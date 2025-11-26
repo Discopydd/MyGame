@@ -36,6 +36,16 @@ public:
 
     bool  IsDead() const { return isDead_; }
     void  StartDeathFall();   // 触发死亡演出（被 GameScene 调用）
+
+    bool ConsumeDoubleJumpEvent() {
+        bool v = didDoubleJumpThisFrame_;
+        didDoubleJumpThisFrame_ = false;
+        return v;
+    }
+        // 玩家是否面向右
+    bool IsFacingRight() const { return lrDirection_ == LRDirection::kRight; }
+
+    const Vector3& GetDashDirection() const { return dashDirection_; }
 private:
     Object3d* model_ = nullptr;
     Object3dCommon* object3dCommon_ = nullptr;
@@ -116,4 +126,6 @@ private:
     // ---- Jump / Double Jump ----
     int   jumpCount_ = 0;        // 已使用的跳跃次数
     int   maxJumpCount_ = 2;     // 最大跳跃次数（2 = 二段跳）
+
+    bool  didDoubleJumpThisFrame_ = false; // 本帧是否触发了二段跳
 };

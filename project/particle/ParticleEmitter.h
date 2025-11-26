@@ -15,13 +15,13 @@ public:
     void Initialize(Object3dCommon* objCommon, SpriteCommon* sprCommon);
 
     void Emit(int count,
-              ParticleType type,
-              const char* modelOrTexture,
-              const Vector3& spawnPos,
-              float minSpeed,
-              float maxSpeed,
-              float minLife,
-              float maxLife);
+        ParticleType type,
+        const char* modelOrTexture,
+        const Vector3& spawnPos,
+        float minSpeed,
+        float maxSpeed,
+        float minLife,
+        float maxLife, float horizontalBias = 0.0f, bool randomColor = false);
 
     void Update(float dt);
     void Draw3D();

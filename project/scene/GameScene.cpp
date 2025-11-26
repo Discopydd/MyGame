@@ -140,6 +140,8 @@ void GameScene::Initialize() {
     ModelManager::GetInstants()->LoadModel("coin/coin.obj");
     ModelManager::GetInstants()->LoadModel("coin_ui/coin_ui.obj");
     ModelManager::GetInstants()->LoadModel("snow/snow.obj");
+    ModelManager::GetInstants()->LoadModel("jump/jump.obj");
+    ModelManager::GetInstants()->LoadModel("star/star.obj");
     player_ = new Player();
     player_->Initialize(object3dCommon_, camera_);
     // === HP 3D 条管理器 ===
@@ -207,6 +209,7 @@ void GameScene::Initialize() {
     emitter3D_ = particleMgr_->CreateEmitter();  // 用来发 3D 粒子
     windEmitter_ = particleMgr_->CreateEmitter();
     snowEmitter_ = particleMgr_->CreateEmitter();
+    dashStarEmitter_ = particleMgr_->CreateEmitter();
     if (windEmitter_) {
         windEmitter_->SetWindMode(true);
         windEmitter_->SetUseOriginalSpriteSize(true);
@@ -219,6 +222,12 @@ void GameScene::Initialize() {
         // 同屏最多 200 片雪，别太多
         snowEmitter_->SetMaxParticles(200);
         snowEmitter_->SetFollowCamera(true);
+    }
+    if (dashStarEmitter_) {
+        dashStarEmitter_->SetMaxParticles(150);   // 自己喜欢可以再调
+        dashStarEmitter_->SetSnowMode(false);
+        dashStarEmitter_->SetWindMode(false);
+        dashStarEmitter_->SetFollowCamera(false); // 尾气留在世界里即可
     }
     // === Hub（map2）的关卡配置 ===
     hubStageByMap_.clear();
@@ -384,8 +393,45 @@ void GameScene::Update() {
     // 淡入淡出/加载/演出期间都不可操作
     player_->Update(canControl ? input_ : nullptr, mapChipField_);
 
-    camera_->Update();
+    if (particleMgr_ && emitter3D_ && player_->ConsumeDoubleJumpEvent()) {
+        Vector3 playerPos = player_->GetPosition();
 
+        // 可以微微抬高一点，让粒子从身体附近炸开
+        Vector3 spawnPos = playerPos + Vector3{ 0.0f, 0.8f, 0.0f };
+        float horizontalBias = player_->IsFacingRight() ? -1.0f : 1.0f;
+        emitter3D_->Emit(
+            14,                        // 粒子数量，自己喜欢可以调 12~24
+            ParticleType::Model3D,     // 3D 粒子
+            "jump/jump.obj",           // 暂定使用 cube 模型
+            spawnPos,
+            4.0f, 8.0f,                // 速度范围：向四周炸开的感觉
+            0.25f, 0.45f,horizontalBias                 // 生命周期：短一点，看起来干脆利落
+        );
+    }
+
+    camera_->Update();
+    // === 冲刺星星尾气 ===
+    if (dashStarEmitter_ && player_->IsDashing()) {
+        Vector3 pos = player_->GetPosition();
+        float h = player_->GetHeight();
+
+        // 脚附近
+        pos.y -= h * 0.4f;
+
+        // 根据冲刺方向，把生成点往“身后”挪一点
+        Vector3 dashDir = player_->GetDashDirection(); // x>0 右冲, x<0 左冲
+        pos.x -= dashDir.x * 0.8f;
+
+        dashStarEmitter_->Emit(
+            1,                      // 每帧几颗星星
+            ParticleType::Model3D,
+            "star/star.obj",
+            pos,
+            2.0f, 4.0f,             // 速度
+            0.08f, 0.16f,            // 寿命
+            0.0f,true
+        );
+    }
      {
         Vector3 camPos   = camera_->GetTransform().translate;
         Vector3 camDelta = camPos - prevCameraPos_;
@@ -416,12 +462,12 @@ void GameScene::Update() {
         gameClear_->Update(deltaTime);
     }
    // ==== 刮风粒子效果（整屏 & 只在 map 中）====
-    if (windEmitter_ && currentMapPath_ == "Resources/map/map.csv") {
+    if (windEmitter_ && currentMapPath_ == "Resources/map/map5.csv") {
 
         windSpawnTimer_ -= deltaTime;
         if (windSpawnTimer_ <= 0.0f) {
             // 发射频率稍微高一点，整个屏幕都会有风线
-            windSpawnTimer_ = 0.06f;   // 约 33 条/秒，可自行调
+            windSpawnTimer_ = 0.1f;   // 约 33 条/秒，可自行调
 
             const float margin = 50.0f;
 
@@ -451,10 +497,10 @@ void GameScene::Update() {
             );
         }
     }
-    if (snowEmitter_ && currentMapPath_ == "Resources/map/map.csv") {
+    if (snowEmitter_ && currentMapPath_ == "Resources/map/map5.csv") {
 
         // 想要的平均发射间隔（秒）
-        const float snowInterval = 0.04f;   // 约 25 次/秒，可以自己调
+        const float snowInterval = 0.1f;   // 约 25 次/秒，可以自己调
 
         snowSpawnTimer_ -= deltaTime;
 
@@ -900,8 +946,9 @@ void GameScene::Finalize() {
         particleMgr_->Finalize();
         delete particleMgr_;
         particleMgr_ = nullptr;
-         emitter2D_ = nullptr;
-         emitter3D_ = nullptr;
+        emitter2D_ = nullptr;
+        emitter3D_ = nullptr;
+        dashStarEmitter_ = nullptr;
     }
 }
 

@@ -40,7 +40,7 @@ void ParticleEmitter::Emit(int count,
     float minSpeed,
     float maxSpeed,
     float minLife,
-    float maxLife)
+    float maxLife, float horizontalBias, bool randomColor)
 {
     for (int i = 0; i < count; i++)
     {
@@ -139,17 +139,68 @@ void ParticleEmitter::Emit(int count,
         }
         else {
             // ===== 普通粒子：保持你原来的随机方向逻辑 =====
-            p.velocity = {
-                RandRange(-1, 1) * speed,
-                RandRange(0.3f, 1) * speed,
-                RandRange(-1, 1) * speed
-            };
+            float sideSign = 0.0f;
+            if (horizontalBias > 0.1f)      sideSign = 1.0f;
+            else if (horizontalBias < -0.1f) sideSign = -1.0f;
 
-            p.scale = RandRange(0.2f, 0.5f);
-            p.rotationSpeed = RandRange(-1, 1);
+            float dirX;
+            if (sideSign == 0.0f) {
+                // 没有偏向：左右随机一点点
+                dirX = RandRange(-0.12f, 0.12f);
+            }
+            else {
+                // 有偏向：给一个比较强的侧向分量
+                dirX = RandRange(0.5f, 0.9f) * sideSign;
+            }
+            float dirY;
+            float dirZ;
+
+            if (randomColor && type == ParticleType::Model3D) {
+                // ⭐ dash 彩色星星：上下散开多一点
+                dirY = RandRange(-1.1f, -0.3f);    // 有的更朝下，有的几乎水平
+                dirZ = RandRange(-0.25f, 0.25f);   // 前后也稍微散开一点
+            }
+            else {
+                // 其它 3D 粒子 / 2D 粒子：保持原来的比较窄的范围
+                dirY = RandRange(-1.0f, -0.85f);
+                dirZ = RandRange(-0.12f, 0.12f);
+            }
+
+            float len = std::sqrt(dirX * dirX + dirY * dirY + dirZ * dirZ);
+            if (len > 0.0f) {
+                dirX /= len;
+                dirY /= len;
+                dirZ /= len;
+            }
+
+            p.velocity = { dirX * speed, dirY * speed, dirZ * speed };
+
+            // 尾气块一般比较小
+            p.scale = RandRange(0.18f, 0.30f);
+            p.rotationSpeed = RandRange(-1.2f, 1.2f);
 
             if (p.type == ParticleType::Sprite2D) {
                 p.color = { 1.0f, 1.0f, 1.0f, 0.7f };
+            }
+
+            // 让这种普通 3D 粒子默认有一点重力（可选）
+            if (p.type == ParticleType::Model3D) {
+                p.accel = { 0.0f, -9.8f * 1.2f, 0.0f }; // 往下加速，尾巴拉长一点
+            }
+            if (randomColor && p.type == ParticleType::Model3D) {
+                int c = rand() % 6;
+                switch (c) {
+                case 0: p.color = { 1.0f, 0.4f, 0.4f, 1.0f }; break; // 红
+                case 1: p.color = { 1.0f, 0.8f, 0.3f, 1.0f }; break; // 黄
+                case 2: p.color = { 0.4f, 1.0f, 0.4f, 1.0f }; break; // 绿
+                case 3: p.color = { 0.4f, 0.8f, 1.0f, 1.0f }; break; // 蓝
+                case 4: p.color = { 0.9f, 0.4f, 1.0f, 1.0f }; break; // 紫
+                case 5: p.color = { 1.0f, 0.6f, 0.9f, 1.0f }; break; // 粉
+                }
+            }
+            else {
+                // 默认：不随机，就用白色
+                p.color = { 1.0f, 1.0f, 1.0f, 1.0f };
             }
         }
 
@@ -263,6 +314,8 @@ void ParticleEmitter::Update(float dt)
             o->SetTranslate(p.position);
             o->SetRotate({ 0, p.rotation, 0 });
             o->SetScale({ p.scale,p.scale,p.scale });
+            o->SetColor(p.color);
+
             o->Update();
         }
         else

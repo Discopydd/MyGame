@@ -138,7 +138,7 @@ private:
     ParticleManager* particleMgr_ = nullptr;
     ParticleEmitter* emitter2D_ = nullptr;   // 2D（Sprite）粒子发射器
     ParticleEmitter* emitter3D_ = nullptr;   // 3D（Model）粒子发射器
-
+    ParticleEmitter* dashStarEmitter_ = nullptr;
     // 风特效的粒子发射器
     ParticleEmitter* windEmitter_ = nullptr;
     // 控制风粒子生成频率的计时器
