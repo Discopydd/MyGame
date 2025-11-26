@@ -15,15 +15,27 @@ public:
 
 	static MaterialData LoadMaterialTemplateFile(const std::string& directorypath, const std::string& filename);
 	static ModelData LoadObjectFile(const std::string& ditrectoryPath, const std::string& filename);
-	 void SetEnableLighting(bool enable) {
-        if (materialData) {
-            materialData->enableLighting = enable;
-        }
-    }
+	void SetEnableLighting(bool enable) {
+		if (materialData) {
+			materialData->enableLighting = enable;
+		}
+	}
 
-    bool GetEnableLighting() const {
-        return materialData ? materialData->enableLighting : false;
-    }
+	bool GetEnableLighting() const {
+		return materialData ? materialData->enableLighting : false;
+	}
+	void SetColor(const Vector4& color) {
+		if (materialData) {
+			materialData->color = color;
+		}
+	}
+
+	Vector4 GetColor() const {
+		if (materialData) {
+			return materialData->color;
+		}
+		return { 1.0f, 1.0f, 1.0f, 1.0f };
+	}
 private:
 	// モデル
 	ModelCommon* modelCommon_ = nullptr;

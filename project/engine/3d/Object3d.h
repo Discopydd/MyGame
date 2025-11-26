@@ -49,6 +49,19 @@ public:
     void SetPointLightIntensity(float intensity);
     // 设置聚光灯强度
     void SetSpotLightIntensity(float intensity);
+
+	void SetColor(const Vector4& color) {
+        if (model_) {
+            model_->SetColor(color);
+        }
+    }
+
+    Vector4 GetColor() const {
+        if (model_) {
+            return model_->GetColor();
+        }
+        return {1.0f, 1.0f, 1.0f, 1.0f};
+    }
 	void SetEnableLighting(bool enable) {
 		if (model_) {
 			model_->SetEnableLighting(enable);

@@ -39,7 +39,7 @@ void Player::Initialize(Object3dCommon* object3dCommon, Camera* camera) {
 
 void Player::Update(Input* input, const MapChipField& mapChipField) {
     const float deltaTime = 1.0f / 60.0f; // 先按 60FPS 固定，后续可外部传参
-
+    didDoubleJumpThisFrame_ = false;
     // --- HP 每秒递减 ---
     if (hpDrainPerSec_ > 0.0f && hp_ > 0.0f) {
         //hp_ -= hpDrainPerSec_ * deltaTime;
@@ -204,6 +204,7 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
             velocity_.y = jumpVelInit_;
             jumpCount_++;
 
+            didDoubleJumpThisFrame_ = true;
             // TODO: 二段跳特效 / 音效
         }
     }

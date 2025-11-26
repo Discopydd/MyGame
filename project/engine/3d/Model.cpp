@@ -36,9 +36,12 @@ void Model::Initialize(ModelCommon* modelCommon, const std::string& directorypat
 	materialData->uvTransform = Math::MakeIdentity4x4();
 	materialData->shininess = 70;
 	//.objの参照しているテクスチャファイル読み込み
-	TextureManager::GetInstance()->LoadTexture(modelData.material.textureFilePath);
-	//読み込んだテクスチャ番号を取得
-	modelData.material.textureIndex = TextureManager::GetInstance()->GetSrvIndex(modelData.material.textureFilePath);
+	if (!modelData.material.textureFilePath.empty()) {
+		TextureManager::GetInstance()->LoadTexture(modelData.material.textureFilePath);
+		//読み込んだテクスチャ番号を取得
+		modelData.material.textureIndex =
+			TextureManager::GetInstance()->GetSrvIndex(modelData.material.textureFilePath);
+	}
 }
 
 
@@ -73,6 +76,9 @@ MaterialData Model::LoadMaterialTemplateFile(const std::string& directorypath, c
 			//連結してファイルパスにする
 			materialData.textureFilePath = directorypath + "/" + textureFilename;
 		}
+	}
+	if (materialData.textureFilePath.empty()) {
+		materialData.textureFilePath = "Resources/white.png";
 	}
 	return materialData;
 }
