@@ -6,6 +6,7 @@ std::map<std::string, MapChipType> mapChipTable = {
     {"1", MapChipType::kBlock },
     {"2", MapChipType::kPortal },
     {"3", MapChipType::kItem},
+    {"4", MapChipType::kSpike},
 };
 
 }

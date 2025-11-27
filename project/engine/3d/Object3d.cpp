@@ -106,3 +106,8 @@ void Object3d::SetSpotLightIntensity(float intensity)
     if (!spotLightData) { return; }
     spotLightData->intensity = intensity;
 }
+void Object3d::SetLightingMode(int mode)
+{
+    if (!model_) { return; }
+    model_->SetEnableLighting(mode);
+}

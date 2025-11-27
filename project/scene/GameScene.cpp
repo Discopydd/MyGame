@@ -102,6 +102,19 @@ void GameScene::GenerateBlocks() {
 
                 itemMgr_->RegisterItem(currentMapPath_, x, y, item);
             }
+            else if (type == MapChipType::kSpike) {
+                Object3d* spike = new Object3d();
+                spike->Initialize(object3dCommon_);
+                spike->SetModel("strip/strip.obj");   // 使用地刺模型
+                spike->SetCamera(camera_);
+
+                // 视情况微调一下高度（例如让刺从地面冒出来一点）
+                Vector3 spikePos = position;
+                spikePos.y -= 0.1f;                   // 根据模型大小自己调
+                spike->SetTranslate(spikePos);
+                spike->SetLightingMode(2);
+                mapBlocks_.push_back(spike);
+            }
         }
     }
 }
@@ -142,6 +155,7 @@ void GameScene::Initialize() {
     ModelManager::GetInstants()->LoadModel("snow/snow.obj");
     ModelManager::GetInstants()->LoadModel("jump/jump.obj");
     ModelManager::GetInstants()->LoadModel("star/star.obj");
+    ModelManager::GetInstants()->LoadModel("hurd/hurd.obj");
     player_ = new Player();
     player_->Initialize(object3dCommon_, camera_);
     // === HP 3D 条管理器 ===
@@ -736,8 +750,11 @@ void GameScene::Update() {
         MapChipType currentType = mapChipField_.GetMapChipTypeByIndex(playerIndex.xIndex, playerIndex.yIndex);
         const char* typeName = "Unknown";
         switch (currentType) {
-        case MapChipType::kBlock: typeName = "Block"; break;
+        case MapChipType::kBlank:  typeName = "Blank";  break;
+        case MapChipType::kBlock:  typeName = "Block";  break;
         case MapChipType::kPortal: typeName = "Portal"; break;
+        case MapChipType::kItem:   typeName = "Item";   break;
+        case MapChipType::kSpike:  typeName = "Spike";  break;
         }
         ImGui::Text("Current MapChip Type: %s", typeName);
     }
