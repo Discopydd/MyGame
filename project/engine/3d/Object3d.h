@@ -67,6 +67,7 @@ public:
 			model_->SetEnableLighting(enable);
 		}
 	}
+	 void SetLightingMode(int mode);
 private:
 
 	Object3dCommon* object3dCommon_ = nullptr;

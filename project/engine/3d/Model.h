@@ -20,7 +20,12 @@ public:
 			materialData->enableLighting = enable;
 		}
 	}
-
+	void SetEnableLighting(int enable)
+	{
+		if (materialData) {
+			materialData->enableLighting = enable;
+		}
+	}
 	bool GetEnableLighting() const {
 		return materialData ? materialData->enableLighting : false;
 	}
