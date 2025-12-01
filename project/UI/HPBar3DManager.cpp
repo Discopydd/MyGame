@@ -23,7 +23,7 @@ void HPBar3DManager::Initialize(Object3dCommon* objCommon,
         seg->Initialize(object3dCommon_);
         seg->SetModel("hurd/hurd.obj");
         seg->SetCamera(camera_);
-        seg->SetScale({ 0.001f, 0.001f, 0.001f });   // 和你原来的一样
+        seg->SetScale({ 0.001f, 0.001f, 0.001f });
         seg->SetEnableLighting(true);
         seg->SetDirectionalLightIntensity(2.0f);
         strips_.push_back(seg);

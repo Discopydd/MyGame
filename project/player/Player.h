@@ -34,6 +34,9 @@ public:
     void   Heal(float v) { hp_ = (std::min)(hp_ + v, (float)maxHP_); }
     bool IsOnGround() const { return isOnGround_; }
 
+    bool  IsInvincible() const { return isInvincible_; }
+    void  StartInvincible(float duration);
+
     bool  IsDead() const { return isDead_; }
     void  StartDeathFall();   // 触发死亡演出（被 GameScene 调用）
 
@@ -128,4 +131,11 @@ private:
     int   maxJumpCount_ = 2;     // 最大跳跃次数（2 = 二段跳）
 
     bool  didDoubleJumpThisFrame_ = false; // 本帧是否触发了二段跳
+
+     // --- 受伤无敌 & 闪烁 ---
+    bool  isInvincible_       = false;
+    float invincibleTimer_    = 0.0f;
+    float damageBlinkTimer_   = 0.0f;
+    float damageBlinkInterval_ = 0.08f; // 闪烁间隔（秒）
+    bool  damageBlinkVisible_ = true;
 };
