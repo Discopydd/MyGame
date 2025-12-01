@@ -256,6 +256,9 @@ void GameScene::Initialize() {
     hubProgress_ = 0;
     allStagesCleared_ = false;
 
+    playerIndexHistoryCursor_ = 0;
+    playerIndexHistoryInitialized_ = false;
+    playerIndexOneSecAgo_ = MapChipField::IndexSet{};
 }
 
 void GameScene::Update() {
@@ -590,6 +593,88 @@ void GameScene::Update() {
 
     MapChipField::IndexSet playerIndex =
         mapChipField_.GetMapChipIndexByPosition(player_->GetPosition());
+  // ===== 记录玩家所在格子的历史，用于“回到 1 秒前的位置” =====
+    if (!playerIndexHistoryInitialized_) {
+        // 初次：用当前格子填满整个缓冲区，避免读到垃圾数据
+        for (int i = 0; i < kPlayerIndexHistoryFrameCount_; ++i) {
+            playerIndexHistory_[i] = playerIndex;
+        }
+        playerIndexHistoryInitialized_ = true;
+        playerIndexHistoryCursor_ = 0;
+        playerIndexOneSecAgo_ = playerIndex;
+    }
+
+    // 1 秒前所在的格子 = 当前写入位置里存放的旧值
+    playerIndexOneSecAgo_ = playerIndexHistory_[playerIndexHistoryCursor_];
+
+    // 将本帧格子写入历史，并推进游标
+    playerIndexHistory_[playerIndexHistoryCursor_] = playerIndex;
+    playerIndexHistoryCursor_++;
+    if (playerIndexHistoryCursor_ >= kPlayerIndexHistoryFrameCount_) {
+        playerIndexHistoryCursor_ = 0;
+    }
+
+    // ===== 踩到地刺：扣血 1 格 & 回到 1 秒前所在格子 =====
+    {
+        MapChipType tileType =
+            mapChipField_.GetMapChipTypeByIndex(playerIndex.xIndex, playerIndex.yIndex);
+
+        if (tileType == MapChipType::kSpike) {
+            if (!player_->IsDead() && !player_->IsInvincible()) {
+
+                 // 先假设回到“约 0.5 秒前”的那个格子
+                MapChipField::IndexSet safeIndex = playerIndexOneSecAgo_;
+
+                MapChipType safeType =
+                    mapChipField_.GetMapChipTypeByIndex(safeIndex.xIndex, safeIndex.yIndex);
+
+                // 如果 0.5 秒前也在地刺上，就在历史里往更早找一个“不是地刺”的格子
+                if (safeType == MapChipType::kSpike) {
+                    for (int i = 0; i < kPlayerIndexHistoryFrameCount_; ++i) {
+                        int idx = playerIndexHistoryCursor_ - 1 - i;
+                        if (idx < 0) {
+                            idx += kPlayerIndexHistoryFrameCount_;
+                        }
+
+                        MapChipField::IndexSet candidate = playerIndexHistory_[idx];
+                        MapChipType candidateType =
+                            mapChipField_.GetMapChipTypeByIndex(
+                                candidate.xIndex, candidate.yIndex);
+
+                        if (candidateType != MapChipType::kSpike) {
+                            safeIndex = candidate;
+                            safeType = candidateType;
+                            break;
+                        }
+                    }
+                }
+
+                // HPBar 共有 5 段 → 每段 = MaxHP / 5
+                const int hpSegments = 5;
+                float damagePerSpike =
+                    static_cast<float>(player_->GetMaxHP()) / static_cast<float>(hpSegments);
+                player_->TakeDamage(damagePerSpike);
+
+                if (safeType != MapChipType::kSpike) {
+
+                    // 计算这个安全格子的世界坐标（脚正好踩在格子上）
+                    auto rectPrev = mapChipField_.GetRectByIndex(
+                        safeIndex.xIndex, safeIndex.yIndex);
+
+                    Vector3 targetPos{};
+                    targetPos.x = (rectPrev.left + rectPrev.right) * 0.5f;
+                    float halfH = player_->GetHeight() * 0.5f;
+                    targetPos.y = rectPrev.top + halfH;
+                    targetPos.z = player_->GetPosition().z;
+
+                    player_->SetPosition(targetPos);
+                    player_->ResetForMapTransition(true);
+                }
+                // 开启一段时间的无敌 + 闪烁
+                player_->StartInvincible(1.0f);
+            }
+        }
+    }
         // 更新传送门提示图标（是否显示 + 位置）
     const PortalInfo* currentPortal = nullptr;
     if (portalMgr_) {
@@ -663,36 +748,6 @@ void GameScene::Update() {
     }
     if (input_->TriggerKey(DIK_P)) {
         SoundManager::GetInstance()->Play("fanfare", false, 1.0f);
-       if (particleMgr_ && emitter2D_) {
-        // 以玩家位置为中心，在屏幕空间发射 2D 粒子
-        Vector3 playerPos = player_->GetPosition();
-        Vector3 screenPos = WorldToScreen(playerPos, camera_); // 已经在文件开头实现的工具函数
-
-        // 这里的 "Resources/particle2d.png" 请改成你自己实际有的贴图
-        emitter2D_->Emit(
-            30,                        // 粒子数量
-            ParticleType::Sprite2D,    // 2D 粒子
-            "Resources/circle.png",// 2D 粒子用的纹理
-            { screenPos.x, screenPos.y, 0.0f }, // 在屏幕位置发射
-            3.0f, 6.0f,                // 速度范围
-            0.5f, 1.0f                 // 生命周期范围(秒)
-        );
-       } 
-    }
-    if (input_->TriggerKey(DIK_L)) {
-        if (particleMgr_ && emitter3D_) {
-            Vector3 playerPos = player_->GetPosition();
-
-            // 这里用 cube 模型做例子，你可以换成别的模型
-            emitter3D_->Emit(
-                20,                        // 粒子数量
-                ParticleType::Model3D,     // 3D 粒子
-                "cube/cube.obj",           // 3D 粒子用的模型
-                playerPos + Vector3{ 0, 1.0f, 0 },  // 玩家头顶附近
-                2.0f, 4.0f,                // 速度范围
-                0.7f, 1.5f                 // 生命周期范围(秒)
-            );
-        }
     }
     // ===== FadingIn：从全黑淡入 =====
     if (fade_ && fade_->GetPhase() == FadePhase::FadingIn) {
@@ -1124,6 +1179,13 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
     // 设置玩家起点
     player_->SetPosition(startPos);
     player_->ResetForMapTransition(true);
+    MapChipField::IndexSet startIndex = mapChipField_.GetMapChipIndexByPosition(startPos);
+        for (int i = 0; i < kPlayerIndexHistoryFrameCount_; ++i) {
+            playerIndexHistory_[i] = startIndex;
+        }
+        playerIndexHistoryCursor_ = 0;
+        playerIndexHistoryInitialized_ = true;
+        playerIndexOneSecAgo_ = startIndex;
     // 相机同步
     camera_->SetTranslate(startPos + Vector3{ 0,0,-40 });
     prevCameraPos_ = camera_->GetTransform().translate;

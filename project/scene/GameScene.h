@@ -147,5 +147,12 @@ private:
     ParticleEmitter* snowEmitter_ = nullptr;
     float snowSpawnTimer_         = 0.0f;
 
+     // 玩家位置历史（用于地刺回退到 1 秒前所在格子）
+    static inline const int kPlayerIndexHistoryFrameCount_ =30;
+    MapChipField::IndexSet playerIndexHistory_[kPlayerIndexHistoryFrameCount_]{};
+    int  playerIndexHistoryCursor_ = 0;
+    bool playerIndexHistoryInitialized_ = false;
+    MapChipField::IndexSet playerIndexOneSecAgo_{};
+
     Vector3 prevCameraPos_{};
 };

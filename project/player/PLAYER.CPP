@@ -40,6 +40,25 @@ void Player::Initialize(Object3dCommon* object3dCommon, Camera* camera) {
 void Player::Update(Input* input, const MapChipField& mapChipField) {
     const float deltaTime = 1.0f / 60.0f; // 先按 60FPS 固定，后续可外部传参
     didDoubleJumpThisFrame_ = false;
+     // === 受伤无敌 & 闪烁处理 ===
+    if (isInvincible_) {
+        invincibleTimer_ -= deltaTime;
+        damageBlinkTimer_ += deltaTime;
+
+        // 每隔 damageBlinkInterval_ 翻转一次可见性
+        if (damageBlinkTimer_ >= damageBlinkInterval_) {
+            damageBlinkTimer_ = 0.0f;
+            damageBlinkVisible_ = !damageBlinkVisible_;
+        }
+
+        // 无敌时间结束
+        if (invincibleTimer_ <= 0.0f) {
+            isInvincible_ = false;
+            invincibleTimer_ = 0.0f;
+            damageBlinkTimer_ = 0.0f;
+            damageBlinkVisible_ = true;
+        }
+    }
     // --- HP 每秒递减 ---
     if (hpDrainPerSec_ > 0.0f && hp_ > 0.0f) {
         //hp_ -= hpDrainPerSec_ * deltaTime;
@@ -261,9 +280,14 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
 }
 
 void Player::Draw() {
-    if (model_) {
-        model_->Draw();
+    if (!model_) { return; }
+
+    // 无敌期间：通过“某些帧不画”来实现闪烁
+    if (isInvincible_ && !damageBlinkVisible_) {
+        return;
     }
+
+    model_->Draw();
 }
 
 void Player::HandleMapCollision(const MapChipField& mapChipField) {
@@ -374,6 +398,11 @@ void Player::ResetForMapTransition(bool keepFacing) {
     dashCooldownTimer_ = 0.0f;  // 若想保留冷却可移除此行
     canDash_ = true;
 
+    isInvincible_       = false;
+    invincibleTimer_    = 0.0f;
+    damageBlinkTimer_   = 0.0f;
+    damageBlinkVisible_ = true;
+
     // 重力“基准”恢复（与新参数体系对齐）
     originalGravity_ = gravityBase_;
 }
@@ -398,4 +427,21 @@ void Player::StartDeathFall() {
     deathTimer_ = 0.0f;
     deathSpinZ_ = 0.0f;
     jumpCount_ = 0;
+}
+
+void Player::StartInvincible(float duration)
+{
+    if (duration <= 0.0f) {
+        isInvincible_ = false;
+        invincibleTimer_ = 0.0f;
+        damageBlinkTimer_ = 0.0f;
+        damageBlinkVisible_ = true;
+        return;
+    }
+
+    isInvincible_     = true;
+    invincibleTimer_  = duration;
+    damageBlinkTimer_ = 0.0f;
+    // 开始时就闪一下：先设为不可见
+    damageBlinkVisible_ = false;
 }
