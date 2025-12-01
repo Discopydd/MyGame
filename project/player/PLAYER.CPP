@@ -381,6 +381,50 @@ void Player::HandleMapCollision(const MapChipField& mapChipField) {
     }
 }
 
+void Player::LandOnExternalGround(float groundTopY)
+{
+    const float kHalfH = height_ * 0.5f;
+    position_.y = groundTopY + kHalfH;
+    if (velocity_.y < 0.0f) {
+        velocity_.y = 0.0f;
+    }
+    isOnGround_ = true;
+    jumpCount_ = 0;
+    isJumping_ = false;
+    jumpPressDuration_ = 0.0f;
+    currentMaxJumpHoldTime_ = 0.0f;
+}
+
+void Player::SnapOnGround(float groundTopY)
+{
+    const float kHalfH = height_ * 0.5f;
+
+    // 把“脚”放到 groundTopY 上面
+    position_.y = groundTopY + kHalfH;
+
+    // 如果正在往下掉，就把垂直速度清零
+    if (velocity_.y < 0.0f) {
+        velocity_.y = 0.0f;
+    }
+
+    // 视为落地，重置跳跃状态
+    isOnGround_ = true;
+    jumpCount_ = 0;
+    isJumping_ = false;
+    jumpPressDuration_ = 0.0f;
+    currentMaxJumpHoldTime_ = 0.0f;
+}
+
+void Player::ApplyExternalDisplacement(const Vector3& delta)
+{
+     position_ = position_ + delta;
+
+    if (model_) {
+        model_->SetTranslate(position_);
+        model_->Update();
+    }
+}
+
 void Player::ResetForMapTransition(bool keepFacing) {
     // 清零速度 & 动作
     velocity_ = { 0, 0, 0 };

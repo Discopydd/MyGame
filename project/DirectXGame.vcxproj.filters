@@ -178,6 +178,9 @@
     <ClCompile Include="particle\ParticleManager.cpp">
       <Filter>particle</Filter>
     </ClCompile>
+    <ClCompile Include="map\MovingPlatform.cpp">
+      <Filter>map</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="engine\math\Matrix3x3.h">
@@ -362,6 +365,9 @@
     </ClInclude>
     <ClInclude Include="particle\ParticleType.h">
       <Filter>particle</Filter>
+    </ClInclude>
+    <ClInclude Include="map\MovingPlatform.h">
+      <Filter>map</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

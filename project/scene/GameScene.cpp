@@ -71,7 +71,7 @@ void GameScene::GenerateBlocks() {
                 // 添加到方块列表
                 mapBlocks_.push_back(block);
             }
-             else if (type == MapChipType::kPortal) {
+            else if (type == MapChipType::kPortal) {
                 // 创建传送门可视化对象（例如使用不同颜色的方块）
                 Object3d* portal = new Object3d();
                 portal->Initialize(object3dCommon_);
@@ -115,6 +115,88 @@ void GameScene::GenerateBlocks() {
                 spike->SetLightingMode(2);
                 mapBlocks_.push_back(spike);
             }
+        }
+    }
+    for (uint32_t y = 0; y < mapChipField_.numBlockVertical_; ++y) {
+        uint32_t x = 0;
+        while (x < mapChipField_.numBlockHorizontal_) {
+            MapChipType t = mapChipField_.GetMapChipTypeByIndex(x, y);
+            if (t != MapChipType::kMoveHorizontal) {
+                ++x;
+                continue;
+            }
+
+            // 找这一条连续 5 的长度
+            uint32_t startX = x;
+            uint32_t endX = x;
+            while (endX + 1 < mapChipField_.numBlockHorizontal_ &&
+                mapChipField_.GetMapChipTypeByIndex(endX + 1, y) == MapChipType::kMoveHorizontal) {
+                ++endX;
+            }
+
+            int length = static_cast<int>(endX - startX + 1);
+
+            Vector3 leftPos = mapChipField_.GetMapChipPositionByIndex(startX, y);
+            Vector3 rightPos = mapChipField_.GetMapChipPositionByIndex(endX, y);
+            Vector3 center{};
+            center.x = (leftPos.x + rightPos.x) * 0.5f;
+            center.y = leftPos.y;
+            center.z = leftPos.z;
+
+            auto* platform = new MovingPlatform();
+            platform->Initialize(
+                object3dCommon_,
+                camera_,
+                center,
+                MovingPlatform::Axis::Horizontal,
+                movingPlatformSpeed_,   // 右→左速度，负数就反向
+                length
+            );
+            movingPlatforms_.push_back(platform);
+
+            x = endX + 1; // 跳过这一段
+        }
+    }
+
+    // === 生成上下移动平台（连续的 kMoveUD 一条为一个 MovingPlatform）===
+    for (uint32_t y = 0; y < mapChipField_.numBlockVertical_; ++y) {
+        uint32_t x = 0;
+        while (x < mapChipField_.numBlockHorizontal_) {
+            MapChipType t = mapChipField_.GetMapChipTypeByIndex(x, y);
+            if (t != MapChipType::kMoveVertical) {
+                ++x;
+                continue;
+            }
+
+            // 找这一行里连续 6 的长度
+            uint32_t startX = x;
+            uint32_t endX = x;
+            while (endX + 1 < mapChipField_.numBlockHorizontal_ &&
+                mapChipField_.GetMapChipTypeByIndex(endX + 1, y) == MapChipType::kMoveVertical) {
+                ++endX;
+            }
+
+            int length = static_cast<int>(endX - startX + 1);
+
+            Vector3 leftPos = mapChipField_.GetMapChipPositionByIndex(startX, y);
+            Vector3 rightPos = mapChipField_.GetMapChipPositionByIndex(endX, y);
+            Vector3 center{};
+            center.x = (leftPos.x + rightPos.x) * 0.5f;   // 中点
+            center.y = leftPos.y;
+            center.z = leftPos.z;
+
+            auto* platform = new MovingPlatform();
+            platform->Initialize(
+                object3dCommon_,
+                camera_,
+                center,
+                MovingPlatform::Axis::Vertical,          // ★ 上下移动
+                movingPlatformSpeed_,
+                length                                    // ★ 这一条上有多少个 6
+            );
+            movingPlatforms_.push_back(platform);
+
+            x = endX + 1; // 跳过这一段 6
         }
     }
 }
@@ -407,8 +489,92 @@ void GameScene::Update() {
     }
     imguiManager_->Begin();
     playerCamera_->Update();
+
+    for (auto* p : movingPlatforms_) {
+        p->Update(deltaTime, mapChipField_, movingPlatforms_);
+    }
     // 淡入淡出/加载/演出期间都不可操作
     player_->Update(canControl ? input_ : nullptr, mapChipField_);
+
+  // ========= 阶段1：两条移动平台互相夹住玩家 =========
+    crushedByPlatformThisFrame_ = false;
+
+    if (player_ && !player_->IsDead() && !player_->IsInvincible()) {
+
+        Vector3 pPos = player_->GetPosition();
+        float halfW = player_->GetWidth() * 0.5f;
+        float halfH = player_->GetHeight() * 0.5f;
+
+        float left   = pPos.x - halfW;
+        float right  = pPos.x + halfW;
+        float bottom = pPos.y - halfH;
+        float top    = pPos.y + halfH;
+
+        int overlapPlatformCount = 0;
+        for (auto* plat : movingPlatforms_) {
+            if (!plat) continue;
+            MapChipField::Rect r = plat->GetRect();
+            bool overlapX = !(right <= r.left || left >= r.right);
+            bool overlapY = !(top   <= r.bottom || bottom >= r.top);
+            if (overlapX && overlapY) {
+                ++overlapPlatformCount;
+                if (overlapPlatformCount >= 2) {
+                    // 同时和两条平台重叠 ⇒ 直接判定为被夹住
+                    crushedByPlatformThisFrame_ = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    // 先做平台上的落地 / 分离 / 搭乘
+    if (!crushedByPlatformThisFrame_) {
+        HandlePlayerOnMovingPlatforms();
+    }
+
+    // ========= 阶段2：被平台推进方块 / 刺 / 门，或者推出地图边界 =========
+    if (player_ && !player_->IsDead() && !player_->IsInvincible()) {
+        Vector3 pPos = player_->GetPosition();
+        float halfW = player_->GetWidth() * 0.5f;
+        float halfH = player_->GetHeight() * 0.5f;
+
+        float left   = pPos.x - halfW;
+        float right  = pPos.x + halfW;
+        float bottom = pPos.y - halfH;
+        float top    = pPos.y + halfH;
+
+        // 2a) 若此时玩家 AABB 已经扎进任何 Block/Spike/Portal，就认为是被平台挤进去
+        auto minIdx = mapChipField_.GetMapChipIndexByPosition({ left,  bottom, 0.0f });
+        auto maxIdx = mapChipField_.GetMapChipIndexByPosition({ right, top,    0.0f });
+
+        for (uint32_t y = minIdx.yIndex; y <= maxIdx.yIndex && !crushedByPlatformThisFrame_; ++y) {
+            for (uint32_t x = minIdx.xIndex; x <= maxIdx.xIndex; ++x) {
+                MapChipType t = mapChipField_.GetMapChipTypeByIndex(x, y);
+                if (t != MapChipType::kBlock &&
+                    t != MapChipType::kSpike ) {
+                    continue;
+                }
+                auto r = mapChipField_.GetRectByIndex(x, y);
+                bool overlapX = !(right <= r.left || left >= r.right);
+                bool overlapY = !(top   <= r.bottom || bottom >= r.top);
+                if (overlapX && overlapY) {
+                    crushedByPlatformThisFrame_ = true;
+                    break;
+                }
+            }
+        }
+
+        // 2b) 被平台推到地图外（超出上下边界）也算挤压
+        if (!crushedByPlatformThisFrame_) {
+            Vector3 mapMin = mapChipField_.GetMapMinPosition();
+            Vector3 mapMax = mapChipField_.GetMapMaxPosition();
+
+            // 这里加一点点裕度，避免浮点抖动
+            if (top > mapMax.y + 0.01f || bottom < mapMin.y - 0.01f) {
+                crushedByPlatformThisFrame_ = true;
+            }
+        }
+    }
 
     if (particleMgr_ && emitter3D_ && player_->ConsumeDoubleJumpEvent()) {
         Vector3 playerPos = player_->GetPosition();
@@ -618,61 +784,59 @@ void GameScene::Update() {
     {
         MapChipType tileType =
             mapChipField_.GetMapChipTypeByIndex(playerIndex.xIndex, playerIndex.yIndex);
+        bool onSpike = (tileType == MapChipType::kSpike);
+        if ((onSpike || crushedByPlatformThisFrame_) &&
+            !player_->IsDead() && !player_->IsInvincible()) {
 
-        if (tileType == MapChipType::kSpike) {
-            if (!player_->IsDead() && !player_->IsInvincible()) {
+            MapChipField::IndexSet safeIndex = playerIndexOneSecAgo_;
 
-                 // 先假设回到“约 0.5 秒前”的那个格子
-                MapChipField::IndexSet safeIndex = playerIndexOneSecAgo_;
+            // 如果 1 秒前也在地刺上，就再往更早找一个“不是地刺”的格子
+            MapChipType safeType =
+                mapChipField_.GetMapChipTypeByIndex(safeIndex.xIndex, safeIndex.yIndex);
 
-                MapChipType safeType =
-                    mapChipField_.GetMapChipTypeByIndex(safeIndex.xIndex, safeIndex.yIndex);
+            if (safeType == MapChipType::kSpike) {
+                MapChipField::IndexSet firstNonSpike{};
+                bool found = false;
 
-                // 如果 0.5 秒前也在地刺上，就在历史里往更早找一个“不是地刺”的格子
-                if (safeType == MapChipType::kSpike) {
-                    for (int i = 0; i < kPlayerIndexHistoryFrameCount_; ++i) {
-                        int idx = playerIndexHistoryCursor_ - 1 - i;
-                        if (idx < 0) {
-                            idx += kPlayerIndexHistoryFrameCount_;
-                        }
-
-                        MapChipField::IndexSet candidate = playerIndexHistory_[idx];
-                        MapChipType candidateType =
-                            mapChipField_.GetMapChipTypeByIndex(
-                                candidate.xIndex, candidate.yIndex);
-
-                        if (candidateType != MapChipType::kSpike) {
-                            safeIndex = candidate;
-                            safeType = candidateType;
-                            break;
-                        }
+                for (int i = 0; i < kPlayerIndexHistoryFrameCount_; ++i) {
+                    const auto& candidate = playerIndexHistory_[i];
+                    MapChipType type =
+                        mapChipField_.GetMapChipTypeByIndex(candidate.xIndex, candidate.yIndex);
+                    if (type != MapChipType::kSpike) {
+                        firstNonSpike = candidate;
+                        found = true;
+                        break;
                     }
                 }
 
-                // HPBar 共有 5 段 → 每段 = MaxHP / 5
-                const int hpSegments = 5;
-                float damagePerSpike =
-                    static_cast<float>(player_->GetMaxHP()) / static_cast<float>(hpSegments);
-                player_->TakeDamage(damagePerSpike);
-
-                if (safeType != MapChipType::kSpike) {
-
-                    // 计算这个安全格子的世界坐标（脚正好踩在格子上）
-                    auto rectPrev = mapChipField_.GetRectByIndex(
-                        safeIndex.xIndex, safeIndex.yIndex);
-
-                    Vector3 targetPos{};
-                    targetPos.x = (rectPrev.left + rectPrev.right) * 0.5f;
-                    float halfH = player_->GetHeight() * 0.5f;
-                    targetPos.y = rectPrev.top + halfH;
-                    targetPos.z = player_->GetPosition().z;
-
-                    player_->SetPosition(targetPos);
-                    player_->ResetForMapTransition(true);
+                if (found) {
+                    safeIndex = firstNonSpike;
                 }
-                // 开启一段时间的无敌 + 闪烁
-                player_->StartInvincible(1.0f);
             }
+
+            auto rectPrev = mapChipField_.GetRectByIndex(
+                safeIndex.xIndex, safeIndex.yIndex);
+
+            // 让玩家站在这个格子的“上表面”
+            Vector3 targetPos{};
+            targetPos.x = (rectPrev.left + rectPrev.right) * 0.5f;
+
+            float halfH = player_->GetHeight() * 0.5f;
+            // rectPrev.top 是格子的上边缘（地面的高度）
+            // 再加上玩家半高，让脚正好踩在格子上
+            targetPos.y = rectPrev.top + halfH;
+
+            // Z 保持不变
+            targetPos.z = player_->GetPosition().z;
+
+            player_->SetPosition(targetPos);
+
+            // 重置移动 / 跳跃 / 冲刺等状态
+            player_->ResetForMapTransition(true);
+
+            // 按你现在地刺的伤害数值
+            player_->TakeDamage(static_cast<float>(player_->GetMaxHp() * 0.2f));
+            player_->StartInvincible(1.0f);
         }
     }
         // 更新传送门提示图标（是否显示 + 位置）
@@ -810,6 +974,9 @@ void GameScene::Update() {
         case MapChipType::kPortal: typeName = "Portal"; break;
         case MapChipType::kItem:   typeName = "Item";   break;
         case MapChipType::kSpike:  typeName = "Spike";  break;
+        case MapChipType::kMoveHorizontal: typeName = "MoveHorizontal"; break;
+        case MapChipType::kMoveVertical:   typeName = "MoveVertical";   break;
+
         }
         ImGui::Text("Current MapChip Type: %s", typeName);
     }
@@ -831,6 +998,9 @@ void GameScene::Draw() {
     // 地图方块
     for (auto* block : mapBlocks_) {
         block->Draw();
+    }
+    for (auto* p : movingPlatforms_) {
+        p->Draw();
     }
     // 道具
     if (itemMgr_) {
@@ -1022,6 +1192,10 @@ void GameScene::Finalize() {
         emitter3D_ = nullptr;
         dashStarEmitter_ = nullptr;
     }
+    for (auto* p : movingPlatforms_) {
+        delete p;
+    }
+    movingPlatforms_.clear();
 }
 
 void GameScene::StartLoadingMap(const std::string& mapPath, const Vector3& startPos, bool isPortal = false) {
@@ -1056,7 +1230,8 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
 
     for (auto* block : mapBlocks_) delete block;
     mapBlocks_.clear();
-
+    for (auto* p : movingPlatforms_) delete p;
+    movingPlatforms_.clear();
     if (spaceHint_.sprite) {
         delete spaceHint_.sprite;
         spaceHint_.sprite = nullptr;
@@ -1278,4 +1453,80 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
             }
         }
     }
+}
+
+void GameScene::HandlePlayerOnMovingPlatforms()
+{
+    if (!player_) return;
+    if (movingPlatforms_.empty()) return;
+    if (player_->IsDead()) return;
+
+    Vector3 pos = player_->GetPosition();
+    Vector3 vel = player_->GetVelocity();
+
+    const float halfW = player_->GetWidth() * 0.5f;
+    const float halfH = player_->GetHeight() * 0.5f;
+
+    for (auto* platform : movingPlatforms_) {
+        if (!platform) continue;
+
+        MapChipField::Rect r = platform->GetRect();
+
+        float left = pos.x - halfW;
+        float right = pos.x + halfW;
+        float bottom = pos.y - halfH;
+        float top = pos.y + halfH;
+
+        bool overlapX = !(right <= r.left || left >= r.right);
+        bool overlapY = !(top <= r.bottom || bottom >= r.top);
+        if (!overlapX || !overlapY) {
+            continue;
+        }
+
+        // 计算 X / Y 方向的最小穿透量
+        float penX = (std::min)(r.right - left, right - r.left);
+        float penY = (std::min)(r.top - bottom, top - r.bottom);
+
+        if (penX < penY) {
+            // 水平方向分离（挡住侧面）
+            float centerPlayerX = pos.x;
+            float centerRectX = (r.left + r.right) * 0.5f;
+            if (centerPlayerX < centerRectX) {
+                pos.x -= penX;   // 玩家在左 → 往左推
+            }
+            else {
+                pos.x += penX;   // 玩家在右 → 往右推
+            }
+            vel.x = 0.0f;
+        }
+        else {
+            // 垂直方向分离（挡住头顶/脚底）
+            float centerPlayerY = pos.y;
+            float centerRectY = (r.bottom + r.top) * 0.5f;
+
+            if (centerPlayerY < centerRectY) {
+                // 从下往上撞到平台底部
+                pos.y -= penY;
+                if (vel.y > 0.0f) vel.y = 0.0f;
+            }
+            else {
+                // 从上踩到平台 → 当做地面 + 站在上面跟着动
+                // 先让 Player 内部把“落地状态”处理好
+                player_->SetPosition(pos);
+                player_->SetVelocity(vel);
+                player_->LandOnExternalGround(r.top);
+
+                // 取一下修正后的 pos / vel
+                pos = player_->GetPosition();
+                vel = player_->GetVelocity();
+
+                // 把玩家跟着平台一起移动（这一帧平台的位移）
+                Vector3 delta = platform->GetPosition() - platform->GetPrevPosition();
+                pos.x += delta.x;
+            }
+        }
+    }
+
+    player_->SetPosition(pos);
+    player_->SetVelocity(vel);
 }

@@ -14,7 +14,13 @@ public:
 
     void HandleMapCollision(const MapChipField& mapChipField);
 
-    void SetPosition(const Vector3& pos) { position_ = pos; }
+    void SetPosition(const Vector3& pos) {
+        position_ = pos;
+        if (model_) {
+            model_->SetTranslate(position_);
+            model_->Update();
+        }
+    }
     const Vector3& GetPosition() const { return position_; }
 
     bool IsDashing() const { return isDashing_; }
@@ -22,6 +28,21 @@ public:
     float GetDashCooldownDuration() const { return dashCooldown_; }
     bool CanDash() const { return canDash_; }
     float GetHeight() const { return height_; }
+
+    float GetWidth()  const { return width_; }
+    const Vector3& GetVelocity() const { return velocity_; }
+
+    void SetVelocity(const Vector3& v) { velocity_ = v; }
+
+    // 给外部（移动平台）用的“落地在某个高度”
+    void LandOnExternalGround(float groundTopY);
+    int GetMaxHp() const { return maxHP_; }
+    // 让玩家“落在某个 Y 高度的地面上（平台/方块都可以用）”
+    void SnapOnGround(float groundTopY);
+
+    // 外部强制位移（比如被移动平台带着走）
+    void ApplyExternalDisplacement(const Vector3& delta);
+
 
     void ResetForMapTransition(bool keepFacing = true);
 
@@ -45,7 +66,7 @@ public:
         didDoubleJumpThisFrame_ = false;
         return v;
     }
-        // 玩家是否面向右
+    // 玩家是否面向右
     bool IsFacingRight() const { return lrDirection_ == LRDirection::kRight; }
 
     const Vector3& GetDashDirection() const { return dashDirection_; }
@@ -70,7 +91,7 @@ private:
     bool  isOnGround_ = false;
     bool  isJumping_ = false;   // “可控上升”阶段（在 hold 窗口内且还在上升）
     float jumpPressDuration_ = 0.0f;   // 已长按时长（秒）
-    
+
     // 当前这一跳实际使用的最大蓄力时间（根据是第几段跳赋值）
     float currentMaxJumpHoldTime_ = 0.0f;
     // 可变重力：让“早松手/下落”更利落
@@ -132,10 +153,10 @@ private:
 
     bool  didDoubleJumpThisFrame_ = false; // 本帧是否触发了二段跳
 
-     // --- 受伤无敌 & 闪烁 ---
-    bool  isInvincible_       = false;
-    float invincibleTimer_    = 0.0f;
-    float damageBlinkTimer_   = 0.0f;
+    // --- 受伤无敌 & 闪烁 ---
+    bool  isInvincible_ = false;
+    float invincibleTimer_ = 0.0f;
+    float damageBlinkTimer_ = 0.0f;
     float damageBlinkInterval_ = 0.08f; // 闪烁间隔（秒）
     bool  damageBlinkVisible_ = true;
 };
