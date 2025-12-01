@@ -33,6 +33,7 @@
 #include "../UI/DashUIManager.h" 
 #include "../map/PortalManager.h" 
 #include "../particle/ParticleManager.h" 
+#include "./map/MovingPlatform.h" 
 class GameScene : public BaseScene {
 public:
     void Initialize() override;
@@ -60,6 +61,7 @@ private:
     std::vector<Object3d*> mapBlocks_;       // 存储地图方块对象
     void GenerateBlocks();
     void LoadMap(const std::string& mapPath, const Vector3& startPos);
+    void HandlePlayerOnMovingPlatforms();
     Player* player_ = nullptr;
 
     DashUIManager* dashUI_ = nullptr;
@@ -155,4 +157,9 @@ private:
     MapChipField::IndexSet playerIndexOneSecAgo_{};
 
     Vector3 prevCameraPos_{};
+
+    std::vector<MovingPlatform*> movingPlatforms_;
+    float movingPlatformSpeed_ = 10.0f;
+
+    bool crushedByPlatformThisFrame_ = false;
 };

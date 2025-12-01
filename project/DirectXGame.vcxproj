@@ -194,6 +194,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="main.cpp" />
     <ClCompile Include="map\ItemManager.cpp" />
     <ClCompile Include="map\MapChipField.cpp" />
+    <ClCompile Include="map\MovingPlatform.cpp" />
     <ClCompile Include="map\PortalManager.cpp" />
     <ClCompile Include="MyGame.cpp" />
     <ClCompile Include="particle\ParticleEmitter.cpp" />
@@ -255,6 +256,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="logger\Logger.h" />
     <ClInclude Include="map\ItemManager.h" />
     <ClInclude Include="map\MapChipField.h" />
+    <ClInclude Include="map\MovingPlatform.h" />
     <ClInclude Include="map\PortalManager.h" />
     <ClInclude Include="MyGame.h" />
     <ClInclude Include="particle\Particle.h" />

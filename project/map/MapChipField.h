@@ -13,6 +13,8 @@ enum class MapChipType {
 	kPortal,
 	kItem,
 	kSpike,
+	kMoveHorizontal, // 左右往返
+    kMoveVertical,
 };
 
 struct MapChipData {
