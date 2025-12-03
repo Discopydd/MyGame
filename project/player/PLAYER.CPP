@@ -313,7 +313,7 @@ void Player::HandleMapCollision(const MapChipField& mapChipField) {
 
         for (uint32_t y = minIdx.yIndex; y <= maxIdx.yIndex; ++y) {
             for (uint32_t x = minIdx.xIndex; x <= maxIdx.xIndex; ++x) {
-                if (mapChipField.GetMapChipTypeByIndex(x, y) != MapChipType::kBlock) continue;
+                if (mapChipField.GetMapChipTypeByIndex(x, y) != MapChipType::kBlock && mapChipField.GetMapChipTypeByIndex(x, y) != MapChipType::kBlock2) continue;
                 auto r = mapChipField.GetRectByIndex(x, y);
 
                 bool overlapY = !(top <= r.bottom || bottom >= r.top);

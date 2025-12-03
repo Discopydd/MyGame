@@ -4,6 +4,7 @@ namespace {
 std::map<std::string, MapChipType> mapChipTable = {
     {"0", MapChipType ::kBlank},
     {"1", MapChipType::kBlock },
+    {"10", MapChipType::kBlock2 },
     {"2", MapChipType::kPortal },
     {"3", MapChipType::kItem},
     {"4", MapChipType::kSpike},
