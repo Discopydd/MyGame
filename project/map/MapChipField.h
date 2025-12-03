@@ -14,6 +14,7 @@ enum class MapChipType {
 	kPortal,
 	kItem,
 	kSpike,
+	kWater,
 	kMoveHorizontal, // 左右往返
     kMoveVertical,
 };

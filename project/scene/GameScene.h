@@ -59,6 +59,7 @@ private:
     //Map
     MapChipField mapChipField_;              // 地图数据管理对象
     std::vector<Object3d*> mapBlocks_;       // 存储地图方块对象
+    std::vector<Object3d*> waterBlocks_; 
     void GenerateBlocks();
     void LoadMap(const std::string& mapPath, const Vector3& startPos);
     void HandlePlayerOnMovingPlatforms();

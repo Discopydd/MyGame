@@ -10,6 +10,7 @@ std::map<std::string, MapChipType> mapChipTable = {
     {"4", MapChipType::kSpike},
     {"5", MapChipType::kMoveHorizontal}, // 左右移动平台
     {"6", MapChipType::kMoveVertical},
+    {"7", MapChipType::kWater},
 };
 
 }
