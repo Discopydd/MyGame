@@ -3,6 +3,10 @@
 #include <scene/LoadingScene.h>
 #include "SceneManager.h"
 #include <cstdlib>
+namespace {
+    // 0.0f = 完全没有伤害高度, 1.0f = 整个格子都算刺
+    constexpr float kSpikeHeightRatio = 0.5f;
+}
 
 static float RandRangeFloat(float a, float b)
 {
@@ -70,6 +74,14 @@ void GameScene::GenerateBlocks() {
                 block->SetTranslate(position);
                 // 添加到方块列表
                 mapBlocks_.push_back(block);
+            }
+             else if (type == MapChipType::kBlock2) {
+                Object3d* block2 = new Object3d();
+                block2->Initialize(object3dCommon_);
+                block2->SetModel("cube2/cube2.obj");
+                block2->SetCamera(camera_);
+                block2->SetTranslate(position);
+                mapBlocks_.push_back(block2);
             }
             else if (type == MapChipType::kPortal) {
                 // 创建传送门可视化对象（例如使用不同颜色的方块）
@@ -238,6 +250,7 @@ void GameScene::Initialize() {
     ModelManager::GetInstants()->LoadModel("jump/jump.obj");
     ModelManager::GetInstants()->LoadModel("star/star.obj");
     ModelManager::GetInstants()->LoadModel("hurd/hurd.obj");
+    ModelManager::GetInstants()->LoadModel("cube2/cube2.obj"); 
     player_ = new Player();
     player_->Initialize(object3dCommon_, camera_);
     // === HP 3D 条管理器 ===
@@ -551,18 +564,39 @@ void GameScene::Update() {
             for (uint32_t x = minIdx.xIndex; x <= maxIdx.xIndex; ++x) {
                 MapChipType t = mapChipField_.GetMapChipTypeByIndex(x, y);
                 if (t != MapChipType::kBlock &&
-                    t != MapChipType::kSpike ) {
+                    t != MapChipType::kSpike &&
+                    t != MapChipType::kBlock2) {
                     continue;
                 }
-                auto r = mapChipField_.GetRectByIndex(x, y);
-                bool overlapX = !(right <= r.left || left >= r.right);
-                bool overlapY = !(top   <= r.bottom || bottom >= r.top);
-                if (overlapX && overlapY) {
-                    crushedByPlatformThisFrame_ = true;
-                    break;
+
+                MapChipField::Rect r = mapChipField_.GetRectByIndex(x, y);
+
+                // Block / Block2：整格
+                if (t == MapChipType::kBlock || t == MapChipType::kBlock2) {
+                    bool overlapX = !(right <= r.left || left >= r.right);
+                    bool overlapY = !(top <= r.bottom || bottom >= r.top);
+                    if (overlapX && overlapY) {
+                        crushedByPlatformThisFrame_ = true;
+                        break;
+                    }
+                }
+                // Spike：只用底部 kSpikeHeightRatio 的高度
+                else if (t == MapChipType::kSpike) {
+                    float tileHeight = r.top - r.bottom;
+                    MapChipField::Rect spikeHitRect = r;
+                    spikeHitRect.top = spikeHitRect.bottom + tileHeight * kSpikeHeightRatio;
+
+                    bool overlapX = !(right <= spikeHitRect.left || left >= spikeHitRect.right);
+                    bool overlapY = !(top <= spikeHitRect.bottom || bottom >= spikeHitRect.top);
+
+                    if (overlapX && overlapY) {
+                        crushedByPlatformThisFrame_ = true;
+                        break;
+                    }
                 }
             }
         }
+
 
         // 2b) 被平台推到地图外（超出上下边界）也算挤压
         if (!crushedByPlatformThisFrame_) {
@@ -784,7 +818,40 @@ void GameScene::Update() {
     {
         MapChipType tileType =
             mapChipField_.GetMapChipTypeByIndex(playerIndex.xIndex, playerIndex.yIndex);
-        bool onSpike = (tileType == MapChipType::kSpike);
+
+        bool onSpike = false;
+
+        // 只对地刺格做“矮一点的判定区域”
+        if (tileType == MapChipType::kSpike) {
+
+            // 1) 地刺所在格子的矩形
+            MapChipField::Rect spikeRect =
+                mapChipField_.GetRectByIndex(playerIndex.xIndex, playerIndex.yIndex);
+
+            // 2) 玩家当前 AABB
+            Vector3 pPos = player_->GetPosition();
+            float halfW = player_->GetWidth() * 0.5f;
+            float halfH = player_->GetHeight() * 0.5f;
+
+            float left = pPos.x - halfW;
+            float right = pPos.x + halfW;
+            float bottom = pPos.y - halfH;
+            float top = pPos.y + halfH;
+
+            // 3) 只用格子高度的 60% 作为“有效地刺高度”
+            float tileHeight = spikeRect.top - spikeRect.bottom;
+
+            MapChipField::Rect hitRect = spikeRect;
+            hitRect.top = hitRect.bottom + tileHeight * kSpikeHeightRatio;
+
+            // 4) 玩家 AABB 和“缩短后的地刺矩形”做重叠判定
+            bool overlapX = !(right <= hitRect.left || left >= hitRect.right);
+            bool overlapY = !(top <= hitRect.bottom || bottom >= hitRect.top);
+
+            onSpike = overlapX && overlapY;
+        }
+
+        // 被平台夹死照旧用 crushedByPlatformThisFrame_（全格判定）
         if ((onSpike || crushedByPlatformThisFrame_) &&
             !player_->IsDead() && !player_->IsInvincible()) {
 
@@ -822,19 +889,12 @@ void GameScene::Update() {
             targetPos.x = (rectPrev.left + rectPrev.right) * 0.5f;
 
             float halfH = player_->GetHeight() * 0.5f;
-            // rectPrev.top 是格子的上边缘（地面的高度）
-            // 再加上玩家半高，让脚正好踩在格子上
             targetPos.y = rectPrev.top + halfH;
-
-            // Z 保持不变
             targetPos.z = player_->GetPosition().z;
 
             player_->SetPosition(targetPos);
-
-            // 重置移动 / 跳跃 / 冲刺等状态
             player_->ResetForMapTransition(true);
 
-            // 按你现在地刺的伤害数值
             player_->TakeDamage(static_cast<float>(player_->GetMaxHp() * 0.2f));
             player_->StartInvincible(1.0f);
         }

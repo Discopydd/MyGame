@@ -94,7 +94,7 @@ void MovingPlatform::HandleBlockCollision(const MapChipField& field)
                 MapChipType t = field.GetMapChipTypeByIndex(x, y);
                 if (t != MapChipType::kBlock &&
                     t != MapChipType::kSpike &&
-                    t != MapChipType::kPortal) {
+                    t != MapChipType::kPortal && t != MapChipType::kBlock2) {
                     continue;
                 }
                 auto r = field.GetRectByIndex(x, y);
@@ -131,7 +131,7 @@ void MovingPlatform::HandleBlockCollision(const MapChipField& field)
                 MapChipType t = field.GetMapChipTypeByIndex(x, y);
                 if (t != MapChipType::kBlock &&
                     t != MapChipType::kSpike &&
-                    t != MapChipType::kPortal) {
+                    t != MapChipType::kPortal && t != MapChipType::kBlock2) {
                     continue;
                 }
                 auto r = field.GetRectByIndex(x, y);
