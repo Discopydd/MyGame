@@ -16,7 +16,13 @@ public:
         uint32_t x = 0, y = 0;
         Object3d* obj = nullptr;
     };
-
+    struct PickupEffect {
+        Object3d* obj = nullptr;
+        float     elapsed = 0.0f;                 // 已经播放了多久（秒）
+        float     duration = 0.35f;                // 总时长（秒）
+        Vector3   velocity = { 0.0f, 0.0f, 0.0f }; // 上升速度（世界单位/秒）
+        float     rotateSpeedY = 0.0f;              // 绕 Y 轴旋转速度（弧度/秒）
+    };
     ItemManager() = default;
     ~ItemManager() = default;
 
@@ -54,4 +60,6 @@ private:
     std::unordered_map<std::string, std::unordered_set<uint32_t>> pickedItems_;
 
     static inline uint32_t PackIdx(uint32_t x, uint32_t y) { return (y << 16) | x; }
+
+    std::vector<PickupEffect> pickupEffects_;
 };

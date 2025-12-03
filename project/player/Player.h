@@ -55,6 +55,10 @@ public:
     void   Heal(float v) { hp_ = (std::min)(hp_ + v, (float)maxHP_); }
     bool IsOnGround() const { return isOnGround_; }
 
+     // 水相关状态（可选：UI / 特效用）
+    bool IsInWater() const { return inWater_; }
+    bool IsOnWaterSurface() const { return onWaterSurface_; }
+
     bool  IsInvincible() const { return isInvincible_; }
     void  StartInvincible(float duration);
 
@@ -159,4 +163,8 @@ private:
     float damageBlinkTimer_ = 0.0f;
     float damageBlinkInterval_ = 0.08f; // 闪烁间隔（秒）
     bool  damageBlinkVisible_ = true;
+
+     // ---- 水状态 ----
+    bool inWater_ = false;        // 是否处于水块内部（按下 S 下潜）
+    bool onWaterSurface_ = false; // 是否在水面上漂浮
 };

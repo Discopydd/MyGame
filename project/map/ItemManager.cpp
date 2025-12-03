@@ -6,6 +6,7 @@ void ItemManager::Initialize(Object3dCommon* objCommon, Camera* camera)
     object3dCommon_ = objCommon;
     camera_         = camera;
     items_.clear();
+    pickupEffects_.clear();
 }
 
 void ItemManager::Finalize()
@@ -44,6 +45,39 @@ void ItemManager::Update(float dt)
         v.obj->SetRotate(rot);
         v.obj->Update();
     }
+    for (auto it = pickupEffects_.begin(); it != pickupEffects_.end(); ) {
+        PickupEffect& e = *it;
+        if (!e.obj) {
+            it = pickupEffects_.erase(it);
+            continue;
+        }
+
+        e.elapsed += dt;
+
+        // 向上移动
+        Vector3 pos = e.obj->GetTranslate();
+        pos.x += e.velocity.x * dt;
+        pos.y += e.velocity.y * dt;
+        pos.z += e.velocity.z * dt;
+        e.obj->SetTranslate(pos);
+
+        // 快速旋转
+        Vector3 rot = e.obj->GetRotate();
+        rot.y += e.rotateSpeedY * dt;
+        e.obj->SetRotate(rot);
+
+        e.obj->Update();
+
+        // 到时间就删掉
+        if (e.elapsed >= e.duration) {
+            delete e.obj;
+            e.obj = nullptr;
+            it = pickupEffects_.erase(it);
+        }
+        else {
+            ++it;
+        }
+    }
 }
 
 void ItemManager::Draw3D()
@@ -51,6 +85,11 @@ void ItemManager::Draw3D()
     for (auto& v : items_) {
         if (v.obj) {
             v.obj->Draw();
+        }
+    }
+     for (auto& e : pickupEffects_) {
+        if (e.obj) {
+            e.obj->Draw();
         }
     }
 }
@@ -80,7 +119,16 @@ bool ItemManager::OnPlayerStepOnTile(const std::string& mapPath,
     for (auto it = items_.begin(); it != items_.end(); ++it) {
         if (it->x == playerIndex.xIndex && it->y == playerIndex.yIndex) {
             if (it->obj) {
-                delete it->obj;
+                PickupEffect effect;
+                effect.obj = it->obj;
+                effect.elapsed = 0.0f;
+                effect.duration = 0.35f;                 // 播放 0.35 秒
+                effect.velocity = { 0.0f, 2.0f, 0.0f };  // 向上 2.0 单位/秒，自己可以调
+                effect.rotateSpeedY = 25.0f;               // 快速旋转（弧度/秒）
+
+                pickupEffects_.push_back(effect);
+
+                // ownership 移到 pickupEffects_，这里不要 delete
                 it->obj = nullptr;
             }
             items_.erase(it);
@@ -105,4 +153,11 @@ void ItemManager::ClearVisuals()
         }
     }
     items_.clear();
+     for (auto& e : pickupEffects_) {
+        if (e.obj) {
+            delete e.obj;
+            e.obj = nullptr;
+        }
+    }
+    pickupEffects_.clear();
 }
