@@ -75,7 +75,7 @@ void GameScene::GenerateBlocks() {
                 // 添加到方块列表
                 mapBlocks_.push_back(block);
             }
-             else if (type == MapChipType::kBlock2) {
+            else if (type == MapChipType::kBlock2) {
                 Object3d* block2 = new Object3d();
                 block2->Initialize(object3dCommon_);
                 block2->SetModel("cube2/cube2.obj");
@@ -126,6 +126,17 @@ void GameScene::GenerateBlocks() {
                 spike->SetTranslate(spikePos);
                 spike->SetLightingMode(2);
                 mapBlocks_.push_back(spike);
+            }
+            else if (type == MapChipType::kWater) {     // 水方块
+                Object3d* water = new Object3d();
+                water->Initialize(object3dCommon_);
+                water->SetModel("water/water.obj");
+                water->SetCamera(camera_);
+                water->SetTranslate(position);
+                Vector4 color = water->GetColor();
+                color.w = 0.5f;
+                water->SetColor(color);
+                waterBlocks_.push_back(water);
             }
         }
     }
@@ -251,6 +262,7 @@ void GameScene::Initialize() {
     ModelManager::GetInstants()->LoadModel("star/star.obj");
     ModelManager::GetInstants()->LoadModel("hurd/hurd.obj");
     ModelManager::GetInstants()->LoadModel("cube2/cube2.obj"); 
+    ModelManager::GetInstants()->LoadModel("water/water.obj");
     player_ = new Player();
     player_->Initialize(object3dCommon_, camera_);
     // === HP 3D 条管理器 ===
@@ -787,6 +799,9 @@ void GameScene::Update() {
     for (auto* block : mapBlocks_) {
         block->Update();
     }
+    for (auto* water : waterBlocks_) {
+        water->Update();
+    }
     if (itemMgr_) {
         itemMgr_->Update(deltaTime);
     }
@@ -1034,6 +1049,7 @@ void GameScene::Update() {
         case MapChipType::kPortal: typeName = "Portal"; break;
         case MapChipType::kItem:   typeName = "Item";   break;
         case MapChipType::kSpike:  typeName = "Spike";  break;
+        case MapChipType::kWater:  typeName = "Water";  break;
         case MapChipType::kMoveHorizontal: typeName = "MoveHorizontal"; break;
         case MapChipType::kMoveVertical:   typeName = "MoveVertical";   break;
 
@@ -1116,12 +1132,17 @@ void GameScene::Draw() {
     }
     else {
         player_->Draw();
-             // ==== Coin UI：右上角的 3D coin 模型 ====
+        // ==== Coin UI：右上角的 3D coin 模型 ====
         if (coinUI_) {
             coinUI_->Draw3D();
         }
         if (particleMgr_) {
             particleMgr_->Draw3D();
+        }
+        for (auto* water : waterBlocks_) {
+            if (water) {
+                water->Draw();
+            }
         }
     }
     // ================== 4) 最前景 UI Sprite ==================
@@ -1169,6 +1190,10 @@ void GameScene::Finalize() {
         delete block;
     }
     mapBlocks_.clear();
+    for (auto* water : waterBlocks_) {
+        delete water;
+    }
+    waterBlocks_.clear();
     delete player_;
     delete imguiManager_;
     if (dashUI_) {
@@ -1290,6 +1315,9 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
 
     for (auto* block : mapBlocks_) delete block;
     mapBlocks_.clear();
+    for (auto* water : waterBlocks_) {
+        delete water;
+    }
     for (auto* p : movingPlatforms_) delete p;
     movingPlatforms_.clear();
     if (spaceHint_.sprite) {
