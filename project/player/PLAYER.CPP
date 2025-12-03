@@ -40,6 +40,13 @@ void Player::Initialize(Object3dCommon* object3dCommon, Camera* camera) {
 void Player::Update(Input* input, const MapChipField& mapChipField) {
     const float deltaTime = 1.0f / 60.0f; // 先按 60FPS 固定，后续可外部传参
     didDoubleJumpThisFrame_ = false;
+   // 记录上一帧的水状态，用于判断“刚刚进入水中”
+    bool wasInWater        = inWater_;
+    bool wasOnWaterSurface = onWaterSurface_;
+
+    // 每帧默认认为不在水中，后面再基于地图重算
+    inWater_ = false;
+    onWaterSurface_ = false;
      // === 受伤无敌 & 闪烁处理 ===
     if (isInvincible_) {
         invincibleTimer_ -= deltaTime;
@@ -132,7 +139,118 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
             canDash_ = true;
         }
     }
+            // ========= 水方块判定 =========
+    {
+        const float halfW = width_ * 0.5f;
+        const float halfH = height_ * 0.5f;
 
+        float left = position_.x - halfW;
+        float right = position_.x + halfW;
+        float bottom = position_.y - halfH;
+        float top = position_.y + halfH;
+
+        const float kWaterProbeOffset = 0.05f;
+        auto minIdx = mapChipField.GetMapChipIndexByPosition({ left,  bottom - kWaterProbeOffset, 0 });
+        auto maxIdx = mapChipField.GetMapChipIndexByPosition({ right, top,                        0 });
+
+        bool  hasWater = false;
+        float waterSurfaceY = 0.0f;
+
+        for (uint32_t y = minIdx.yIndex; y <= maxIdx.yIndex; ++y) {
+            for (uint32_t x = minIdx.xIndex; x <= maxIdx.xIndex; ++x) {
+                if (mapChipField.GetMapChipTypeByIndex(x, y) != MapChipType::kWater) {
+                    continue;
+                }
+                auto r = mapChipField.GetRectByIndex(x, y);
+                if (!hasWater || r.top > waterSurfaceY) {
+                    hasWater = true;
+                    waterSurfaceY = r.top;
+                }
+            }
+        }
+
+        // 默认认为不在水中 / 不在水面，下面按检测结果再改
+        inWater_ = false;
+        onWaterSurface_ = false;
+
+        if (hasWater) {
+            float depth = waterSurfaceY - bottom;
+            const float kSurfaceSnapThreshold = height_ * 0.5f;
+            // 下落速度多大以内，仍然算“慢慢接触水面”，可以漂浮
+            const float kFloatMaxFallSpeed = 0.15f;   // 可以自己再调大/调小
+
+            const bool diveInput =
+                input->PushKey(DIK_S) || input->PushKey(DIK_DOWN);
+
+            if (depth > 0.0f) {
+                // 垂直速度绝对值比较小（无论向上还是向下），认为是“轻轻接触水面”
+                bool canFloatOnSurface =
+                    (std::fabs(velocity_.y) <= kFloatMaxFallSpeed);
+
+                if (!diveInput &&
+                    depth <= kSurfaceSnapThreshold &&
+                    canFloatOnSurface) {
+
+                    // ★ 在水面上漂浮：保持一半身体在水中
+                    SnapOnGround(waterSurfaceY - halfH);
+                    onWaterSurface_ = true;
+                    inWater_ = false;
+                }
+                else {
+                    // ★ 速度较快（从高处跳落）或者按了 S：视为真正进入水内
+                    inWater_ = true;
+                    onWaterSurface_ = false;
+                }
+
+                if (!diveInput &&
+                    depth <= kSurfaceSnapThreshold &&
+                    canFloatOnSurface) {
+
+                    // ★ 在水面上漂浮：保持一半身体在水中
+                    SnapOnGround(waterSurfaceY - halfH);
+                    onWaterSurface_ = true;
+                    inWater_ = false;
+                }
+                else {
+                    // ★ 速度较快（从高处跳落）或者按了 S：视为真正进入水内
+                    inWater_ = true;
+                    onWaterSurface_ = false;
+                }
+            }
+            // depth <= 0：脚在水面以上，当成空气
+        }
+    }
+
+
+       // === 刚从空气 / 水面进入水中的一帧：给一个固定“入水速度” ===
+    bool justEnteredWater = (!wasInWater && !wasOnWaterSurface && inWater_);
+    if (justEnteredWater) {
+
+        // 判断这次跳到空中的时候，使用了几段跳
+        // 0：只是掉下去    1：普通跳    2：二段跳
+        int usedJumps = jumpCount_;
+        if (usedJumps < 0) usedJumps = 0;
+        if (usedJumps > 2) usedJumps = 2;
+
+        // 基础入水速度（从空中掉进水里时往下轻轻一滑）
+        const float kBaseEnterSinkSpeed = -0.10f; // 单位：世界单位/帧左右的感觉
+
+        // 二段跳额外加深一点（越多段跳，入水那一下越深）
+        const float kExtraSinkPerExtraJump = -0.05f; // 每比“一段跳”多一段，多沉这么多
+
+        // 计算目标入水速度：
+        //  - 掉落/一段跳：   -0.10
+        //  - 二段跳入水：    -0.15
+        float targetVy = kBaseEnterSinkSpeed
+                       + (float)(usedJumps - 1) * kExtraSinkPerExtraJump;
+
+        // 不允许是向上的速度，确保一定是往下轻轻沉
+        if (targetVy >= 0.0f) {
+            targetVy = -0.05f;
+        }
+
+        velocity_.y = targetVy;
+    }
     // 触发冲刺（左 Shift）
     if (input->TriggerKey(DIK_LSHIFT) && canDash_ && !isDashing_) {
         isDashing_ = true;
@@ -174,12 +292,25 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
         velocity_.x = 0.0f;
     }
 
+    // ---- 水中物理倍率（可以按手感调整）----
+    const float kWaterMoveSpeedScale  = 0.4f;  // 水里移动速度 40%
+    const float kWaterDashSpeedScale  = 0.5f;  // 水里冲刺速度 50%
+    const float kWaterJumpVelScale    = 0.2f;  // 水里起跳初速度 20%
+    const float kWaterGravityScale    = 0.18f; // 水里重力 35%
+
     float currentMoveSpeed = moveSpeed_;
+    if (inWater_) {
+        currentMoveSpeed *= kWaterMoveSpeedScale;
+    }
     Vector3 moveVelocity = moveInput * currentMoveSpeed;
 
     if (isDashing_) {
         // 冲刺期间固定速度，忽略输入
-        moveVelocity = dashDirection_ * (moveSpeed_ * dashSpeedMultiplier_);
+        float dashSpeed = moveSpeed_ * dashSpeedMultiplier_;
+        if (inWater_) {
+            dashSpeed *= kWaterDashSpeedScale;
+        }
+        moveVelocity = dashDirection_ * dashSpeed;
         if (isDashJumping_) {
             moveVelocity.y = 0.0f;
         }
@@ -187,11 +318,10 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
 
     velocity_.x = moveVelocity.x;
 
-    // ========= 跳跃（一次性冲量 + 长按小加速度 + 可变重力）=========
-    const bool isSpacePressed   = input->PushKey(DIK_SPACE);
+  const bool isSpacePressed   = input->PushKey(DIK_SPACE);
     const bool justPressedJump  = input->TriggerKey(DIK_SPACE);
 
- // 起跳 & 二段跳
+    // 起跳 & 二段跳 / 水中无限跳
     if (justPressedJump) {
 
         // ① 地面起跳（重置跳跃次数）
@@ -200,31 +330,43 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
 
             isJumping_ = true;
             jumpPressDuration_ = 0.0f;
-            currentMaxJumpHoldTime_ = maxJumpHoldTimeFirst_;   // ☆ 一段跳用自己的时间上限
+            currentMaxJumpHoldTime_ = maxJumpHoldTimeFirst_;
 
             velocity_.y = jumpVelInit_;
+            // 水面上起跳也可以更“沉”一点（按需要可以去掉这句）
+            if (inWater_) {
+                velocity_.y *= kWaterJumpVelScale;
+            }
             jumpCount_ = 1; // 已经用掉第一段
 
             if (isDashing_) {
                 velocity_.x = dashDirection_.x * (moveSpeed_ * dashSpeedMultiplier_);
             }
         }
-        // ② 空中二段跳
-        else if (!isOnGround_ && jumpCount_ < maxJumpCount_) {
+        // ② 空中跳跃：
+        //    - 普通情况：最多 maxJumpCount_ 次（二段跳）
+        //    - inWater_ == true 时：不限制次数 → 无限跳
+        else if (!isOnGround_ && (jumpCount_ < maxJumpCount_ || inWater_)) {
 
             isJumping_ = true;
             jumpPressDuration_ = 0.0f;
-            currentMaxJumpHoldTime_ = maxJumpHoldTimeSecond_;  // ☆ 二段跳单独算自己的蓄力时间
+            currentMaxJumpHoldTime_ = maxJumpHoldTimeSecond_;
 
             // 打断冲刺，避免乱飞
             isDashing_ = false;
             isDashJumping_ = false;
 
             velocity_.y = jumpVelInit_;
-            jumpCount_++;
+            if (inWater_) {
+                velocity_.y *= kWaterJumpVelScale;
+            }
 
-            didDoubleJumpThisFrame_ = true;
-            // TODO: 二段跳特效 / 音效
+            // 为了不让 jumpCount_ 无限制变大，只在未达到上限时 +1
+            if (jumpCount_ < maxJumpCount_) {
+                jumpCount_++;
+            }
+
+            didDoubleJumpThisFrame_ = true; // 水中额外跳也当成“二段跳事件”，方便播特效
         }
     }
 
@@ -244,24 +386,43 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
         }
     }
 
-    // 可变重力
+      // 可变重力
     float g = gravityBase_;
-    // 早松手（结束可控上升但还在上升）→ 更大重力，短跳更利落
-    if (!isOnGround_ && velocity_.y > 0.0f && !isJumping_) {
-        g *= lowJumpGravityScale_;
+
+    if (inWater_) {
+        // ★ 在水中：只用基础重力 * 水倍率，不叠加额外下落/早松手重力
+        g *= kWaterGravityScale;
+    } else {
+        // ★ 在空气中才使用“早松手/下落更重”的逻辑
+        // 早松手（结束可控上升但还在上升）→ 更大重力，短跳更利落
+        if (!isOnGround_ && velocity_.y > 0.0f && !isJumping_) {
+            g *= lowJumpGravityScale_;
+        }
+        // 下落期 → 更重
+        if (!isOnGround_ && velocity_.y <= 0.0f) {
+            g *= fallGravityScale_;
+        }
     }
-    // 下落期 → 更重
-    if (!isOnGround_ && velocity_.y <= 0.0f) {
-        g *= fallGravityScale_;
+
+    // 在水面上漂浮 → 不受重力影响
+    if (onWaterSurface_) {
+        g = 0.0f;
     }
-    // 空中冲刺 → 无重力
+
+    // 空中冲刺 → 无重力（优先级最高）
     if (isDashing_) {
         g = 0.0f;
     }
 
     // 应用重力
     velocity_.y += g * deltaTime;
-
+    // ★ 水中：限制最大下沉速度，避免越掉越快
+    if (inWater_ && !onWaterSurface_) {
+        const float kMaxSinkSpeed = -0.20f; // 每帧最多这么快往下掉（可调）
+        if (velocity_.y < kMaxSinkSpeed) {
+            velocity_.y = kMaxSinkSpeed;
+        }
+    }
     // ========= 碰撞修正 =========
     HandleMapCollision(mapChipField);
 
@@ -449,12 +610,17 @@ void Player::ResetForMapTransition(bool keepFacing) {
 
     // 重力“基准”恢复（与新参数体系对齐）
     originalGravity_ = gravityBase_;
+    // 离开当前地图/传送时，不保留水中状态
+    inWater_ = false;
+    onWaterSurface_ = false;
 }
 void Player::StartDeathFall() {
     if (deathStarted_) { return; }
     deathStarted_ = true;
     isDead_ = true;
-
+    // 死亡时不再判定水
+    inWater_ = false;
+    onWaterSurface_ = false;
     // 立即打断一切动作
     isDashing_ = false; canDash_ = false;
     isDashJumping_ = false; dashTimer_ = 0.0f;

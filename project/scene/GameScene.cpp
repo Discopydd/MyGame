@@ -1318,6 +1318,7 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
     for (auto* water : waterBlocks_) {
         delete water;
     }
+    waterBlocks_.clear();
     for (auto* p : movingPlatforms_) delete p;
     movingPlatforms_.clear();
     if (spaceHint_.sprite) {

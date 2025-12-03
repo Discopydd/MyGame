@@ -42,7 +42,7 @@ public:
 	PointLight* GetPointLightData() const { return pointLightData; }
     SpotLight* GetSpotLightData() const { return spotLightData; }
 	const Vector3& GetRotate() const { return transform.rotate; }
-
+    const Vector3& GetTranslate() const { return transform.translate; }
 	// 设置平行光强度
     void SetDirectionalLightIntensity(float intensity);
     // 设置点光源强度
