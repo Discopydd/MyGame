@@ -138,6 +138,18 @@ void GameScene::GenerateBlocks() {
                 water->SetColor(color);
                 waterBlocks_.push_back(water);
             }
+            else if (type == MapChipType::kEnemy) {
+                uint8_t subID = mapChipField_.GetMapChipSubIDByIndex(x, y);
+
+                EnemyType eType = EnemyType::Type0;
+                if (subID == 1) {
+                    eType = EnemyType::Type1;
+                }
+
+                Enemy* enemy = new Enemy();
+                enemy->Initialize(object3dCommon_, camera_, position, eType);
+                enemies_.push_back(enemy);
+            }
         }
     }
     for (uint32_t y = 0; y < mapChipField_.numBlockVertical_; ++y) {
@@ -236,6 +248,18 @@ void GameScene::Initialize() {
 
     TextureManager::GetInstance()->Initialize(dxCommon_, srvManager_);
 
+
+    const std::string kSkyTexPath = "Resources/sky_bg.png";
+
+        backgroundSprite_ = new Sprite();
+        backgroundSprite_->Initialize(spriteCommon_, kSkyTexPath);
+
+        // 左上角对齐屏幕
+        backgroundSprite_->SetPosition({ 0.0f, 0.0f });
+        backgroundSprite_->SetSize({
+            (float)WinApp::kClientWidth,
+            (float)WinApp::kClientHeight
+            });
     imguiManager_ = new ImGuiManager();
     imguiManager_->Initialize(winApp_, dxCommon_, srvManager_);
 
@@ -263,6 +287,9 @@ void GameScene::Initialize() {
     ModelManager::GetInstants()->LoadModel("hurd/hurd.obj");
     ModelManager::GetInstants()->LoadModel("cube2/cube2.obj"); 
     ModelManager::GetInstants()->LoadModel("water/water.obj");
+    ModelManager::GetInstants()->LoadModel("enemy0/enemy0.obj");
+    ModelManager::GetInstants()->LoadModel("enemy1/enemy1.obj");
+
     player_ = new Player();
     player_->Initialize(object3dCommon_, camera_);
     // === HP 3D 条管理器 ===
@@ -371,6 +398,7 @@ void GameScene::Initialize() {
 void GameScene::Update() {
     const float deltaTime = 1.0f / 60.0f;
     input_->Update();
+    backgroundSprite_->Update();
     // —— 是否允许玩家操作（淡出/加载/淡入期间 & 开场演出期间都禁止）——
     const bool isFading = (fade_ && fade_->GetPhase() != FadePhase::None);
     const bool inIntro    = (intro_ && intro_->IsPlaying());
@@ -518,12 +546,17 @@ void GameScene::Update() {
     for (auto* p : movingPlatforms_) {
         p->Update(deltaTime, mapChipField_, movingPlatforms_);
     }
+    for (auto* e : enemies_) {
+        if (e) {
+            e->Update(deltaTime);
+        }
+    }
     // 淡入淡出/加载/演出期间都不可操作
     player_->Update(canControl ? input_ : nullptr, mapChipField_);
 
   // ========= 阶段1：两条移动平台互相夹住玩家 =========
     crushedByPlatformThisFrame_ = false;
-
+    damagedByEnemyThisFrame_    = false;
     if (player_ && !player_->IsDead() && !player_->IsInvincible()) {
 
         Vector3 pPos = player_->GetPosition();
@@ -551,7 +584,63 @@ void GameScene::Update() {
             }
         }
     }
+     // ========= 玩家与敌人的碰撞 =========
+    if (player_ && !player_->IsDead()) {
 
+        Vector3 pPos = player_->GetPosition();
+        float   pHalfW = player_->GetWidth() * 0.5f;
+        float   pHalfH = player_->GetHeight() * 0.5f;
+        Vector3 pVel = player_->GetVelocity();
+
+        float pLeft = pPos.x - pHalfW;
+        float pRight = pPos.x + pHalfW;
+        float pBottom = pPos.y - pHalfH;
+        float pTop = pPos.y + pHalfH;
+
+        for (auto* enemy : enemies_) {
+            if (!enemy) { continue; }
+
+            Vector3 ePos = enemy->GetPosition();
+            float   eHalfW = enemy->GetWidth() * 0.5f;
+            float   eHalfH = enemy->GetHeight() * 0.5f;
+
+            float eLeft = ePos.x - eHalfW;
+            float eRight = ePos.x + eHalfW;
+            float eBottom = ePos.y - eHalfH;
+            float eTop = ePos.y + eHalfH;
+
+            bool overlapX = !(pRight <= eLeft || pLeft >= eRight);
+            bool overlapY = !(pTop <= eBottom || pBottom >= eTop);
+            if (!overlapX || !overlapY) {
+                continue;
+            }
+
+            // ====== 判定是否“从上方踩到”敌人 ======
+            const float stompTolerance = 0.15f;
+            bool isStomp =
+                (pVel.y <= 0.0f) &&          // 玩家正在往下
+                (pBottom >= ePos.y) &&       // 脚大致在敌人中间以下
+                (pBottom <= eTop + stompTolerance);
+
+            if (isStomp) {
+                // ☆ 踩到敌人：敌人闪烁，玩家弹一下，不受伤
+                enemy->StartHitReaction(0.4f);   // 闪烁 0.4 秒，可自己调
+
+                Vector3 newVel = pVel;
+                newVel.y = 0.7f;                // 踩完向上弹的力度，可自己调手感
+                player_->SetVelocity(newVel);
+
+                // 不给玩家伤害，处理完当前敌人就继续下一个
+                continue;
+            }
+            else {
+                // ☆ 不是从上面踩 ⇒ 视为被敌人撞到，玩家受伤
+                if (!player_->IsInvincible()) {
+                    damagedByEnemyThisFrame_ = true;
+                }
+            }
+        }
+    }
     // 先做平台上的落地 / 分离 / 搭乘
     if (!crushedByPlatformThisFrame_) {
         HandlePlayerOnMovingPlatforms();
@@ -867,7 +956,7 @@ void GameScene::Update() {
         }
 
         // 被平台夹死照旧用 crushedByPlatformThisFrame_（全格判定）
-        if ((onSpike || crushedByPlatformThisFrame_) &&
+        if ((onSpike || crushedByPlatformThisFrame_|| damagedByEnemyThisFrame_) &&
             !player_->IsDead() && !player_->IsInvincible()) {
 
             MapChipField::IndexSet safeIndex = playerIndexOneSecAgo_;
@@ -876,7 +965,7 @@ void GameScene::Update() {
             MapChipType safeType =
                 mapChipField_.GetMapChipTypeByIndex(safeIndex.xIndex, safeIndex.yIndex);
 
-            if (safeType == MapChipType::kSpike) {
+            if (safeType == MapChipType::kSpike|| safeType == MapChipType::kEnemy) {
                 MapChipField::IndexSet firstNonSpike{};
                 bool found = false;
 
@@ -1052,7 +1141,7 @@ void GameScene::Update() {
         case MapChipType::kWater:  typeName = "Water";  break;
         case MapChipType::kMoveHorizontal: typeName = "MoveHorizontal"; break;
         case MapChipType::kMoveVertical:   typeName = "MoveVertical";   break;
-
+        case MapChipType::kEnemy:  typeName = "Enemy";  break;
         }
         ImGui::Text("Current MapChip Type: %s", typeName);
     }
@@ -1066,7 +1155,14 @@ void GameScene::Draw() {
 
     // 是否处于 GameClear 演出中
     bool inGameClear = (gameClear_ && gameClear_->IsPlaying());
-
+     // ================== 0) 背景天空（2D Sprite） ==================
+    // 先切到 SRV / Sprite 的绘制状态，然后画一个全屏的天空
+    srvManager_->PreDraw();
+    spriteCommon_->CommonDraw();
+    if (backgroundSprite_) {
+        backgroundSprite_->Draw();
+    }
+    dxCommon_->ClearDepthBuffer();
     // ================== 1) 3D 场景（地图、HP 3D条等） ==================
     srvManager_->PreDraw();
     object3dCommon_->CommonDraw();
@@ -1077,6 +1173,12 @@ void GameScene::Draw() {
     }
     for (auto* p : movingPlatforms_) {
         p->Draw();
+    }
+    // === 敌人 ===
+    for (auto* e : enemies_) {
+        if (e) {
+            e->Draw();
+        }
     }
     // 道具
     if (itemMgr_) {
@@ -1186,6 +1288,11 @@ void GameScene::Finalize() {
     delete playerCamera_;
     delete spriteCommon_;
     delete object3dCommon_;
+    if (backgroundSprite_) {
+        delete backgroundSprite_;
+        backgroundSprite_ = nullptr;
+    }
+
     for (auto* block : mapBlocks_) {
         delete block;
     }
@@ -1194,6 +1301,11 @@ void GameScene::Finalize() {
         delete water;
     }
     waterBlocks_.clear();
+    for (auto* e : enemies_) {
+        delete e;
+    }
+    enemies_.clear();
+
     delete player_;
     delete imguiManager_;
     if (dashUI_) {
@@ -1319,6 +1431,9 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
         delete water;
     }
     waterBlocks_.clear();
+    for (auto* e : enemies_) delete e;
+    enemies_.clear();
+
     for (auto* p : movingPlatforms_) delete p;
     movingPlatforms_.clear();
     if (spaceHint_.sprite) {

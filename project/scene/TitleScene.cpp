@@ -15,7 +15,7 @@ void TitleScene::Initialize() {
     TextureManager::GetInstance()->Initialize(dxCommon_, srvManager_);
 
 
-    std::string textureFilePath[] = { "Resources/black.png", "Resources/GameTitle.dds" ,"Resources/Start.dds"};
+    std::string textureFilePath[] = { "Resources/black.png", "Resources/GameTitle.dds" ,"Resources/Start.dds" };
     titleSprite_ = new Sprite();
     titleSprite_->Initialize(spriteCommon_, textureFilePath[1]); // 一张纯黑/灰色贴图
     titleSprite_->SetPosition({ 0.0f, titleY_ });
@@ -28,6 +28,17 @@ void TitleScene::Initialize() {
     fadeSprite_->SetSize({ (float)WinApp::kClientWidth, (float)WinApp::kClientHeight });
     fadeSprite_->SetColor({ 1.0f, 1.0f, 1.0f, 0.0f });
     fadeSprite_->SetVisible(false);
+
+    // === 背景 Sprite ===
+    backgroundSprite_ = new Sprite();
+    backgroundSprite_->Initialize(spriteCommon_, "Resources/sky_bg.png");
+
+    backgroundSprite_->SetAnchorPoint({ 0.0f, 0.0f });
+    backgroundSprite_->SetPosition({ 0.0f, 0.0f });
+    backgroundSprite_->SetSize({
+        static_cast<float>(WinApp::kClientWidth),
+        static_cast<float>(WinApp::kClientHeight)
+        });
 
     state_ = State::Idle;
     fadeAlpha_ = 0.0f;
@@ -96,6 +107,7 @@ void TitleScene::Update() {
     }
 
     // 更新精灵（若你的 Sprite 实现需要）
+    backgroundSprite_->Update();
     titleSprite_->Update();
     startSprite_->Update();
     fadeSprite_->SetColor({ 1.0f, 1.0f, 1.0f, fadeAlpha_ });
@@ -106,6 +118,9 @@ void TitleScene::Draw() {
     dxCommon_->Begin();
     srvManager_->PreDraw();
     spriteCommon_->CommonDraw();
+    if (backgroundSprite_) {
+        backgroundSprite_->Draw();
+    }
 
     // 1) 背景/标题
     if (titleSprite_) {
@@ -125,7 +140,7 @@ void TitleScene::Draw() {
 void TitleScene::Finalize() {
     // 若 TextureManager 作为全局单例供后续场景继续使用，建议不要在这里 Finalize
     TextureManager::GetInstance()->Finalize();
-
+    delete backgroundSprite_; backgroundSprite_ = nullptr;
     delete spriteCommon_;  spriteCommon_ = nullptr;
     delete titleSprite_;   titleSprite_ = nullptr;
     delete fadeSprite_;    fadeSprite_ = nullptr;

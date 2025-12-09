@@ -50,6 +50,9 @@
     <Filter Include="particle">
       <UniqueIdentifier>{4a88276a-06d0-4ebe-8824-7a7bede89a07}</UniqueIdentifier>
     </Filter>
+    <Filter Include="enemy">
+      <UniqueIdentifier>{c4cb6ea2-a615-4cd9-b53a-1a9cb7931968}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="engine\math\MyMath.cpp">
@@ -180,6 +183,9 @@
     </ClCompile>
     <ClCompile Include="map\MovingPlatform.cpp">
       <Filter>map</Filter>
+    </ClCompile>
+    <ClCompile Include="enemy\Enemy.cpp">
+      <Filter>enemy</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -368,6 +374,9 @@
     </ClInclude>
     <ClInclude Include="map\MovingPlatform.h">
       <Filter>map</Filter>
+    </ClInclude>
+    <ClInclude Include="enemy\Enemy.h">
+      <Filter>enemy</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

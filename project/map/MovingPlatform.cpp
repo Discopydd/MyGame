@@ -1,6 +1,21 @@
 #include "map/MovingPlatform.h"
 #include <algorithm>
 #include <cmath>
+namespace {
+    bool IsSolidForPlatform(MapChipType t) {
+        switch (t) {
+        case MapChipType::kBlock:
+        case MapChipType::kBlock2:
+        case MapChipType::kSpike:
+        case MapChipType::kPortal:
+        case MapChipType::kEnemy:
+        case MapChipType::kItem:
+            return true;
+        default:
+            return false;
+        }
+    }
+}
 MovingPlatform::~MovingPlatform()
 {
     for (auto* obj : tiles_) {
@@ -92,9 +107,7 @@ void MovingPlatform::HandleBlockCollision(const MapChipField& field)
         for (uint32_t y = minIdx.yIndex; y <= maxIdx.yIndex; ++y) {
             for (uint32_t x = minIdx.xIndex; x <= maxIdx.xIndex; ++x) {
                 MapChipType t = field.GetMapChipTypeByIndex(x, y);
-                if (t != MapChipType::kBlock &&
-                    t != MapChipType::kSpike &&
-                    t != MapChipType::kPortal && t != MapChipType::kBlock2) {
+                if (!IsSolidForPlatform(t)) {
                     continue;
                 }
                 auto r = field.GetRectByIndex(x, y);
@@ -129,9 +142,7 @@ void MovingPlatform::HandleBlockCollision(const MapChipField& field)
         for (uint32_t y = minIdx.yIndex; y <= maxIdx.yIndex; ++y) {
             for (uint32_t x = minIdx.xIndex; x <= maxIdx.xIndex; ++x) {
                 MapChipType t = field.GetMapChipTypeByIndex(x, y);
-                if (t != MapChipType::kBlock &&
-                    t != MapChipType::kSpike &&
-                    t != MapChipType::kPortal && t != MapChipType::kBlock2) {
+                if (!IsSolidForPlatform(t)) {
                     continue;
                 }
                 auto r = field.GetRectByIndex(x, y);
