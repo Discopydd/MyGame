@@ -487,7 +487,7 @@ void GameScene::Update() {
     // 在本帧后段会处理 FadingIn（如下）
     if (shouldStartLoading_) {
         shouldStartLoading_ = false;
-        StartLoadingMap("Resources/map/map.csv", { 3,3,0 }, false);
+        StartLoadingMap("Resources/map/map3.csv", { 3,3,0 }, false);
         return; // 本帧先显示 LoadingScene
     }
     // 2️⃣ 初始加载计时
@@ -497,7 +497,7 @@ void GameScene::Update() {
             isMapLoading_ = false;
 
             // 真正加载地图
-            LoadMap("Resources/map/map.csv", { 3,3,0 });
+            LoadMap("Resources/map/map3.csv", { 3,3,0 });
             if (sceneManager_) sceneManager_->ClearOverlayScene();
             if (fade_) fade_->SetPhase(FadePhase::FadingIn);
 
