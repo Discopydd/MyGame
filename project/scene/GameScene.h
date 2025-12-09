@@ -34,6 +34,7 @@
 #include "../map/PortalManager.h" 
 #include "../particle/ParticleManager.h" 
 #include "./map/MovingPlatform.h" 
+#include "../enemy/Enemy.h"
 class GameScene : public BaseScene {
 public:
     void Initialize() override;
@@ -53,6 +54,8 @@ private:
     Object3dCommon* object3dCommon_ = nullptr;
     Camera* camera_ = nullptr;
     PlayerCamera* playerCamera_ = nullptr;
+
+    Sprite* backgroundSprite_ = nullptr;
 
     Vector2 rotation_{};
 
@@ -163,4 +166,6 @@ private:
     float movingPlatformSpeed_ = 10.0f;
 
     bool crushedByPlatformThisFrame_ = false;
+    bool damagedByEnemyThisFrame_ = false;
+    std::vector<Enemy*> enemies_; 
 };

@@ -42,6 +42,8 @@ private:
     Sprite* titleSprite_ = nullptr;
     Sprite* startSprite_ = nullptr;
 
+    Sprite* backgroundSprite_ = nullptr;
+
     State state_ = State::Idle;
 
     // --- Title drop & bounce (tuned) ---
