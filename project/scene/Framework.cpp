@@ -1,10 +1,11 @@
 #include "Framework.h"
 void Framework::Initialize() {
-    sceneManager_ = new SceneManager();
+    sceneManager_ = std::make_unique<SceneManager>();
      WinApp::GetInstance()->Initialize();
     DirectXCommon::GetInstance()->Initialize(WinApp::GetInstance());
     Input::GetInstance()->Initialize(WinApp::GetInstance());
     SrvManager::GetInstance()->Initialize(DirectXCommon::GetInstance());
+    SpriteCommon::GetInstance()->Initialize(DirectXCommon::GetInstance());
 }
 void Framework::Run() {
     Initialize();
@@ -27,8 +28,7 @@ void Framework::Draw() {
     sceneManager_->Draw();
 }
 void Framework::Finalize() {
-    delete sceneManager_;
-    sceneManager_ = nullptr;
+    sceneManager_.reset();
 
     DirectXCommon::GetInstance()->Finalize();
     WinApp::GetInstance()->Finalize();

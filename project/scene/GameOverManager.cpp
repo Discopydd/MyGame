@@ -4,7 +4,7 @@ void GameOverManager::Initialize(SpriteCommon* spriteCommon)
 {
     spriteCommon_ = spriteCommon;
 
-    titleSprite_ = new Sprite();
+    titleSprite_ = std::make_unique<Sprite>();
     titleSprite_->Initialize(spriteCommon_, "Resources/GameOver.png");
     titleSprite_->SetSize(titleSize_);
     titleSprite_->SetVisible(false);
@@ -15,10 +15,7 @@ void GameOverManager::Initialize(SpriteCommon* spriteCommon)
 
 void GameOverManager::Finalize()
 {
-    if (titleSprite_) {
-        delete titleSprite_;
-        titleSprite_ = nullptr;
-    }
+    titleSprite_.reset();
 }
 
 void GameOverManager::Start()

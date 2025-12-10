@@ -100,7 +100,7 @@ void GameScene::GenerateBlocks() {
                     continue;
                 }
 
-                Object3d* item = new Object3d();
+                auto item = std::make_unique<Object3d>();
                 item->Initialize(object3dCommon_);
                 item->SetModel("coin/coin.obj");
                 item->SetCamera(camera_);
@@ -112,7 +112,7 @@ void GameScene::GenerateBlocks() {
                 item->SetDirectionalLightIntensity(2.0f);
                 item->SetPointLightIntensity(2.0f);
 
-                itemMgr_->RegisterItem(currentMapPath_, x, y, item);
+                itemMgr_->RegisterItem(currentMapPath_, x, y, std::move(item));
             }
             else if (type == MapChipType::kSpike) {
                 Object3d* spike = new Object3d();
@@ -242,8 +242,7 @@ void GameScene::Initialize() {
     input_ = Input::GetInstance();
     srvManager_ = SrvManager::GetInstance();
 
-    spriteCommon_ = new SpriteCommon();
-    spriteCommon_->Initialize(dxCommon_);
+    spriteCommon_ = SpriteCommon::GetInstance();
 
 
     TextureManager::GetInstance()->Initialize(dxCommon_, srvManager_);
@@ -437,7 +436,7 @@ void GameScene::Update() {
                 returnToTitle_ = false;
                 if (sceneManager_) {
                     sceneManager_->ClearOverlayScene();
-                    sceneManager_->SetNextScene(new TitleScene());
+                    sceneManager_->SetNextScene(std::make_unique<TitleScene>());
                 }
                 return;
             }
@@ -446,7 +445,7 @@ void GameScene::Update() {
             if (!fade_->OverlayPushed()) {
                 if (!pendingGameClear_ && !returnToTitle_) {
                     if (sceneManager_) {
-                        sceneManager_->SetOverlayScene(new LoadingScene());
+                        sceneManager_->SetOverlayScene(std::make_unique<LoadingScene>());
                     }
                 }
                 fade_->SetOverlayPushed(true);
@@ -858,7 +857,7 @@ void GameScene::Update() {
 
         if (sceneManager_) {
             sceneManager_->ClearOverlayScene();
-            sceneManager_->SetNextScene(new TitleScene());
+            sceneManager_->SetNextScene(std::make_unique<TitleScene>());
         }
     }
 
@@ -1286,7 +1285,6 @@ void GameScene::Finalize() {
 
     delete camera_;
     delete playerCamera_;
-    delete spriteCommon_;
     delete object3dCommon_;
     if (backgroundSprite_) {
         delete backgroundSprite_;
@@ -1397,8 +1395,7 @@ void GameScene::Finalize() {
 
 void GameScene::StartLoadingMap(const std::string& mapPath, const Vector3& startPos, bool isPortal = false) {
     if (sceneManager_) {
-        LoadingScene* loadingScene = new LoadingScene();
-        sceneManager_->SetOverlayScene(loadingScene);
+        sceneManager_->SetOverlayScene(std::make_unique<LoadingScene>());
     }
     if (isPortal) {
         // 传送门加载

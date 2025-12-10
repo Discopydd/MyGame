@@ -31,7 +31,7 @@ private:
     State  state_ = State::None;
     float  t_     = 0.0f;      // 计时
 
-    Sprite* titleSprite_ = nullptr;
+    std::unique_ptr<Sprite> titleSprite_;
     // 和原来一样：整屏大字 GameOver
     Vector2 titleSize_   = { 500.0f, 300.0f };
     Vector2 titlePos_{};

@@ -6,7 +6,7 @@
 #include "Camera.h"
 #include <map/MapChipField.h>
 #include "MyMath.h"
-
+#include <memory>
 // 原来在 GameScene 里的 PortalInfo 挪到这里
 struct PortalInfo {
     MapChipField::IndexSet index;  // 传送门格子索引
@@ -48,6 +48,6 @@ private:
     SpriteCommon* spriteCommon_ = nullptr;
     Camera*       camera_       = nullptr;
 
-    Sprite* hintSprite_         = nullptr;  // “按E”图标
+    std::unique_ptr<Sprite> hintSprite_;  // “按E”图标
     std::vector<PortalInfo> portals_;
 };

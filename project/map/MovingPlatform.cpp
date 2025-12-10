@@ -16,13 +16,6 @@ namespace {
         }
     }
 }
-MovingPlatform::~MovingPlatform()
-{
-    for (auto* obj : tiles_) {
-        delete obj;
-    }
-    tiles_.clear();
-}
 
 void MovingPlatform::Initialize(Object3dCommon* common, Camera* camera,
     const Vector3& startPos, Axis axis, float speed, int lengthInTiles)
@@ -31,52 +24,45 @@ void MovingPlatform::Initialize(Object3dCommon* common, Camera* camera,
     position_ = startPos;
     prevPosition_ = position_;
 
-    // 记住一条有多少块，至少 1
     lengthInTiles_ = (std::max)(1, lengthInTiles);
 
-    // 速度 & 方向（axis 只决定运动方向）
     speed_ = std::fabs(speed);
     if (axis_ == Axis::Horizontal) {
         dir_ = { (speed >= 0.0f) ? 1.0f : -1.0f, 0.0f, 0.0f };
-    }
-    else {
+    } else {
         dir_ = { 0.0f, (speed >= 0.0f) ? 1.0f : -1.0f, 0.0f };
     }
 
-    // 形状：不管水平/垂直移动，都是“横着一排 lengthInTiles_ 个砖块”
-    halfW_ = MapChipField::kBlockWidth * 0.5f * static_cast<float>(lengthInTiles_);
+    halfW_ = MapChipField::kBlockWidth  * 0.5f * static_cast<float>(lengthInTiles_);
     halfH_ = MapChipField::kBlockHeight * 0.5f;
 
     // 生成这一排小方块
-    // 先清空之前的
-    for (auto* obj : tiles_) {
-        delete obj;
-    }
-    tiles_.clear();
+    tiles_.clear();          // ★ unique_ptr 会自动释放旧的
     tileOffsets_.clear();
 
     tiles_.reserve(lengthInTiles_);
     tileOffsets_.reserve(lengthInTiles_);
 
-    const float step = MapChipField::kBlockWidth;
+    const float step        = MapChipField::kBlockWidth;
     const float offsetStart = -step * 0.5f * static_cast<float>(lengthInTiles_ - 1);
 
     for (int i = 0; i < lengthInTiles_; ++i) {
-        Object3d* tile = new Object3d();
+        auto tile = std::make_unique<Object3d>();
         tile->Initialize(common);
         tile->SetModel("cube/cube.obj");
         tile->SetCamera(camera);
-        // 先放在中心，Update 里加偏移
         tile->SetTranslate(startPos);
-        tiles_.push_back(tile);
+
+        tiles_.push_back(std::move(tile));
 
         Vector3 offset{};
-        offset.x = offsetStart + step * static_cast<float>(i);  // 横向排开
+        offset.x = offsetStart + step * static_cast<float>(i);
         offset.y = 0.0f;
         offset.z = 0.0f;
         tileOffsets_.push_back(offset);
     }
 }
+
 
 MapChipField::Rect MovingPlatform::GetRect() const
 {
@@ -209,7 +195,10 @@ void MovingPlatform::Update(float dt,
 
 void MovingPlatform::Draw()
 {
-     for (auto* obj : tiles_) {
-        if (obj) obj->Draw();
+    for (auto& tile : tiles_) {
+        if (tile) {
+            tile->Draw();
+        }
     }
 }
+

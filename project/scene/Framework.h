@@ -4,6 +4,7 @@
 #include <DirectXCommon.h>
 #include <Input.h>
 #include <SrvManager.h>
+#include "SpriteCommon.h"
 class Framework {
 public:
     virtual ~Framework() = default;
@@ -18,5 +19,5 @@ public:
 
 protected:
     bool endRequest_ = false;
-    SceneManager* sceneManager_ = nullptr;
+    std::unique_ptr<SceneManager> sceneManager_;
 };

@@ -75,7 +75,7 @@ public:
 
     const Vector3& GetDashDirection() const { return dashDirection_; }
 private:
-    Object3d* model_ = nullptr;
+    std::unique_ptr<Object3d> model_;
     Object3dCommon* object3dCommon_ = nullptr;
     Camera* camera_ = nullptr;
 

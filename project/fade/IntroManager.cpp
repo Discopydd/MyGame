@@ -11,33 +11,33 @@ void IntroManager::Initialize(SpriteCommon* spriteCommon, Input* input)
     const float H = (float)WinApp::kClientHeight;
 
     // 电影黑边
-    letterboxTop_ = new Sprite();
+    letterboxTop_ = std::make_unique<Sprite>();
     letterboxTop_->Initialize(spriteCommon_, "Resources/black.png");
     letterboxTop_->SetSize({ W, H * 0.14f });
     letterboxTop_->SetPosition({ 0.0f, -H * 0.14f });
     letterboxTop_->SetColor({ 1,1,1,0 });
 
-    letterboxBottom_ = new Sprite();
+    letterboxBottom_ = std::make_unique<Sprite>();
     letterboxBottom_->Initialize(spriteCommon_, "Resources/black.png");
     letterboxBottom_->SetSize({ W, H * 0.14f });
     letterboxBottom_->SetPosition({ 0.0f, H });
     letterboxBottom_->SetColor({ 1,1,1,0 });
 
     // 暗角
-    vignette_ = new Sprite();
+    vignette_ = std::make_unique<Sprite>();
     vignette_->Initialize(spriteCommon_, "Resources/gray.png");
     vignette_->SetSize({ W, H });
     vignette_->SetPosition({ 0.0f, 0.0f });
     vignette_->SetColor({ 1,1,1,0.0f });
 
     // 标题
-    introTitle_ = new Sprite();
+    introTitle_ = std::make_unique<Sprite>();
     introTitle_->Initialize(spriteCommon_, "Resources/GameTitle.dds");
     introTitle_->SetPosition({ 0.0f, H * 0.15f });
     introTitle_->SetColor({ 1,1,1,0 });
 
     // Skip 提示
-    skipHint_ = new Sprite();
+    skipHint_ = std::make_unique<Sprite>();
     skipHint_->Initialize(spriteCommon_, "Resources/Start.dds");
     skipHint_->SetPosition({ W * 0.5f - 100.0f, H * 0.8f });
     skipHint_->SetColor({ 1,1,1,0 });
@@ -51,11 +51,11 @@ void IntroManager::Initialize(SpriteCommon* spriteCommon, Input* input)
 
 void IntroManager::Finalize()
 {
-    if (letterboxTop_)    { delete letterboxTop_;    letterboxTop_ = nullptr; }
-    if (letterboxBottom_) { delete letterboxBottom_; letterboxBottom_ = nullptr; }
-    if (vignette_)        { delete vignette_;        vignette_ = nullptr; }
-    if (introTitle_)      { delete introTitle_;      introTitle_ = nullptr; }
-    if (skipHint_)        { delete skipHint_;        skipHint_ = nullptr; }
+    letterboxTop_.reset();
+    letterboxBottom_.reset();
+    vignette_.reset();
+    introTitle_.reset();
+    skipHint_.reset();
 }
 
 void IntroManager::Start(const Vector3& playerPos)

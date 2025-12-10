@@ -4,6 +4,11 @@
 class SpriteCommon
 {
 public:
+	static SpriteCommon* GetInstance() {
+		static SpriteCommon instance;
+		return &instance;
+	}
+
 	/// <summary>
 	/// 初期化
 	/// </summary>
@@ -13,7 +18,10 @@ public:
 
 	DirectXCommon* GetDxCommon()const { return dxCommon_; }
 private:
-
+	SpriteCommon() = default;
+    ~SpriteCommon() = default;
+    SpriteCommon(const SpriteCommon&) = delete;
+    SpriteCommon& operator=(const SpriteCommon&) = delete;
 	HRESULT hr;
 	//ルートシグネチャの作成
 	void RootSignatureInitialize();

@@ -2,7 +2,7 @@
 #include "SpriteCommon.h"
 #include "Sprite.h"
 #include "WinApp.h"
-
+#include <memory>
 // 和你原来的一样的枚举名字，方便复用
 enum class FadePhase { None, FadingOut, LoadingHold, FadingIn };
 
@@ -35,7 +35,7 @@ public:
     float GetSpeed() const { return speed_; }
     void  SetSpeed(float s) { speed_ = s; }
 
-    Sprite* GetSprite() { return sprite_; }
+    Sprite* GetSprite() { return sprite_.get(); }
 
     // 快捷操作
     void StartFadeOut();   // 从 0 淡到 1
@@ -55,7 +55,7 @@ public:
 
 private:
     SpriteCommon* spriteCommon_ = nullptr;
-    Sprite*       sprite_       = nullptr;
+    std::unique_ptr<Sprite> sprite_;
 
     FadePhase phase_   = FadePhase::None;
     float     alpha_   = 0.0f;

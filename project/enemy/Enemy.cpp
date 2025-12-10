@@ -1,14 +1,6 @@
 #include "Enemy.h"
 #include "ModelManager.h"
 
-Enemy::~Enemy()
-{
-    if (obj_) {
-        delete obj_;
-        obj_ = nullptr;
-    }
-}
-
 void Enemy::Initialize(
     Object3dCommon* common,
     Camera* camera,
@@ -18,7 +10,7 @@ void Enemy::Initialize(
     type_     = type;
     position_ = spawnPos;
 
-    obj_ = new Object3d();
+    obj_ = std::make_unique<Object3d>();
     obj_->Initialize(common);
     obj_->SetCamera(camera);
 
