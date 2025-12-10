@@ -3,7 +3,7 @@
 #include "Object3dCommon.h"
 #include "SpriteCommon.h"
 #include "ParticleEmitter.h"
-
+#include <memory>
 // 统一管理所有粒子发射器
 class ParticleManager
 {
@@ -32,5 +32,5 @@ public:
 private:
     Object3dCommon* objCommon_ = nullptr;
     SpriteCommon* sprCommon_   = nullptr;
-    std::vector<ParticleEmitter*> emitters_;
+    std::vector<std::unique_ptr<ParticleEmitter>> emitters_;
 };

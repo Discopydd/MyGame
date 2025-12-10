@@ -13,13 +13,13 @@ void GameClearManager::Initialize(SpriteCommon* spriteCommon,
     hpNdcZ_         = hpNdcZ;
 
     // 标题 Sprite
-    titleSprite_ = new Sprite();
+    titleSprite_ = std::make_unique<Sprite>();
     titleSprite_->Initialize(spriteCommon_, "Resources/GameClear.png");
     titleSprite_->SetSize(titleSize_);
     titleSprite_->SetVisible(false);
 
     // GameClear 玩家模型（先创建，Start 时再设位置）
-    clearPlayerObj_ = new Object3d();
+    clearPlayerObj_ = std::make_unique<Object3d>();
     clearPlayerObj_->Initialize(object3dCommon_);
     clearPlayerObj_->SetModel("player/player.obj");
     clearPlayerObj_->SetCamera(camera_);
@@ -32,14 +32,8 @@ void GameClearManager::Initialize(SpriteCommon* spriteCommon,
 }
 
 void GameClearManager::Finalize() {
-    if (titleSprite_) {
-        delete titleSprite_;
-        titleSprite_ = nullptr;
-    }
-    if (clearPlayerObj_) {
-        delete clearPlayerObj_;
-        clearPlayerObj_ = nullptr;
-    }
+    titleSprite_.reset();
+    clearPlayerObj_.reset();
 }
 
 void GameClearManager::Start() {

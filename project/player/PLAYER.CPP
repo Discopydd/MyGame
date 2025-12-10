@@ -7,20 +7,17 @@
 Player::Player() {}
 
 Player::~Player() {
-    if (model_) {
-        delete model_;
-        model_ = nullptr;
-    }
 }
 
 void Player::Initialize(Object3dCommon* object3dCommon, Camera* camera) {
     object3dCommon_ = object3dCommon;
     camera_ = camera;
 
-    model_ = new Object3d();
+    model_ = std::make_unique<Object3d>();
     model_->Initialize(object3dCommon_);
     model_->SetModel("player/player.obj");
     model_->SetCamera(camera_);
+
 
     position_ = { -10, 0, 0 };
     velocity_ = { 0, 0, 0 };

@@ -25,13 +25,13 @@ bool ItemManager::CanSpawnItem(const std::string& mapPath, uint32_t x, uint32_t 
     return (it->second.count(key) == 0);
 }
 
-void ItemManager::RegisterItem(const std::string& mapPath, uint32_t x, uint32_t y, Object3d* obj)
+void ItemManager::RegisterItem(const std::string& mapPath, uint32_t x, uint32_t y, std::unique_ptr<Object3d> obj)
 {
     ItemVisual v;
     v.x   = x;
     v.y   = y;
-    v.obj = obj;
-    items_.push_back(v);
+    v.obj = std::move(obj);
+    items_.push_back(std::move(v));
     (void)mapPath; // 这里只用来区分是否生成，真正记录在拾取时做
 }
 
@@ -70,8 +70,7 @@ void ItemManager::Update(float dt)
 
         // 到时间就删掉
         if (e.elapsed >= e.duration) {
-            delete e.obj;
-            e.obj = nullptr;
+            e.obj.reset();
             it = pickupEffects_.erase(it);
         }
         else {
@@ -120,16 +119,14 @@ bool ItemManager::OnPlayerStepOnTile(const std::string& mapPath,
         if (it->x == playerIndex.xIndex && it->y == playerIndex.yIndex) {
             if (it->obj) {
                 PickupEffect effect;
-                effect.obj = it->obj;
-                effect.elapsed = 0.0f;
-                effect.duration = 0.35f;                 // 播放 0.35 秒
-                effect.velocity = { 0.0f, 2.0f, 0.0f };  // 向上 2.0 单位/秒，自己可以调
-                effect.rotateSpeedY = 25.0f;               // 快速旋转（弧度/秒）
+                effect.obj          = std::move(it->obj);
+                effect.elapsed      = 0.0f;
+                effect.duration     = 0.35f;                   // 播放 0.35 秒
+                effect.velocity     = { 0.0f, 2.0f, 0.0f };    // 向上 2.0 单位/秒
+                effect.rotateSpeedY = 25.0f;                   // 快速旋转（弧度/秒）
 
-                pickupEffects_.push_back(effect);
+                pickupEffects_.push_back(std::move(effect));
 
-                // ownership 移到 pickupEffects_，这里不要 delete
-                it->obj = nullptr;
             }
             items_.erase(it);
             break;
@@ -146,18 +143,6 @@ bool ItemManager::OnPlayerStepOnTile(const std::string& mapPath,
 
 void ItemManager::ClearVisuals()
 {
-    for (auto& v : items_) {
-        if (v.obj) {
-            delete v.obj;
-            v.obj = nullptr;
-        }
-    }
     items_.clear();
-     for (auto& e : pickupEffects_) {
-        if (e.obj) {
-            delete e.obj;
-            e.obj = nullptr;
-        }
-    }
     pickupEffects_.clear();
 }

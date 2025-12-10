@@ -4,7 +4,7 @@ void FadeManager::Initialize(SpriteCommon* spriteCommon)
 {
     spriteCommon_ = spriteCommon;
 
-    sprite_ = new Sprite();
+    sprite_ = std::make_unique<Sprite>();
     sprite_->Initialize(spriteCommon_, "Resources/black.png");
     sprite_->SetPosition({ 0.0f, 0.0f });
     sprite_->SetSize({
@@ -24,10 +24,7 @@ void FadeManager::Initialize(SpriteCommon* spriteCommon)
 
 void FadeManager::Finalize()
 {
-    if (sprite_) {
-        delete sprite_;
-        sprite_ = nullptr;
-    }
+    sprite_.reset();
 }
 
 void FadeManager::StartFadeOut()

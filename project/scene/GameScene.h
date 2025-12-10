@@ -35,6 +35,8 @@
 #include "../particle/ParticleManager.h" 
 #include "./map/MovingPlatform.h" 
 #include "../enemy/Enemy.h"
+
+#include <memory>
 class GameScene : public BaseScene {
 public:
     void Initialize() override;

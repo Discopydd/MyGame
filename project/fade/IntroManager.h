@@ -4,7 +4,7 @@
 #include "Input.h"
 #include "WinApp.h"
 #include "MyMath.h"
-
+#include <memory>
 class IntroManager {
 public:
     enum class State { None, BarsIn, OrbitZoom, TitleShow, BarsOut, Done };
@@ -39,11 +39,11 @@ private:
     bool  started_   = false;  // 是否已经启动过一次
 
     // Sprite 们
-    Sprite* letterboxTop_    = nullptr;
-    Sprite* letterboxBottom_ = nullptr;
-    Sprite* vignette_        = nullptr;
-    Sprite* introTitle_      = nullptr;
-    Sprite* skipHint_        = nullptr;
+    std::unique_ptr<Sprite> letterboxTop_;
+    std::unique_ptr<Sprite> letterboxBottom_;
+    std::unique_ptr<Sprite> vignette_;
+    std::unique_ptr<Sprite> introTitle_;
+    std::unique_ptr<Sprite> skipHint_;
 
     // 摄像机相关（目前只保存，不在这里直接动相机）
     Vector3 camStartPos_{ 0, 12, -85 };

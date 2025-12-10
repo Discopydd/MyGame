@@ -11,7 +11,4 @@ public:
     void Update() override;
     void Draw() override;
     void Finalize() override;
-
-private:
-    BaseScene* scene_ = nullptr;
 };

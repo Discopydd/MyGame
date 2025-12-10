@@ -5,7 +5,7 @@
 #include "Object3d.h"
 #include "SpriteCommon.h"
 #include "Sprite.h"
-
+#include <memory>
 class ParticleEmitter
 {
 public:
@@ -42,8 +42,10 @@ private:
     SpriteCommon* sprCommon_   = nullptr;
 
     std::vector<Particle> particles_;
-    std::vector<Object3d*> modelPool_;
-    std::vector<Sprite*> spritePool_;
+
+    // ★ 拥有：用 unique_ptr 管池子
+    std::vector<std::unique_ptr<Object3d>> modelPool_;
+    std::vector<std::unique_ptr<Sprite>>   spritePool_;
 
     bool windMode_ = false;
     bool useOriginalSpriteSize_ = false;

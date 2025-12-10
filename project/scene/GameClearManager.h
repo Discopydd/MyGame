@@ -6,7 +6,7 @@
 #include "Camera.h"
 #include "MyMath.h"
 #include "WinApp.h"
-
+#include <memory>
 class GameClearManager {
 public:
     enum class State { None, SlideTitle, PlayerShow, Done };
@@ -41,7 +41,7 @@ private:
     float t_     = 0.0f;   // 通用计时
 
     // === 标题相关 ===
-    Sprite* titleSprite_ = nullptr;
+    std::unique_ptr<Sprite> titleSprite_;
     Vector2 titleSize_   = { 1280.0f, 720.0f };
     Vector2 titlePos_{};
     Vector2 titleStartPos_{};
@@ -49,7 +49,7 @@ private:
     float   titleSlideTime_ = 0.65f;
 
     // === GameClear 玩家模型 ===
-    Object3d* clearPlayerObj_ = nullptr;
+    std::unique_ptr<Object3d> clearPlayerObj_;
     Vector3   clearPlayerStartPos_{};
     Vector3   clearPlayerBasePos_{};
     float     clearPlayerSpinT_ = 0.0f;

@@ -5,7 +5,7 @@ void PortalManager::Initialize(SpriteCommon* spriteCommon, Camera* camera)
     spriteCommon_ = spriteCommon;
     camera_       = camera;
 
-    hintSprite_ = new Sprite();
+    hintSprite_ = std::make_unique<Sprite>();
     hintSprite_->Initialize(spriteCommon_, "Resources/letterE.png");
     hintSprite_->SetPosition({ 0.0f, 0.0f });
     hintSprite_->SetSize({ 32.0f, 32.0f });
@@ -16,10 +16,7 @@ void PortalManager::Initialize(SpriteCommon* spriteCommon, Camera* camera)
 
 void PortalManager::Finalize()
 {
-    if (hintSprite_) {
-        delete hintSprite_;
-        hintSprite_ = nullptr;
-    }
+    hintSprite_.reset();
     portals_.clear();
 }
 

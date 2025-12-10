@@ -13,7 +13,7 @@ public:
     };
 
     MovingPlatform() = default;
-    ~MovingPlatform();
+    ~MovingPlatform() = default;
 
     // speed 为正/负决定初始方向（正：右/上，负：左/下）
     void Initialize(Object3dCommon* common, Camera* camera,
@@ -37,9 +37,8 @@ private:
     int lengthInTiles_ = 1;
 
     // 这一条上所有小方块
-    std::vector<Object3d*> tiles_;
-    // 每个 tile 相对于“整条平台中心”的偏移
-    std::vector<Vector3>   tileOffsets_;
+    std::vector<std::unique_ptr<Object3d>> tiles_;
+    std::vector<Vector3>                   tileOffsets_;
 
     Axis axis_ = Axis::Horizontal;
     float speed_ = 1.0f;   // 绝对速度（单位：世界单位/秒）

@@ -12,19 +12,8 @@ ParticleEmitter::~ParticleEmitter()
 }
 void ParticleEmitter::Finalize()
 {
-    // 删除 3D 粒子对象池
-    for (auto* o : modelPool_) {
-        delete o;
-    }
     modelPool_.clear();
-
-    // 删除 2D 粒子对象池
-    for (auto* s : spritePool_) {
-        delete s;
-    }
     spritePool_.clear();
-
-    // 清空粒子数据
     particles_.clear();
 }
 void ParticleEmitter::Initialize(Object3dCommon* objCommon, SpriteCommon* sprCommon)
@@ -211,24 +200,20 @@ void ParticleEmitter::Emit(int count,
         //    以后复用同一个槽位就不再 new 新对象
         if (type == ParticleType::Model3D) {
             if (needNewVisual) {
-                Object3d* o = new Object3d();
+                auto o = std::make_unique<Object3d>();
                 o->Initialize(objCommon_);
-                o->SetModel(modelOrTex);  // 模型路径
+                o->SetModel(modelOrTex);
                 o->SetCamera(objCommon_->GetDefaultCamera());
                 o->SetEnableLighting(false);
-                modelPool_.push_back(o);
+                modelPool_.push_back(std::move(o));
             }
         }
         else { // Sprite 粒子
             if (needNewVisual) {
-                Sprite* s = new Sprite();
-                s->Initialize(sprCommon_, modelOrTex); // 图片路径
-
-                // 如果你有“使用原图尺寸”的逻辑，可以在这里决定要不要 SetSize
-                // s->SetSize({32, 32});
-
+                auto s = std::make_unique<Sprite>();
+                s->Initialize(sprCommon_, modelOrTex);
                 s->SetVisible(true);
-                spritePool_.push_back(s);
+                spritePool_.push_back(std::move(s));
             }
         }
     }
@@ -310,7 +295,7 @@ void ParticleEmitter::Update(float dt)
         }
         if (p.type == ParticleType::Model3D)
         {
-            Object3d* o = modelPool_[modelID++];
+            Object3d* o = modelPool_[modelID++].get();
             o->SetTranslate(p.position);
             o->SetRotate({ 0, p.rotation, 0 });
             o->SetScale({ p.scale,p.scale,p.scale });
@@ -320,7 +305,7 @@ void ParticleEmitter::Update(float dt)
         }
         else
         {
-            Sprite* s = spritePool_[spriteID++];
+            Sprite* s = spritePool_[spriteID++].get();
             s->SetPosition({ p.position.x, p.position.y });
             s->SetRotation(p.rotation);
             s->SetColor(p.color);

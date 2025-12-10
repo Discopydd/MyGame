@@ -6,18 +6,18 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
-
+#include <memory>
 #include <map/MapChipField.h>
 #include <player/Player.h>
-
+#include <utility>
 class ItemManager {
 public:
     struct ItemVisual {
         uint32_t x = 0, y = 0;
-        Object3d* obj = nullptr;
+        std::unique_ptr<Object3d> obj;
     };
     struct PickupEffect {
-        Object3d* obj = nullptr;
+        std::unique_ptr<Object3d> obj;
         float     elapsed = 0.0f;                 // 已经播放了多久（秒）
         float     duration = 0.35f;                // 总时长（秒）
         Vector3   velocity = { 0.0f, 0.0f, 0.0f }; // 上升速度（世界单位/秒）
@@ -33,7 +33,7 @@ public:
     bool CanSpawnItem(const std::string& mapPath, uint32_t x, uint32_t y) const;
 
     // 生成好 Object3d 后注册给管理器
-    void RegisterItem(const std::string& mapPath, uint32_t x, uint32_t y, Object3d* obj);
+    void RegisterItem(const std::string& mapPath, uint32_t x, uint32_t y, std::unique_ptr<Object3d> obj);
 
     // 每帧更新：旋转 & Update
     void Update(float dt);

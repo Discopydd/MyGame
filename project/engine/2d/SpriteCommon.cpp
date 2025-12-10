@@ -3,6 +3,9 @@
 
 void SpriteCommon::Initialize(DirectXCommon* dxCommon)
 {
+	if (dxCommon_ != nullptr) {
+		return;
+	}
 	dxCommon_ = dxCommon;
 	GraphicsPipelineInitialize();
 }

@@ -13,7 +13,7 @@ enum class EnemyType : uint8_t {
 class Enemy {
 public:
     Enemy() = default;
-    ~Enemy();
+     ~Enemy() = default;
 
     // 初始化：指定共通资源、相机、出生位置、敌人类型
     void Initialize(
@@ -37,7 +37,7 @@ public:
     void StartHitReaction(float duration);
     bool IsHitReacting() const { return isHitReacting_; }
 private:
-    Object3d*    obj_      = nullptr;
+    std::unique_ptr<Object3d> obj_;
     Vector3      position_{};
     EnemyType    type_{ EnemyType::Type0 };
 
