@@ -5,7 +5,7 @@
 #include "Object3d.h"
 #include "Camera.h"
 #include "WinApp.h"
-
+#include <memory>
 class CoinUIManager {
 public:
     CoinUIManager() = default;
@@ -36,11 +36,11 @@ private:
     float           hpNdcZ_         = 0.08f;
 
     // 3D coin 模型
-    Object3d* coinObj_ = nullptr;
-
-    // 冒号 ":" + 3 个数字 sprite
-    Sprite* colonSprite_ = nullptr;
-    Sprite* digitSprites_[3] = { nullptr, nullptr, nullptr };
+    std::unique_ptr<Object3d> coinObj_;
+    std::unique_ptr<Sprite>   colonSprite_;
+    std::unique_ptr<Sprite>   digitSprites_[3] = {
+        nullptr, nullptr, nullptr
+    };
 
     int   totalCoin_ = 0;
     int   lastCoin_  = -1;

@@ -5,7 +5,7 @@
 #include "WinApp.h"
 #include "MyMath.h"
 #include <vector>
-
+#include <memory>
 // 需要用到 Player 的 GetHpRatio
 #include <player/Player.h>
 
@@ -36,7 +36,7 @@ private:
     Camera*         camera_         = nullptr;
     Player*         player_         = nullptr;
 
-    std::vector<Object3d*> strips_;   // 每一段血条
+    std::vector<std::unique_ptr<Object3d>> strips_;   // 每一段血条
 
     int   segments_      = 5;        // 总段数
     int   visibleCount_  = 5;        // 当前可见段数

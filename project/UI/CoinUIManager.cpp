@@ -14,7 +14,7 @@ void CoinUIManager::Initialize(SpriteCommon* spriteCommon,
     hpNdcZ_         = hpNdcZ;
 
     // ==== 右上角 Coin UI（3D 模型） ====
-    coinObj_ = new Object3d();
+    coinObj_ = std::make_unique<Object3d>();
     coinObj_->Initialize(object3dCommon_);
     coinObj_->SetModel("coin_ui/coin_ui.obj");
     coinObj_->SetCamera(camera_);
@@ -22,13 +22,13 @@ void CoinUIManager::Initialize(SpriteCommon* spriteCommon,
     coinObj_->SetEnableLighting(true);
 
     // ==== Coin 数字 UI (Sprite) ====
-    colonSprite_ = new Sprite();
+    colonSprite_ = std::make_unique<Sprite>();
     colonSprite_->Initialize(spriteCommon_, "Resources/numbers/colon.png");
     colonSprite_->SetSize({ 24.0f, 24.0f });
 
     // 先全部初始化成 0.png，之后在 UpdateDigits_ 里切换贴图
     for (int i = 0; i < 3; ++i) {
-        digitSprites_[i] = new Sprite();
+        digitSprites_[i] = std::make_unique<Sprite>();
         digitSprites_[i]->Initialize(spriteCommon_, "Resources/numbers/0.png");
         digitSprites_[i]->SetSize({ 24.0f, 24.0f });
     }
@@ -40,20 +40,11 @@ void CoinUIManager::Initialize(SpriteCommon* spriteCommon,
 
 void CoinUIManager::Finalize()
 {
-    if (colonSprite_) {
-        delete colonSprite_;
-        colonSprite_ = nullptr;
-    }
+    colonSprite_.reset();
     for (int i = 0; i < 3; ++i) {
-        if (digitSprites_[i]) {
-            delete digitSprites_[i];
-            digitSprites_[i] = nullptr;
-        }
+        digitSprites_[i].reset();
     }
-    if (coinObj_) {
-        delete coinObj_;
-        coinObj_ = nullptr;
-    }
+    coinObj_.reset();
 }
 
 void CoinUIManager::SetTotalCoin(int total)

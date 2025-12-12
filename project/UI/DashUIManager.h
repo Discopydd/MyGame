@@ -2,7 +2,7 @@
 #include "SpriteCommon.h"
 #include "Sprite.h"
 #include <player/Player.h>
-
+#include <memory>
 class DashUIManager {
 public:
     DashUIManager() = default;
@@ -18,6 +18,6 @@ private:
     SpriteCommon* spriteCommon_ = nullptr;
     Player*       player_       = nullptr;
 
-    Sprite* icon_      = nullptr; // 技能图标
-    Sprite* overlay_   = nullptr; // 冷却灰罩
+    std::unique_ptr<Sprite> icon_;    // 技能图标
+    std::unique_ptr<Sprite> overlay_; // 冷却灰罩
 };

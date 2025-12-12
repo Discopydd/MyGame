@@ -59,39 +59,45 @@ Vector3 ScreenToWorld(float screenX, float screenY, float ndcZ, Camera* camera)
 }
 
 void GameScene::GenerateBlocks() {
+    // 先清理旧的方块 / 水块 / 平台 / 敌人
+    mapBlocks_.clear();
+    waterBlocks_.clear();
+    movingPlatforms_.clear();
+    enemies_.clear();
+
     for (uint32_t y = 0; y < mapChipField_.numBlockVertical_; y++) {
         for (uint32_t x = 0; x < mapChipField_.numBlockHorizontal_; x++) {
-            // 获取当前格子类型
-            MapChipType type = mapChipField_.GetMapChipTypeByIndex(x, y);
-            Vector3 position = mapChipField_.GetMapChipPositionByIndex(x, y);
-            // 如果是方块（kBlock），创建3D对象
+            MapChipType type     = mapChipField_.GetMapChipTypeByIndex(x, y);
+            Vector3     position = mapChipField_.GetMapChipPositionByIndex(x, y);
+
+            // 普通方块
             if (type == MapChipType::kBlock) {
-                Object3d* block = new Object3d();
-                block->Initialize(object3dCommon_);
-                block->SetModel("cube/cube.obj");       // 使用方块模型
-                block->SetCamera(camera_);
-                // 设置方块位置（根据格子索引转换为世界坐标）
+                auto block = std::make_unique<Object3d>();
+                block->Initialize(object3dCommon_.get());
+                block->SetModel("cube/cube.obj");
+                block->SetCamera(camera_.get());
                 block->SetTranslate(position);
-                // 添加到方块列表
-                mapBlocks_.push_back(block);
+                mapBlocks_.push_back(std::move(block));
             }
+            // 第二种方块
             else if (type == MapChipType::kBlock2) {
-                Object3d* block2 = new Object3d();
-                block2->Initialize(object3dCommon_);
+                auto block2 = std::make_unique<Object3d>();
+                block2->Initialize(object3dCommon_.get());
                 block2->SetModel("cube2/cube2.obj");
-                block2->SetCamera(camera_);
+                block2->SetCamera(camera_.get());
                 block2->SetTranslate(position);
-                mapBlocks_.push_back(block2);
+                mapBlocks_.push_back(std::move(block2));
             }
+            // 传送门（可视方块）
             else if (type == MapChipType::kPortal) {
-                // 创建传送门可视化对象（例如使用不同颜色的方块）
-                Object3d* portal = new Object3d();
-                portal->Initialize(object3dCommon_);
-                portal->SetModel("door/Door.obj"); // 特殊传送门模型
-                portal->SetCamera(camera_);
+                auto portal = std::make_unique<Object3d>();
+                portal->Initialize(object3dCommon_.get());
+                portal->SetModel("door/Door.obj");
+                portal->SetCamera(camera_.get());
                 portal->SetTranslate(position);
-                mapBlocks_.push_back(portal);
+                mapBlocks_.push_back(std::move(portal));
             }
+            // 道具格
             else if (type == MapChipType::kItem) {
                 if (!itemMgr_) { continue; }
 
@@ -101,9 +107,9 @@ void GameScene::GenerateBlocks() {
                 }
 
                 auto item = std::make_unique<Object3d>();
-                item->Initialize(object3dCommon_);
+                item->Initialize(object3dCommon_.get());
                 item->SetModel("coin/coin.obj");
-                item->SetCamera(camera_);
+                item->SetCamera(camera_.get());
 
                 Vector3 itemPos = position;
                 itemPos.y += 0.4f;
@@ -114,30 +120,32 @@ void GameScene::GenerateBlocks() {
 
                 itemMgr_->RegisterItem(currentMapPath_, x, y, std::move(item));
             }
+            // 地刺
             else if (type == MapChipType::kSpike) {
-                Object3d* spike = new Object3d();
-                spike->Initialize(object3dCommon_);
-                spike->SetModel("strip/strip.obj");   // 使用地刺模型
-                spike->SetCamera(camera_);
+                auto spike = std::make_unique<Object3d>();
+                spike->Initialize(object3dCommon_.get());
+                spike->SetModel("strip/strip.obj");
+                spike->SetCamera(camera_.get());
 
-                // 视情况微调一下高度（例如让刺从地面冒出来一点）
                 Vector3 spikePos = position;
-                spikePos.y -= 0.1f;                   // 根据模型大小自己调
+                spikePos.y -= 0.1f;
                 spike->SetTranslate(spikePos);
                 spike->SetLightingMode(2);
-                mapBlocks_.push_back(spike);
+                mapBlocks_.push_back(std::move(spike));
             }
-            else if (type == MapChipType::kWater) {     // 水方块
-                Object3d* water = new Object3d();
-                water->Initialize(object3dCommon_);
+            // 水块
+            else if (type == MapChipType::kWater) {
+                auto water = std::make_unique<Object3d>();
+                water->Initialize(object3dCommon_.get());
                 water->SetModel("water/water.obj");
-                water->SetCamera(camera_);
+                water->SetCamera(camera_.get());
                 water->SetTranslate(position);
                 Vector4 color = water->GetColor();
                 color.w = 0.5f;
                 water->SetColor(color);
-                waterBlocks_.push_back(water);
+                waterBlocks_.push_back(std::move(water));
             }
+            // 敌人
             else if (type == MapChipType::kEnemy) {
                 uint8_t subID = mapChipField_.GetMapChipSubIDByIndex(x, y);
 
@@ -146,12 +154,14 @@ void GameScene::GenerateBlocks() {
                     eType = EnemyType::Type1;
                 }
 
-                Enemy* enemy = new Enemy();
-                enemy->Initialize(object3dCommon_, camera_, position, eType);
-                enemies_.push_back(enemy);
+                auto enemy = std::make_unique<Enemy>();
+                enemy->Initialize(object3dCommon_.get(), camera_.get(), position, eType);
+                enemies_.push_back(std::move(enemy));
             }
         }
     }
+
+    // === 生成左右移动平台（连续的 kMoveHorizontal 一条为一个 MovingPlatform）===
     for (uint32_t y = 0; y < mapChipField_.numBlockVertical_; ++y) {
         uint32_t x = 0;
         while (x < mapChipField_.numBlockHorizontal_) {
@@ -161,39 +171,38 @@ void GameScene::GenerateBlocks() {
                 continue;
             }
 
-            // 找这一条连续 5 的长度
             uint32_t startX = x;
-            uint32_t endX = x;
+            uint32_t endX   = x;
             while (endX + 1 < mapChipField_.numBlockHorizontal_ &&
-                mapChipField_.GetMapChipTypeByIndex(endX + 1, y) == MapChipType::kMoveHorizontal) {
+                   mapChipField_.GetMapChipTypeByIndex(endX + 1, y) == MapChipType::kMoveHorizontal) {
                 ++endX;
             }
 
             int length = static_cast<int>(endX - startX + 1);
 
-            Vector3 leftPos = mapChipField_.GetMapChipPositionByIndex(startX, y);
+            Vector3 leftPos  = mapChipField_.GetMapChipPositionByIndex(startX, y);
             Vector3 rightPos = mapChipField_.GetMapChipPositionByIndex(endX, y);
             Vector3 center{};
             center.x = (leftPos.x + rightPos.x) * 0.5f;
             center.y = leftPos.y;
             center.z = leftPos.z;
 
-            auto* platform = new MovingPlatform();
+            auto platform = std::make_unique<MovingPlatform>();
             platform->Initialize(
-                object3dCommon_,
-                camera_,
+                object3dCommon_.get(),
+                camera_.get(),
                 center,
                 MovingPlatform::Axis::Horizontal,
-                movingPlatformSpeed_,   // 右→左速度，负数就反向
+                movingPlatformSpeed_,
                 length
             );
-            movingPlatforms_.push_back(platform);
+            movingPlatforms_.push_back(std::move(platform));
 
-            x = endX + 1; // 跳过这一段
+            x = endX + 1;
         }
     }
 
-    // === 生成上下移动平台（连续的 kMoveUD 一条为一个 MovingPlatform）===
+    // === 生成上下移动平台（连续的 kMoveVertical 一条为一个 MovingPlatform）===
     for (uint32_t y = 0; y < mapChipField_.numBlockVertical_; ++y) {
         uint32_t x = 0;
         while (x < mapChipField_.numBlockHorizontal_) {
@@ -203,195 +212,197 @@ void GameScene::GenerateBlocks() {
                 continue;
             }
 
-            // 找这一行里连续 6 的长度
             uint32_t startX = x;
-            uint32_t endX = x;
+            uint32_t endX   = x;
             while (endX + 1 < mapChipField_.numBlockHorizontal_ &&
-                mapChipField_.GetMapChipTypeByIndex(endX + 1, y) == MapChipType::kMoveVertical) {
+                   mapChipField_.GetMapChipTypeByIndex(endX + 1, y) == MapChipType::kMoveVertical) {
                 ++endX;
             }
 
             int length = static_cast<int>(endX - startX + 1);
 
-            Vector3 leftPos = mapChipField_.GetMapChipPositionByIndex(startX, y);
+            Vector3 leftPos  = mapChipField_.GetMapChipPositionByIndex(startX, y);
             Vector3 rightPos = mapChipField_.GetMapChipPositionByIndex(endX, y);
             Vector3 center{};
-            center.x = (leftPos.x + rightPos.x) * 0.5f;   // 中点
+            center.x = (leftPos.x + rightPos.x) * 0.5f;
             center.y = leftPos.y;
             center.z = leftPos.z;
 
-            auto* platform = new MovingPlatform();
+            auto platform = std::make_unique<MovingPlatform>();
             platform->Initialize(
-                object3dCommon_,
-                camera_,
+                object3dCommon_.get(),
+                camera_.get(),
                 center,
-                MovingPlatform::Axis::Vertical,          // ★ 上下移动
+                MovingPlatform::Axis::Vertical,
                 movingPlatformSpeed_,
-                length                                    // ★ 这一条上有多少个 6
+                length
             );
-            movingPlatforms_.push_back(platform);
+            movingPlatforms_.push_back(std::move(platform));
 
-            x = endX + 1; // 跳过这一段 6
+            x = endX + 1;
         }
     }
 }
 
 void GameScene::Initialize() {
-    winApp_ = WinApp::GetInstance();
-    dxCommon_ = DirectXCommon::GetInstance();
-    input_ = Input::GetInstance();
-    srvManager_ = SrvManager::GetInstance();
+    winApp_      = WinApp::GetInstance();
+    dxCommon_    = DirectXCommon::GetInstance();
+    input_       = Input::GetInstance();
+    srvManager_  = SrvManager::GetInstance();
+    spriteCommon_= SpriteCommon::GetInstance();
 
-    spriteCommon_ = SpriteCommon::GetInstance();
-
-
+    // 纹理管理器（单例）初始化
     TextureManager::GetInstance()->Initialize(dxCommon_, srvManager_);
 
-
+    // === 背景 Sprite ===
     const std::string kSkyTexPath = "Resources/sky_bg.png";
 
-        backgroundSprite_ = new Sprite();
-        backgroundSprite_->Initialize(spriteCommon_, kSkyTexPath);
+    backgroundSprite_ = std::make_unique<Sprite>();
+    backgroundSprite_->Initialize(spriteCommon_, kSkyTexPath);
+    backgroundSprite_->SetPosition({ 0.0f, 0.0f });
+    backgroundSprite_->SetSize({
+        static_cast<float>(WinApp::kClientWidth),
+        static_cast<float>(WinApp::kClientHeight)
+    });
 
-        // 左上角对齐屏幕
-        backgroundSprite_->SetPosition({ 0.0f, 0.0f });
-        backgroundSprite_->SetSize({
-            (float)WinApp::kClientWidth,
-            (float)WinApp::kClientHeight
-            });
-    imguiManager_ = new ImGuiManager();
+    // === ImGui 管理器 ===
+    imguiManager_ = std::make_unique<ImGuiManager>();
     imguiManager_->Initialize(winApp_, dxCommon_, srvManager_);
 
-    object3dCommon_ = new Object3dCommon();
+    // === 3D 共通 & 摄像机 ===
+    object3dCommon_ = std::make_unique<Object3dCommon>();
     object3dCommon_->Initialize(dxCommon_);
 
     ModelManager::GetInstants()->Initialize(dxCommon_);
+
     SoundManager* soundMgr = SoundManager::GetInstance();
     soundMgr->Initialize();
     soundMgr->LoadWav("fanfare", "resources/fanfare.wav");
 
-    camera_ = new Camera();
+    camera_ = std::make_unique<Camera>();
     camera_->SetRotate({ 0, 0, 0 });
-    object3dCommon_->SetDefaultCamera(camera_);
+    object3dCommon_->SetDefaultCamera(camera_.get());
 
+    // 预先加载所有需要的模型
     ModelManager::GetInstants()->LoadModel("cube/cube.obj");
     ModelManager::GetInstants()->LoadModel("player/player.obj");
     ModelManager::GetInstants()->LoadModel("door/Door.obj");
-    ModelManager::GetInstants()->LoadModel("strip/strip.obj");        // 载入模型
+    ModelManager::GetInstants()->LoadModel("strip/strip.obj");
     ModelManager::GetInstants()->LoadModel("coin/coin.obj");
     ModelManager::GetInstants()->LoadModel("coin_ui/coin_ui.obj");
     ModelManager::GetInstants()->LoadModel("snow/snow.obj");
     ModelManager::GetInstants()->LoadModel("jump/jump.obj");
     ModelManager::GetInstants()->LoadModel("star/star.obj");
     ModelManager::GetInstants()->LoadModel("hurd/hurd.obj");
-    ModelManager::GetInstants()->LoadModel("cube2/cube2.obj"); 
+    ModelManager::GetInstants()->LoadModel("cube2/cube2.obj");
     ModelManager::GetInstants()->LoadModel("water/water.obj");
     ModelManager::GetInstants()->LoadModel("enemy0/enemy0.obj");
     ModelManager::GetInstants()->LoadModel("enemy1/enemy1.obj");
 
-    player_ = new Player();
-    player_->Initialize(object3dCommon_, camera_);
-    // === HP 3D 条管理器 ===
-    hpBar_ = new HPBar3DManager();
-    hpBar_->Initialize(object3dCommon_, camera_, player_, hpNdcZ_);
+    // === 玩家 ===
+    player_ = std::make_unique<Player>();
+    player_->Initialize(object3dCommon_.get(), camera_.get());
 
-    playerCamera_ = new PlayerCamera();
-    playerCamera_->Initialize(camera_, player_, &mapChipField_);
+    // === HP 3D 条管理器 ===
+    hpBar_ = std::make_unique<HPBar3DManager>();
+    hpBar_->Initialize(object3dCommon_.get(), camera_.get(), player_.get(), hpNdcZ_);
+
+    // === 跟随摄像机 ===
+    playerCamera_ = std::make_unique<PlayerCamera>();
+    playerCamera_->Initialize(camera_.get(), player_.get(), &mapChipField_);
     playerCamera_->SetOffset({ 0, 0.0f, -40.0f });
     playerCamera_->SetFollowSpeed(0.1f);
     playerCamera_->SetConstrainToMap(true);
 
     prevCameraPos_ = camera_->GetTransform().translate;
 
-     // === 冲刺技能 UI 管理器 ===
-    dashUI_ = new DashUIManager();
-    dashUI_->Initialize(spriteCommon_, player_);
+    // === 冲刺技能 UI 管理器 ===
+    dashUI_ = std::make_unique<DashUIManager>();
+    dashUI_->Initialize(spriteCommon_, player_.get());
 
-     // === Coin UI 管理器 ===
-    coinUI_ = new CoinUIManager();
-    coinUI_->Initialize(spriteCommon_, object3dCommon_, camera_, hpNdcZ_);
-
-    // 一开始显示当前总金币数（通常是 0）
+    // === Coin UI 管理器 ===
+    coinUI_ = std::make_unique<CoinUIManager>();
+    coinUI_->Initialize(spriteCommon_, object3dCommon_.get(), camera_.get(), hpNdcZ_);
     coinUI_->SetTotalCoin(totalCoinCollected_);
 
-      // === Hint UI 管理器 ===
-    hintUI_ = new HintUIManager();
-    hintUI_->Initialize(spriteCommon_, camera_);
+    // === Hint UI 管理器 ===
+    hintUI_ = std::make_unique<HintUIManager>();
+    hintUI_->Initialize(spriteCommon_, camera_.get());
 
-    // 把 GameScene 里的 HintSprite 指针交给管理器
+    // 把 GameScene 里的 HintSprite 指针交给管理器（注意：这里是借用指针）
     hintUI_->SetSpaceHint(&spaceHint_);
     hintUI_->SetShiftHint(&shiftHint_);
     hintUI_->SetSprintHint(&sprintHint_);
     hintUI_->SetUpHints(&upHints_);
 
-        // === Item 管理器 ===
-    itemMgr_ = new ItemManager();
-    itemMgr_->Initialize(object3dCommon_, camera_);
-     // === Portal 管理器 ===
-    portalMgr_ = new PortalManager();
-    portalMgr_->Initialize(spriteCommon_, camera_);
+    // === Item 管理器 ===
+    itemMgr_ = std::make_unique<ItemManager>();
+    itemMgr_->Initialize(object3dCommon_.get(), camera_.get());
+
+    // === Portal 管理器 ===
+    portalMgr_ = std::make_unique<PortalManager>();
+    portalMgr_->Initialize(spriteCommon_, camera_.get());
 
     isMapLoading_ = false;
     loadingTimer_ = 0.0f;
 
-       // === Fade 管理器 ===
-    fade_ = new FadeManager();
+    // === Fade 管理器 ===
+    fade_ = std::make_unique<FadeManager>();
     fade_->Initialize(spriteCommon_);
 
-       // === Intro 管理器 ===
-    intro_ = new IntroManager();
+    // === Intro 管理器 ===
+    intro_ = std::make_unique<IntroManager>();
     intro_->Initialize(spriteCommon_, input_);
 
     // === GameOver 管理器 ===
-    gameOver_ = new GameOverManager();
+    gameOver_ = std::make_unique<GameOverManager>();
     gameOver_->Initialize(spriteCommon_);
 
     // === GameClear 管理器 ===
-    gameClear_ = new GameClearManager();
-    gameClear_->Initialize(spriteCommon_, object3dCommon_, camera_, hpNdcZ_);
+    gameClear_ = std::make_unique<GameClearManager>();
+    gameClear_->Initialize(spriteCommon_, object3dCommon_.get(), camera_.get(), hpNdcZ_);
 
-    particleMgr_ = new ParticleManager();
-    particleMgr_->Initialize(object3dCommon_, spriteCommon_);
-    emitter2D_ = particleMgr_->CreateEmitter();  // 用来发 2D 粒子
-    emitter3D_ = particleMgr_->CreateEmitter();  // 用来发 3D 粒子
-    windEmitter_ = particleMgr_->CreateEmitter();
-    snowEmitter_ = particleMgr_->CreateEmitter();
+    // === 粒子系统 ===
+    particleMgr_ = std::make_unique<ParticleManager>();
+    particleMgr_->Initialize(object3dCommon_.get(), spriteCommon_);
+
+    emitter2D_       = particleMgr_->CreateEmitter();
+    emitter3D_       = particleMgr_->CreateEmitter();
+    windEmitter_     = particleMgr_->CreateEmitter();
+    snowEmitter_     = particleMgr_->CreateEmitter();
     dashStarEmitter_ = particleMgr_->CreateEmitter();
+
     if (windEmitter_) {
         windEmitter_->SetWindMode(true);
         windEmitter_->SetUseOriginalSpriteSize(true);
         windEmitter_->SetMaxParticles(40);
     }
-    
+
     if (snowEmitter_) {
-        // 让这个发射器进入“雪花模式”，下面会在 ParticleEmitter 里实现
         snowEmitter_->SetSnowMode(true);
-        // 同屏最多 200 片雪，别太多
         snowEmitter_->SetMaxParticles(200);
         snowEmitter_->SetFollowCamera(true);
     }
+
     if (dashStarEmitter_) {
-        dashStarEmitter_->SetMaxParticles(150);   // 自己喜欢可以再调
+        dashStarEmitter_->SetMaxParticles(150);
         dashStarEmitter_->SetSnowMode(false);
         dashStarEmitter_->SetWindMode(false);
-        dashStarEmitter_->SetFollowCamera(false); // 尾气留在世界里即可
+        dashStarEmitter_->SetFollowCamera(false);
     }
+
     // === Hub（map2）的关卡配置 ===
     hubStageByMap_.clear();
-    //  第1关: map3.csv
-    //  第2关: map4.csv
-    //  第3关: map5.csv
-    //  最终关: map6.csv
     hubStageByMap_["Resources/map/map3.csv"] = 0; // Stage 0
     hubStageByMap_["Resources/map/map4.csv"] = 1; // Stage 1
     hubStageByMap_["Resources/map/map5.csv"] = 2; // Stage 2
     hubStageByMap_["Resources/map/map6.csv"] = 3; // Stage 3 (最终关)
-    hubProgress_ = 0;
+    hubProgress_      = 0;
     allStagesCleared_ = false;
 
-    playerIndexHistoryCursor_ = 0;
+    playerIndexHistoryCursor_      = 0;
     playerIndexHistoryInitialized_ = false;
-    playerIndexOneSecAgo_ = MapChipField::IndexSet{};
+    playerIndexOneSecAgo_          = MapChipField::IndexSet{};
 }
 
 void GameScene::Update() {
@@ -400,18 +411,18 @@ void GameScene::Update() {
     backgroundSprite_->Update();
     // —— 是否允许玩家操作（淡出/加载/淡入期间 & 开场演出期间都禁止）——
     const bool isFading = (fade_ && fade_->GetPhase() != FadePhase::None);
-    const bool inIntro    = (intro_ && intro_->IsPlaying());
-    const bool inGameOver  = (gameOver_ && gameOver_->IsPlaying());
+    const bool inIntro = (intro_ && intro_->IsPlaying());
+    const bool inGameOver = (gameOver_ && gameOver_->IsPlaying());
     const bool inGameClear = (gameClear_ && gameClear_->IsPlaying());
     const bool canControl = !(isFading || inIntro || inGameOver || inGameClear);
-   
-       // ===== Intro 驱动（在加载/淡出等早退之前执行，但不盖过Loading）=====
+
+    // ===== Intro 驱动（在加载/淡出等早退之前执行，但不盖过Loading）=====
     if (fade_ && fade_->GetPhase() == FadePhase::None && intro_) {
         intro_->Update(deltaTime);
         // Intro 自己会更新内部 sprite 的属性，这里不用再手动 Update
     }
 
-      // ===== 画面淡入淡出状态机（优先执行）=====
+    // ===== 画面淡入淡出状态机（优先执行）=====
     if (fade_ && fade_->GetPhase() == FadePhase::FadingOut) {
         // 1) alpha 逐帧增加
         float a = fade_->GetAlpha();
@@ -426,7 +437,8 @@ void GameScene::Update() {
                 fade_->SetReachedBlack(true);
                 // 第一次到纯黑，先 return，让这一帧只显示纯黑
                 return;
-            } else if (fade_->GetBlackHoldFrames() > 0) {
+            }
+            else if (fade_->GetBlackHoldFrames() > 0) {
                 fade_->SetBlackHoldFrames(fade_->GetBlackHoldFrames() - 1);
                 return;
             }
@@ -542,10 +554,21 @@ void GameScene::Update() {
     imguiManager_->Begin();
     playerCamera_->Update();
 
-    for (auto* p : movingPlatforms_) {
-        p->Update(deltaTime, mapChipField_, movingPlatforms_);
+    std::vector<MovingPlatform*> platformPtrs;
+    platformPtrs.reserve(movingPlatforms_.size());
+    for (auto& mp : movingPlatforms_) {
+        platformPtrs.push_back(mp.get());
     }
-    for (auto* e : enemies_) {
+
+    // 平台自身 Update（传 platformPtrs 给它做平台-平台碰撞）
+    for (auto* p : platformPtrs) {
+        if (p) {
+            p->Update(deltaTime, mapChipField_, platformPtrs);
+        }
+    }
+
+    // 敌人 Update
+    for (auto& e : enemies_) {
         if (e) {
             e->Update(deltaTime);
         }
@@ -553,26 +576,26 @@ void GameScene::Update() {
     // 淡入淡出/加载/演出期间都不可操作
     player_->Update(canControl ? input_ : nullptr, mapChipField_);
 
-  // ========= 阶段1：两条移动平台互相夹住玩家 =========
+    // ========= 阶段1：两条移动平台互相夹住玩家 =========
     crushedByPlatformThisFrame_ = false;
-    damagedByEnemyThisFrame_    = false;
+    damagedByEnemyThisFrame_ = false;
     if (player_ && !player_->IsDead() && !player_->IsInvincible()) {
 
         Vector3 pPos = player_->GetPosition();
         float halfW = player_->GetWidth() * 0.5f;
         float halfH = player_->GetHeight() * 0.5f;
 
-        float left   = pPos.x - halfW;
-        float right  = pPos.x + halfW;
+        float left = pPos.x - halfW;
+        float right = pPos.x + halfW;
         float bottom = pPos.y - halfH;
-        float top    = pPos.y + halfH;
+        float top = pPos.y + halfH;
 
         int overlapPlatformCount = 0;
-        for (auto* plat : movingPlatforms_) {
+        for (auto* plat : platformPtrs) {
             if (!plat) continue;
             MapChipField::Rect r = plat->GetRect();
             bool overlapX = !(right <= r.left || left >= r.right);
-            bool overlapY = !(top   <= r.bottom || bottom >= r.top);
+            bool overlapY = !(top <= r.bottom || bottom >= r.top);
             if (overlapX && overlapY) {
                 ++overlapPlatformCount;
                 if (overlapPlatformCount >= 2) {
@@ -583,7 +606,7 @@ void GameScene::Update() {
             }
         }
     }
-     // ========= 玩家与敌人的碰撞 =========
+    // ========= 玩家与敌人的碰撞 =========
     if (player_ && !player_->IsDead()) {
 
         Vector3 pPos = player_->GetPosition();
@@ -596,7 +619,8 @@ void GameScene::Update() {
         float pBottom = pPos.y - pHalfH;
         float pTop = pPos.y + pHalfH;
 
-        for (auto* enemy : enemies_) {
+        for (auto& enemyPtr : enemies_) {
+            Enemy* enemy = enemyPtr.get();
             if (!enemy) { continue; }
 
             Vector3 ePos = enemy->GetPosition();
@@ -651,10 +675,10 @@ void GameScene::Update() {
         float halfW = player_->GetWidth() * 0.5f;
         float halfH = player_->GetHeight() * 0.5f;
 
-        float left   = pPos.x - halfW;
-        float right  = pPos.x + halfW;
+        float left = pPos.x - halfW;
+        float right = pPos.x + halfW;
         float bottom = pPos.y - halfH;
-        float top    = pPos.y + halfH;
+        float top = pPos.y + halfH;
 
         // 2a) 若此时玩家 AABB 已经扎进任何 Block/Spike/Portal，就认为是被平台挤进去
         auto minIdx = mapChipField_.GetMapChipIndexByPosition({ left,  bottom, 0.0f });
@@ -722,7 +746,7 @@ void GameScene::Update() {
             "jump/jump.obj",           // 暂定使用 cube 模型
             spawnPos,
             4.0f, 8.0f,                // 速度范围：向四周炸开的感觉
-            0.25f, 0.45f,horizontalBias                 // 生命周期：短一点，看起来干脆利落
+            0.25f, 0.45f, horizontalBias                 // 生命周期：短一点，看起来干脆利落
         );
     }
 
@@ -746,13 +770,13 @@ void GameScene::Update() {
             pos,
             2.0f, 4.0f,             // 速度
             0.08f, 0.16f,            // 寿命
-            0.0f,true
+            0.0f, true
         );
     }
-     {
-        Vector3 camPos   = camera_->GetTransform().translate;
+    {
+        Vector3 camPos = camera_->GetTransform().translate;
         Vector3 camDelta = camPos - prevCameraPos_;
-        prevCameraPos_   = camPos;
+        prevCameraPos_ = camPos;
 
         if (snowEmitter_) {
             snowEmitter_->ApplyCameraMove(camDelta);
@@ -764,13 +788,13 @@ void GameScene::Update() {
             gameOver_->Start();
         }
     }
-     if (coinUI_) {
+    if (coinUI_) {
         coinUI_->Update(deltaTime);
     }
-     if (hintUI_) {
+    if (hintUI_) {
         hintUI_->Update(deltaTime);
     }
-     // GameOver 状态机推进（交给管理器）
+    // GameOver 状态机推进（交给管理器）
     if (gameOver_) {
         gameOver_->Update(deltaTime);
     }
@@ -778,7 +802,7 @@ void GameScene::Update() {
     if (gameClear_) {
         gameClear_->Update(deltaTime);
     }
-   // ==== 刮风粒子效果（整屏 & 只在 map 中）====
+    // ==== 刮风粒子效果（整屏 & 只在 map 中）====
     if (windEmitter_ && currentMapPath_ == "Resources/map/map5.csv") {
 
         windSpawnTimer_ -= deltaTime;
@@ -836,7 +860,7 @@ void GameScene::Update() {
 
             float ndcZ = RandRangeFloat(0.45f, 0.65f);
 
-            Vector3 worldPos = ScreenToWorld(screenX, screenY, ndcZ, camera_);
+            Vector3 worldPos = ScreenToWorld(screenX, screenY, ndcZ, camera_.get());
 
             // ✅ 每次只发 1 片（或者 2 片），多次累积起来就是“连续的雪”
             snowEmitter_->Emit(
@@ -852,7 +876,7 @@ void GameScene::Update() {
     if (particleMgr_) {
         particleMgr_->Update(deltaTime);
     }
-        // === 在 GameClear 演出期间按 Space → 回标题 ===
+    // === 在 GameClear 演出期间按 Space → 回标题 ===
     if (gameClear_ && gameClear_->IsPlaying() && input_ && input_->TriggerKey(DIK_SPACE)) {
 
         if (sceneManager_) {
@@ -884,19 +908,24 @@ void GameScene::Update() {
     if (hpBar_) {
         hpBar_->Update(deltaTime);
     }
-    for (auto* block : mapBlocks_) {
-        block->Update();
+    for (auto& block : mapBlocks_) {
+        if (block) {
+            block->Update();
+        }
     }
-    for (auto* water : waterBlocks_) {
-        water->Update();
+    for (auto& water : waterBlocks_) {
+        if (water) {
+            water->Update();
+        }
     }
+
     if (itemMgr_) {
         itemMgr_->Update(deltaTime);
     }
 
     MapChipField::IndexSet playerIndex =
         mapChipField_.GetMapChipIndexByPosition(player_->GetPosition());
-  // ===== 记录玩家所在格子的历史，用于“回到 1 秒前的位置” =====
+    // ===== 记录玩家所在格子的历史，用于“回到 1 秒前的位置” =====
     if (!playerIndexHistoryInitialized_) {
         // 初次：用当前格子填满整个缓冲区，避免读到垃圾数据
         for (int i = 0; i < kPlayerIndexHistoryFrameCount_; ++i) {
@@ -955,7 +984,7 @@ void GameScene::Update() {
         }
 
         // 被平台夹死照旧用 crushedByPlatformThisFrame_（全格判定）
-        if ((onSpike || crushedByPlatformThisFrame_|| damagedByEnemyThisFrame_) &&
+        if ((onSpike || crushedByPlatformThisFrame_ || damagedByEnemyThisFrame_) &&
             !player_->IsDead() && !player_->IsInvincible()) {
 
             MapChipField::IndexSet safeIndex = playerIndexOneSecAgo_;
@@ -964,7 +993,7 @@ void GameScene::Update() {
             MapChipType safeType =
                 mapChipField_.GetMapChipTypeByIndex(safeIndex.xIndex, safeIndex.yIndex);
 
-            if (safeType == MapChipType::kSpike|| safeType == MapChipType::kEnemy) {
+            if (safeType == MapChipType::kSpike || safeType == MapChipType::kEnemy) {
                 MapChipField::IndexSet firstNonSpike{};
                 bool found = false;
 
@@ -1002,7 +1031,7 @@ void GameScene::Update() {
             player_->StartInvincible(1.0f);
         }
     }
-        // 更新传送门提示图标（是否显示 + 位置）
+    // 更新传送门提示图标（是否显示 + 位置）
     const PortalInfo* currentPortal = nullptr;
     if (portalMgr_) {
         portalMgr_->UpdateHint(playerIndex, player_->GetPosition(), canControl);
@@ -1010,7 +1039,7 @@ void GameScene::Update() {
     }
 
     if (itemMgr_) {
-        bool picked = itemMgr_->OnPlayerStepOnTile(currentMapPath_, playerIndex, mapChipField_, player_);
+        bool picked = itemMgr_->OnPlayerStepOnTile(currentMapPath_, playerIndex, mapChipField_, player_.get());
         if (picked) {
             ++totalCoinCollected_;
             if (coinUI_) {
@@ -1154,47 +1183,56 @@ void GameScene::Draw() {
 
     // 是否处于 GameClear 演出中
     bool inGameClear = (gameClear_ && gameClear_->IsPlaying());
-     // ================== 0) 背景天空（2D Sprite） ==================
-    // 先切到 SRV / Sprite 的绘制状态，然后画一个全屏的天空
+
+    // ================== 0) 背景天空（2D Sprite） ==================
     srvManager_->PreDraw();
     spriteCommon_->CommonDraw();
     if (backgroundSprite_) {
         backgroundSprite_->Draw();
     }
     dxCommon_->ClearDepthBuffer();
+
     // ================== 1) 3D 场景（地图、HP 3D条等） ==================
     srvManager_->PreDraw();
     object3dCommon_->CommonDraw();
 
     // 地图方块
-    for (auto* block : mapBlocks_) {
-        block->Draw();
+    for (auto& block : mapBlocks_) {
+        if (block) {
+            block->Draw();
+        }
     }
-    for (auto* p : movingPlatforms_) {
-        p->Draw();
+
+    // 移动平台
+    for (auto& p : movingPlatforms_) {
+        if (p) {
+            p->Draw();
+        }
     }
-    // === 敌人 ===
-    for (auto* e : enemies_) {
+
+    // 敌人
+    for (auto& e : enemies_) {
         if (e) {
             e->Draw();
         }
     }
+
     // 道具
     if (itemMgr_) {
         itemMgr_->Draw3D();
     }
+
     // HP 3D 条段
     if (hpBar_) {
         hpBar_->Draw3D();
     }
+
     // ================== 1.5) GameClear 用全屏黑背景 ==================
-    // 盖住上面的地图、道具等，让背景变成纯黑
     if (inGameClear && fade_) {
         Sprite* s = fade_->GetSprite();
         spriteCommon_->CommonDraw();
         if (s) {
-            s->SetVisible(true); // 如果有需要，让它重新可见
-
+            s->SetVisible(true);
             s->Draw();
         }
     }
@@ -1202,7 +1240,7 @@ void GameScene::Draw() {
     // ================== 2) 中间层：交互提示 Sprite ==================
     spriteCommon_->CommonDraw();
     if (!inGameClear) {
-       if (hintUI_) {
+        if (hintUI_) {
             hintUI_->Draw();
         }
 
@@ -1221,31 +1259,40 @@ void GameScene::Draw() {
             portalMgr_->DrawHint();
         }
     }
+
     // ================== 3) 前景 3D：玩家（盖住提示） ==================
     dxCommon_->ClearDepthBuffer();
 
     srvManager_->PreDraw();
     object3dCommon_->CommonDraw();
 
-     // 如果 GameClear 正在播放，就画 GameClear 的玩家，否则画正常玩家
+    // 如果 GameClear 正在播放，就画 GameClear 的玩家，否则画正常玩家
     if (gameClear_ && gameClear_->IsPlaying()) {
         gameClear_->DrawPlayer();
     }
     else {
-        player_->Draw();
-        // ==== Coin UI：右上角的 3D coin 模型 ====
+        if (player_) {
+            player_->Draw();
+        }
+
+        // 右上角 3D coin
         if (coinUI_) {
             coinUI_->Draw3D();
         }
+
+        // 3D 粒子
         if (particleMgr_) {
             particleMgr_->Draw3D();
         }
-        for (auto* water : waterBlocks_) {
+
+        // 水块（放在玩家前面）
+        for (auto& water : waterBlocks_) {
             if (water) {
                 water->Draw();
             }
         }
     }
+
     // ================== 4) 最前景 UI Sprite ==================
     spriteCommon_->CommonDraw();
 
@@ -1255,8 +1302,8 @@ void GameScene::Draw() {
     }
 
     // 黑幕淡入淡出（GameClear 时不用这个黑幕，避免挡住胜利画面）
-    if (fade_  && !inGameClear) {
-        fade_ ->Draw();
+    if (fade_ && !inGameClear) {
+        fade_->Draw();
     }
 
     // GameOver
@@ -1264,134 +1311,122 @@ void GameScene::Draw() {
         gameOver_->Draw();
     }
 
-    // GameClear
+    // GameClear 标题
     if (gameClear_) {
         gameClear_->DrawTitle();
     }
+
+    // 2D 粒子
     if (particleMgr_) {
         particleMgr_->Draw2D();
     }
+
     // ImGui（debug UI）
-    imguiManager_->Draw();
+    if (imguiManager_) {
+        imguiManager_->Draw();
+    }
 
     dxCommon_->End();
 }
 
+
 void GameScene::Finalize() {
+    // ==== 全局 / 单例资源 ====
     SoundManager::GetInstance()->Finalize();
     TextureManager::GetInstance()->Finalize();
     ModelManager::GetInstants()->Finalize();
-    imguiManager_->Finalize();
 
-    delete camera_;
-    delete playerCamera_;
-    delete object3dCommon_;
-    if (backgroundSprite_) {
-        delete backgroundSprite_;
-        backgroundSprite_ = nullptr;
+    // ==== ImGui ====
+    if (imguiManager_) {
+        imguiManager_->Finalize();
+        imguiManager_.reset();
     }
 
-    for (auto* block : mapBlocks_) {
-        delete block;
-    }
-    mapBlocks_.clear();
-    for (auto* water : waterBlocks_) {
-        delete water;
-    }
-    waterBlocks_.clear();
-    for (auto* e : enemies_) {
-        delete e;
-    }
-    enemies_.clear();
-
-    delete player_;
-    delete imguiManager_;
+    // ==== 各种管理器 / UI ====
     if (dashUI_) {
         dashUI_->Finalize();
-        delete dashUI_;
-        dashUI_ = nullptr;
+        dashUI_.reset();
     }
+
     if (portalMgr_) {
         portalMgr_->Finalize();
-        delete portalMgr_;
-        portalMgr_ = nullptr;
+        portalMgr_.reset();
     }
+
     if (fade_) {
         fade_->Finalize();
-        delete fade_;
-        fade_ = nullptr;
+        fade_.reset();
     }
 
     if (intro_) {
         intro_->Finalize();
-        delete intro_;
-        intro_ = nullptr;
+        intro_.reset();
     }
 
     if (hpBar_) {
         hpBar_->Finalize();
-        delete hpBar_;
-        hpBar_ = nullptr;
-    }
-    if (gameOver_) {
-        gameOver_->Finalize();
-        delete gameOver_;
-        gameOver_ = nullptr;
+        hpBar_.reset();
     }
 
-    if (spaceHint_.sprite) {
-        delete spaceHint_.sprite;
-        spaceHint_.sprite = nullptr;
+    if (gameOver_) {
+        gameOver_->Finalize();
+        gameOver_.reset();
     }
-    for (auto& h : upHints_) {
-        if (h.sprite) {
-            delete h.sprite;
-            h.sprite = nullptr;
-        }
-    }
-    upHints_.clear();
-    if (shiftHint_.sprite) {
-        delete shiftHint_.sprite;
-        shiftHint_.sprite = nullptr;
-    }
-    if (sprintHint_.sprite) {
-        delete sprintHint_.sprite;
-        sprintHint_.sprite = nullptr;
-    }
+
     if (itemMgr_) {
         itemMgr_->Finalize();
-        delete itemMgr_;
-        itemMgr_ = nullptr;
+        itemMgr_.reset();
     }
-    // ==== Coin UI 资源释放 ====
+
     if (coinUI_) {
         coinUI_->Finalize();
-        delete coinUI_;
-        coinUI_ = nullptr;
+        coinUI_.reset();
     }
+
     if (gameClear_) {
         gameClear_->Finalize();
-        delete gameClear_;
-        gameClear_ = nullptr;
+        gameClear_.reset();
     }
+
     if (hintUI_) {
         hintUI_->Finalize();
-        delete hintUI_;
-        hintUI_ = nullptr;
+        hintUI_.reset();
     }
+
+    // ==== 粒子系统 ====
     if (particleMgr_) {
         particleMgr_->Finalize();
-        delete particleMgr_;
-        particleMgr_ = nullptr;
-        emitter2D_ = nullptr;
-        emitter3D_ = nullptr;
-        dashStarEmitter_ = nullptr;
+        particleMgr_.reset();
     }
-    for (auto* p : movingPlatforms_) {
-        delete p;
-    }
+    // 发射器只是借用的裸指针，ParticleManager 已经管好它们的 delete 了
+    emitter2D_ = nullptr;
+    emitter3D_ = nullptr;
+    dashStarEmitter_ = nullptr;
+    windEmitter_ = nullptr;
+    snowEmitter_ = nullptr;
+
+    // ==== 背景 Sprite ====
+    backgroundSprite_.reset();
+
+    // ==== 3D 物体容器（方块 / 水面 / 敌人 / 平台）====
+    // 里面是 unique_ptr，clear() 时会自动 delete 元素
+    mapBlocks_.clear();
+    waterBlocks_.clear();
+    enemies_.clear();
     movingPlatforms_.clear();
+
+    // ==== 玩家 / 摄像机 / 3D 共通 ====
+    playerCamera_.reset();
+    player_.reset();
+    camera_.reset();
+    object3dCommon_.reset();
+
+    spaceHint_.sprite.reset();
+    shiftHint_.sprite.reset();
+    sprintHint_.sprite.reset();
+    upHints_.clear();
 }
+
 
 void GameScene::StartLoadingMap(const std::string& mapPath, const Vector3& startPos, bool isPortal = false) {
     if (sceneManager_) {
@@ -1413,7 +1448,6 @@ void GameScene::StartLoadingMap(const std::string& mapPath, const Vector3& start
 
 void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
 {
-
     // 记录本次地图路径
     currentMapPath_ = mapPath;
 
@@ -1422,75 +1456,63 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
         itemMgr_->ClearVisuals();
     }
 
-    for (auto* block : mapBlocks_) delete block;
+    // ==== 清理旧的 3D 物体（unique_ptr 容器，直接 clear 即可）====
     mapBlocks_.clear();
-    for (auto* water : waterBlocks_) {
-        delete water;
-    }
     waterBlocks_.clear();
-    for (auto* e : enemies_) delete e;
     enemies_.clear();
-
-    for (auto* p : movingPlatforms_) delete p;
     movingPlatforms_.clear();
-    if (spaceHint_.sprite) {
-        delete spaceHint_.sprite;
-        spaceHint_.sprite = nullptr;
-    }
-    for (auto& h : upHints_) {
-        if (h.sprite) {
-            delete h.sprite;
-            h.sprite = nullptr;
-        }
-    }
-    upHints_.clear();
-    if (shiftHint_.sprite) {
-        delete shiftHint_.sprite;
-        shiftHint_.sprite = nullptr;
-    }
-    if (sprintHint_.sprite) {
-        delete sprintHint_.sprite;
-        sprintHint_.sprite = nullptr;
-    }
 
+    // ==== 清理旧的 Hint Sprite（unique_ptr reset）====
+    spaceHint_.sprite.reset();
+    shiftHint_.sprite.reset();
+    sprintHint_.sprite.reset();
+    upHints_.clear();
+
+    // 重新读地图
     mapChipField_.LoadMapChipCsv(mapPath);
     GenerateBlocks();
-     // ==== 刷新右上角 Coin UI：显示「总共拾取的 coin 数」 ====
+
+    // ==== 刷新右上角 Coin UI：显示「总共拾取的 coin 数」 ====
     if (coinUI_) {
         coinUI_->SetTotalCoin(totalCoinCollected_);
     }
-    // === 只在 map 生成 Space / Up 提示 ===
+
+    // === 只在 map1 生成 Space / Shift / Sprint / Up 提示 ===
     if (mapPath == "Resources/map/map.csv") {
 
         // (5,2) → space.png
-        spaceHint_.sprite = new Sprite();
+        spaceHint_.sprite = std::make_unique<Sprite>();
         spaceHint_.sprite->Initialize(spriteCommon_, "Resources/space2.png");
         spaceHint_.sprite->SetSize({ 64.0f, 64.0f });
         spaceHint_.worldPos = mapChipField_.GetMapChipPositionByIndex(5, 2);
         spaceHint_.worldPos.y += 0.4f;
+
         // (19,6) → shift.png
-        shiftHint_.sprite = new Sprite();
+        shiftHint_.sprite = std::make_unique<Sprite>();
         shiftHint_.sprite->Initialize(spriteCommon_, "Resources/shift.png");
         shiftHint_.sprite->SetSize({ 64.0f, 48.0f });
         shiftHint_.worldPos = mapChipField_.GetMapChipPositionByIndex(19, 6);
         shiftHint_.worldPos.x -= 0.2f;
         shiftHint_.worldPos.y += 0.5f;
+
         // (20,6) → sprint.png
-        sprintHint_.sprite = new Sprite();
+        sprintHint_.sprite = std::make_unique<Sprite>();
         sprintHint_.sprite->Initialize(spriteCommon_, "Resources/sprint.png");
         sprintHint_.sprite->SetSize({ 48.0f, 48.0f });
         sprintHint_.worldPos = mapChipField_.GetMapChipPositionByIndex(20, 6);
         sprintHint_.worldPos.x -= 0.3f;
         sprintHint_.worldPos.y += 0.5f;
-        // (6,2) → up.png
+
+        // Up 一组
         auto makeUpHint = [&](int x, int y) {
             HintSprite h;
-            h.sprite = new Sprite();
+            h.sprite = std::make_unique<Sprite>();
             h.sprite->Initialize(spriteCommon_, "Resources/up.dds");
             h.sprite->SetSize({ 32.0f, 32.0f });
             h.worldPos = mapChipField_.GetMapChipPositionByIndex(x, y);
-            upHints_.push_back(h);
-            };
+            // vector 里有 unique_ptr，必须 move
+            upHints_.push_back(std::move(h));
+        };
 
         // (6,2), (11,4), (12,4)
         makeUpHint(6, 2);
@@ -1499,35 +1521,30 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
     }
     // === Hub 地图（map2）：只显示一个方向箭头，指向“下一关的门” ===
     else if (mapPath == "Resources/map/map2.csv") {
-        // 教学用的 Space/Shift 提示在 Hub 不显示
-        spaceHint_.worldPos = { 0,0,0 };
-        shiftHint_.worldPos = { 0,0,0 };
+        // 教学用的 Space/Shift 提示在 Hub 不显示，只清掉位置
+        spaceHint_.worldPos  = { 0,0,0 };
+        shiftHint_.worldPos  = { 0,0,0 };
         sprintHint_.worldPos = { 0,0,0 };
 
         int nextX = -1;
         int nextY = -1;
 
-        // 根据 hubProgress_ 决定箭头指向哪扇门
         // 门索引（在 map2 内）：
         //   map3: (11,5)
         //   map4: (14,5)
         //   map5: (23,1)
         //   map6: (12,14)
         if (hubProgress_ <= 0) {
-            // 还没通关任何一张 → 指向去 map3 的门
             nextX = 11; nextY = 5;
         }
         else if (hubProgress_ == 1) {
-            // 通关了 map3 → 指向去 map4 的门
             nextX = 14; nextY = 5;
         }
         else if (hubProgress_ == 2) {
-            // 通关了 map4 → 指向去 map5 的门
             nextX = 23; nextY = 1;
         }
         else if (hubProgress_ == 3) {
-            // 通关了 map5 → 指向去最终关 map6 的门
-            nextX = 12; nextY = 14;     // 左边那扇门
+            nextX = 12; nextY = 14;
         }
         else {
             // hubProgress_ >= 4 → 所有关卡通关，不再显示方向
@@ -1535,53 +1552,65 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
 
         if (nextX >= 0) {
             HintSprite h;
-            h.sprite = new Sprite();
+            h.sprite = std::make_unique<Sprite>();
             h.sprite->Initialize(spriteCommon_, "Resources/up.png");
             h.sprite->SetSize({ 32.0f, 32.0f });
             h.sprite->SetRotation(std::numbers::pi_v<float>);
             h.worldPos = mapChipField_.GetMapChipPositionByIndex(nextX, nextY);
             h.worldPos.x += 0.4f;
             h.worldPos.y += 2.0f;   // 稍微抬高一点，在门上方飘
-            upHints_.push_back(h);
+            upHints_.push_back(std::move(h));
         }
     }
     else {
-        // 不是 map：确保不画提示
-        spaceHint_.worldPos = { 0,0,0 };
-        shiftHint_.worldPos = { 0,0,0 };
+        // 不是 map1 / map2：确保不画教学提示
+        spaceHint_.worldPos  = { 0,0,0 };
+        shiftHint_.worldPos  = { 0,0,0 };
         sprintHint_.worldPos = { 0,0,0 };
     }
 
-    // 设置玩家起点
-    player_->SetPosition(startPos);
-    player_->ResetForMapTransition(true);
+    // ==== 设置玩家起点 ====
+    if (player_) {
+        player_->SetPosition(startPos);
+        player_->ResetForMapTransition(true);
+    }
+
     MapChipField::IndexSet startIndex = mapChipField_.GetMapChipIndexByPosition(startPos);
-        for (int i = 0; i < kPlayerIndexHistoryFrameCount_; ++i) {
-            playerIndexHistory_[i] = startIndex;
-        }
-        playerIndexHistoryCursor_ = 0;
-        playerIndexHistoryInitialized_ = true;
-        playerIndexOneSecAgo_ = startIndex;
+    for (int i = 0; i < kPlayerIndexHistoryFrameCount_; ++i) {
+        playerIndexHistory_[i] = startIndex;
+    }
+    playerIndexHistoryCursor_      = 0;
+    playerIndexHistoryInitialized_ = true;
+    playerIndexOneSecAgo_          = startIndex;
+
     // 相机同步
-    camera_->SetTranslate(startPos + Vector3{ 0,0,-40 });
-    prevCameraPos_ = camera_->GetTransform().translate;
-    playerCamera_->SetMapBounds(mapChipField_.GetMapMinPosition(), mapChipField_.GetMapMaxPosition());
+    if (camera_) {
+        camera_->SetTranslate(startPos + Vector3{ 0,0,-40 });
+        prevCameraPos_ = camera_->GetTransform().translate;
+    }
+
+    if (playerCamera_) {
+        playerCamera_->SetMapBounds(
+            mapChipField_.GetMapMinPosition(),
+            mapChipField_.GetMapMaxPosition()
+        );
+    }
+
     // 根据当前地图更新传送门列表
     if (portalMgr_) {
         portalMgr_->ClearPortals();
     }
 
-       // ========== map1（起始地图） ==========
+    // ========== map1（起始地图） ==========
     if (mapPath == "Resources/map/map.csv") {
         if (portalMgr_) {
             portalMgr_->AddPortal(
-                { 26, 11 },                                    // 当前 map1 里的格子
-                "Resources/map/map2.csv",                      // 目标地图（Hub）
-                mapChipField_.GetMapChipPositionByIndex(2, 1)  // 在 Hub 中的出生格
+                { 26, 11 },
+                "Resources/map/map2.csv",
+                mapChipField_.GetMapChipPositionByIndex(2, 1)
             );
         }
     }
-
     // ========== map2（中心地图 / Hub） ==========
     else if (mapPath == "Resources/map/map2.csv") {
         if (portalMgr_) {
@@ -1620,7 +1649,6 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
             }
         }
     }
-
     // ========== 各子关卡内部：返回 Hub ==========
     else {
         if (portalMgr_) {
@@ -1668,7 +1696,9 @@ void GameScene::HandlePlayerOnMovingPlatforms()
     const float halfW = player_->GetWidth() * 0.5f;
     const float halfH = player_->GetHeight() * 0.5f;
 
-    for (auto* platform : movingPlatforms_) {
+    // movingPlatforms_ 是 vector<unique_ptr<MovingPlatform>>
+    for (auto& platformPtr : movingPlatforms_) {
+        MovingPlatform* platform = platformPtr.get();
         if (!platform) continue;
 
         MapChipField::Rect r = platform->GetRect();
@@ -1708,11 +1738,12 @@ void GameScene::HandlePlayerOnMovingPlatforms()
             if (centerPlayerY < centerRectY) {
                 // 从下往上撞到平台底部
                 pos.y -= penY;
-                if (vel.y > 0.0f) vel.y = 0.0f;
+                if (vel.y > 0.0f) {
+                    vel.y = 0.0f;
+                }
             }
             else {
                 // 从上踩到平台 → 当做地面 + 站在上面跟着动
-                // 先让 Player 内部把“落地状态”处理好
                 player_->SetPosition(pos);
                 player_->SetVelocity(vel);
                 player_->LandOnExternalGround(r.top);
@@ -1731,3 +1762,4 @@ void GameScene::HandlePlayerOnMovingPlatforms()
     player_->SetPosition(pos);
     player_->SetVelocity(vel);
 }
+
