@@ -19,14 +19,14 @@ void HPBar3DManager::Initialize(Object3dCommon* objCommon,
     strips_.reserve(segments_);
 
     for (int i = 0; i < segments_; ++i) {
-        Object3d* seg = new Object3d();
+        auto seg = std::make_unique<Object3d>();
         seg->Initialize(object3dCommon_);
         seg->SetModel("hurd/hurd.obj");
         seg->SetCamera(camera_);
         seg->SetScale({ 0.001f, 0.001f, 0.001f });
         seg->SetEnableLighting(true);
         seg->SetDirectionalLightIntensity(2.0f);
-        strips_.push_back(seg);
+        strips_.push_back(std::move(seg));
     }
 
     visibleCount_ = segments_;
@@ -34,9 +34,6 @@ void HPBar3DManager::Initialize(Object3dCommon* objCommon,
 
 void HPBar3DManager::Finalize()
 {
-    for (auto* seg : strips_) {
-        delete seg;
-    }
     strips_.clear();
 }
 

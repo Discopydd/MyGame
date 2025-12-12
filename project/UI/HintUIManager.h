@@ -4,10 +4,11 @@
 #include "Camera.h"
 #include "MyMath.h"
 #include <vector>
+#include <memory>
 
 // GameScene 里已经有的结构体，可以直接搬到这里也用这个定义
 struct HintSprite {
-    Sprite* sprite = nullptr;
+    std::unique_ptr<Sprite> sprite;
     Vector3 worldPos{};
 };
 

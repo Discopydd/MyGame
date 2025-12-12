@@ -7,12 +7,12 @@ void DashUIManager::Initialize(SpriteCommon* spriteCommon, Player* player)
 
     const char* textureFilePath[] = { "Resources/skill_icon.png", "Resources/gray.png" };
 
-    icon_ = new Sprite();
+    icon_ = std::make_unique<Sprite>();
     icon_->Initialize(spriteCommon_, textureFilePath[0]);
     icon_->SetPosition({ 40.0f, 80.0f });
     icon_->SetSize({ 32.0f, 32.0f });
 
-    overlay_ = new Sprite();
+    overlay_ = std::make_unique<Sprite>();
     overlay_->Initialize(spriteCommon_, textureFilePath[1]);
     overlay_->SetPosition({ 40.0f, 80.0f });
     overlay_->SetSize({ 32.0f, 32.0f });
@@ -20,14 +20,8 @@ void DashUIManager::Initialize(SpriteCommon* spriteCommon, Player* player)
 
 void DashUIManager::Finalize()
 {
-    if (icon_) {
-        delete icon_;
-        icon_ = nullptr;
-    }
-    if (overlay_) {
-        delete overlay_;
-        overlay_ = nullptr;
-    }
+    icon_.reset();
+    overlay_.reset();
 }
 
 void DashUIManager::Update(float dt)
