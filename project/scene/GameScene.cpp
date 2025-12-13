@@ -153,6 +153,9 @@ void GameScene::GenerateBlocks() {
                 if (subID == 1) {
                     eType = EnemyType::Type1;
                 }
+                else if (subID == 2) {
+                    eType = EnemyType::Boss;
+                }
 
                 auto enemy = std::make_unique<Enemy>();
                 enemy->Initialize(object3dCommon_.get(), camera_.get(), position, eType);
@@ -570,7 +573,7 @@ void GameScene::Update() {
     // 敌人 Update
     for (auto& e : enemies_) {
         if (e) {
-            e->Update(deltaTime);
+            e->Update(deltaTime, mapChipField_, *player_);
         }
     }
     // 淡入淡出/加载/演出期间都不可操作
@@ -623,6 +626,12 @@ void GameScene::Update() {
             Enemy* enemy = enemyPtr.get();
             if (!enemy) { continue; }
 
+            // Boss 远程弹幕判定（不需要和 Boss 本体重叠）
+            if (enemy->CheckBossProjectileHit(*player_)) {
+                if (!player_->IsInvincible()) {
+                    damagedByEnemyThisFrame_ = true;
+                }
+            }
             Vector3 ePos = enemy->GetPosition();
             float   eHalfW = enemy->GetWidth() * 0.5f;
             float   eHalfH = enemy->GetHeight() * 0.5f;
@@ -640,23 +649,33 @@ void GameScene::Update() {
 
             // ====== 判定是否“从上方踩到”敌人 ======
             const float stompTolerance = 0.15f;
-            bool isStomp =
-                (pVel.y <= 0.0f) &&          // 玩家正在往下
-                (pBottom >= ePos.y) &&       // 脚大致在敌人中间以下
-                (pBottom <= eTop + stompTolerance);
 
-            if (isStomp) {
+            float stompMinCenterY = ePos.y; // 普通敌人：中心以上更像踩头
+            if (enemy->GetType() == EnemyType::Boss) {
+                // Boss 更高：允许玩家中心点略低一点也算踩到（提升手感）
+                stompMinCenterY = ePos.y - eHalfH * 0.20f;
+            }
+
+            bool isStomp =
+                (pVel.y <= 0.0f) &&
+                (pPos.y >= stompMinCenterY) &&
+                (pBottom <= eTop + stompTolerance); if (isStomp) {
                 // ☆ 踩到敌人：敌人闪烁，玩家弹一下，不受伤
-                enemy->StartHitReaction(0.4f);   // 闪烁 0.4 秒，可自己调
+                enemy->OnStomp();                // Boss 会扣血/硬直/死亡判定；普通敌人保持闪烁
 
                 Vector3 newVel = pVel;
                 newVel.y = 0.7f;                // 踩完向上弹的力度，可自己调手感
                 player_->SetVelocity(newVel);
 
+                // 把玩家“抬”到敌人头顶，避免侧面重叠导致下一帧又被判成撞到
+                Vector3 newPos = pPos;
+                newPos.y = eTop + pHalfH + 0.01f;
+                player_->SetPosition(newPos);
+
                 // 不给玩家伤害，处理完当前敌人就继续下一个
                 continue;
             }
-            else {
+                else {
                 // ☆ 不是从上面踩 ⇒ 视为被敌人撞到，玩家受伤
                 if (!player_->IsInvincible()) {
                     damagedByEnemyThisFrame_ = true;
@@ -664,6 +683,12 @@ void GameScene::Update() {
             }
         }
     }
+    // ========= 清理死亡敌人（Boss 被踩 5 次后会标记死亡） =========
+    enemies_.erase(
+        std::remove_if(enemies_.begin(), enemies_.end(),
+            [](const std::unique_ptr<Enemy>& e) { return (!e) || e->IsDead(); }),
+        enemies_.end());
+
     // 先做平台上的落地 / 分离 / 搭乘
     if (!crushedByPlatformThisFrame_) {
         HandlePlayerOnMovingPlatforms();
@@ -1001,7 +1026,7 @@ void GameScene::Update() {
                     const auto& candidate = playerIndexHistory_[i];
                     MapChipType type =
                         mapChipField_.GetMapChipTypeByIndex(candidate.xIndex, candidate.yIndex);
-                    if (type != MapChipType::kSpike&& type != MapChipType::kEnemy) {
+                    if (type != MapChipType::kSpike && type != MapChipType::kEnemy) {
                         firstNonSpike = candidate;
                         found = true;
                         break;
