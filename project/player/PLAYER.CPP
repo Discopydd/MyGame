@@ -198,21 +198,6 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
                     inWater_ = true;
                     onWaterSurface_ = false;
                 }
-
-                if (!diveInput &&
-                    depth <= kSurfaceSnapThreshold &&
-                    canFloatOnSurface) {
-
-                    // ★ 在水面上漂浮：保持一半身体在水中
-                    SnapOnGround(waterSurfaceY - halfH);
-                    onWaterSurface_ = true;
-                    inWater_ = false;
-                }
-                else {
-                    // ★ 速度较快（从高处跳落）或者按了 S：视为真正进入水内
-                    inWater_ = true;
-                    onWaterSurface_ = false;
-                }
             }
             // depth <= 0：脚在水面以上，当成空气
         }
@@ -505,7 +490,8 @@ void Player::HandleMapCollision(const MapChipField& mapChipField) {
 
         for (uint32_t y = minIdx.yIndex; y <= maxIdx.yIndex; ++y) {
             for (uint32_t x = minIdx.xIndex; x <= maxIdx.xIndex; ++x) {
-                if (mapChipField.GetMapChipTypeByIndex(x, y) != MapChipType::kBlock) continue;
+                MapChipType t = mapChipField.GetMapChipTypeByIndex(x, y);
+                if (t != MapChipType::kBlock && t != MapChipType::kBlock2) continue;
                 auto r = mapChipField.GetRectByIndex(x, y);
 
                 bool overlapX = !(right <= r.left || left >= r.right);

@@ -1001,7 +1001,7 @@ void GameScene::Update() {
                     const auto& candidate = playerIndexHistory_[i];
                     MapChipType type =
                         mapChipField_.GetMapChipTypeByIndex(candidate.xIndex, candidate.yIndex);
-                    if (type != MapChipType::kSpike) {
+                    if (type != MapChipType::kSpike&& type != MapChipType::kEnemy) {
                         firstNonSpike = candidate;
                         found = true;
                         break;
