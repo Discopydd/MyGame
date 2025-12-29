@@ -99,6 +99,9 @@ private:
     // Dash 的持续时间（Windup -> Dash へ渡す）
     float queuedDashDuration_ = 0.30f;
 
+    float queuedDashSpeed_    = 0.45f;  // Dash 实际使用速度（Windup -> Dash）
+    bool  isShortDash_         = false;  // 贴脸小冲刺/微冲刺：用于更短后摇
+
     // 记录上一帧与玩家的距离（可用于“风筝检测”等）
     float prevDistToPlayer_ = 1e9f;
 
@@ -106,6 +109,7 @@ private:
     float globalAttackCD_ = 0.0f;  // 任意攻击最小间隔
     float meleeCD_        = 0.0f;  // 近战冷却
     float dashCD_         = 0.0f;  // 冲刺冷却
+    float microDashCD_    = 0.0f;  // 贴脸小冲刺冷却（不占用 dashCD_）
     float rangedCD_       = 0.0f;  // 远程冷却
     float ultimateCD_     = 3.0f;  // 大招冷却（开场给一点延迟）
     int   ultimateBounces_ = 0;    // 大招：已反弹次数
@@ -127,8 +131,10 @@ private:
 
     // 近距离冲刺：玩家贴近时立刻冲刺，但不会一直冲（靠 dashCD_ 控制）
     float closeDashRange_    = 4.8f;
-    float closeDashWindup_   = 0.18f;
-    float closeDashDuration_ = 0.24f;
+    float closeDashWindup_   = 0.12f;
+    float closeDashDuration_ = 0.16f;
+    float closeDashSpeed_    = 0.30f;  // 贴脸小冲刺速度（每帧位移）
+    float microDashCooldown_ = 1.20f;  // dashCD_ 没好时也允许一次小冲刺的冷却
 
     // 远距离压制：距离很远时优先远程
     float farRangedPrefer_   = 9.0f;

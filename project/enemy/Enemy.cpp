@@ -61,6 +61,12 @@ void Enemy::Initialize(
     stateTimer_ = 0.0f;
     decisionTimer_ = 0.0f;
 
+
+    // Dash 参数复位
+    queuedDashDuration_ = 0.30f;
+    queuedDashSpeed_    = dashSpeed_;
+    isShortDash_        = false;
+    microDashCD_        = 0.0f;
     globalAttackCD_ = 0.0f;
     meleeCD_ = 0.0f;
     dashCD_ = 0.0f;
@@ -168,6 +174,7 @@ void Enemy::Update(float dt, const MapChipField& map, const Player& player)
 
         meleeCD_        = (std::max)(0.0f, meleeCD_ - dt);
         dashCD_         = (std::max)(0.0f, dashCD_ - dt);
+        microDashCD_    = (std::max)(0.0f, microDashCD_ - dt);
         rangedCD_       = (std::max)(0.0f, rangedCD_ - dt);
         globalAttackCD_ = (std::max)(0.0f, globalAttackCD_ - dt);
         ultimateCD_     = (std::max)(0.0f, ultimateCD_ - dt);
@@ -229,7 +236,8 @@ void Enemy::Update(float dt, const MapChipField& map, const Player& player)
             if (decisionTimer_ <= 0.0f && globalAttackCD_ <= 0.0f) {
 
                 const bool canDashAny   = (dashCD_ <= 0.0f);
-                const bool canRanged    = (dist >= rangedMinRange_ && dist <= rangedMaxRange_ && rangedCD_ <= 0.0f);
+                const bool tooCloseForRanged = (dist <= closeDashRange_);
+                const bool canRanged    = (!tooCloseForRanged && dist >= rangedMinRange_ && dist <= rangedMaxRange_ && rangedCD_ <= 0.0f);
                 const bool canUltimate  = (ultimateCD_ <= 0.0f);
 
                 // ① 大招：时不时来一次“左右来回冲刺”
@@ -263,11 +271,29 @@ void Enemy::Update(float dt, const MapChipField& map, const Player& player)
                     attackFacing_       = facing_;
                     stateTimer_         = closeDashWindup_;
                     queuedDashDuration_ = closeDashDuration_;
+                    queuedDashSpeed_    = closeDashSpeed_;
+                    isShortDash_        = true;
+                    microDashCD_        = microDashCooldown_;
 
                     dashCD_         = 2.70f;
                     globalAttackCD_ = 1.05f;
                     decisionTimer_  = 0.25f;
                 }
+                // ③.5 dashCD_ 还在转：但玩家贴脸时别用远程，改为一次小冲刺
+                else if (!canDashAny && dist <= closeDashRange_ && microDashCD_ <= 0.0f) {
+                    queuedAttack_       = BossAttack::Dash;
+                    bossState_          = BossState::Windup;
+                    attackFacing_       = facing_;
+                    stateTimer_         = closeDashWindup_;
+                    queuedDashDuration_ = closeDashDuration_;
+                    queuedDashSpeed_    = closeDashSpeed_;
+                    isShortDash_        = true;
+
+                    microDashCD_     = microDashCooldown_;
+                    globalAttackCD_  = 0.95f;
+                    decisionTimer_   = 0.20f;
+                }
+
                 // ④ 中距离：择机冲刺（玩家在风筝/拉开距离时更容易触发）
                 else if (canDashAny && dist >= dashMinRange_ && dist <= dashMaxRange_
                     && (playerMovingAway || distIncreasing || dist <= 7.0f)) {
@@ -276,6 +302,8 @@ void Enemy::Update(float dt, const MapChipField& map, const Player& player)
                     attackFacing_ = facing_;
                     stateTimer_ = 0.30f;
                     queuedDashDuration_ = 0.30f;
+                    queuedDashSpeed_    = dashSpeed_;
+                    isShortDash_        = false;
 
                     dashCD_ = 2.10f;
                     globalAttackCD_ = 1.00f;
@@ -308,21 +336,32 @@ void Enemy::Update(float dt, const MapChipField& map, const Player& player)
                     stateTimer_ = queuedDashDuration_;
                 }
                 else if (queuedAttack_ == BossAttack::Ranged) {
-                    bossState_  = BossState::Shoot;
+                    // 玩家贴脸：不要近距离弹幕（反应不过来），改为向前小冲刺
+                    if (dist <= closeDashRange_) {
+                        bossState_          = BossState::Dash;
+                        queuedDashDuration_ = closeDashDuration_;
+                        queuedDashSpeed_    = closeDashSpeed_;
+                        isShortDash_        = true;
+                        microDashCD_        = microDashCooldown_;
+                        stateTimer_         = queuedDashDuration_;
+                        attackFacing_       = facing_;
+                    } else {
+                        bossState_  = BossState::Shoot;
 
-                    // Shoot 状态时长，略长一点方便连射/读招
-                    stateTimer_ = (hp_ <= enrageHp_) ? 0.85f : 0.55f;
+                        // Shoot 状态时长，略长一点方便连射/读招
+                        stateTimer_ = (hp_ <= enrageHp_) ? 0.85f : 0.55f;
 
-                    shotsTotal_ = (hp_ <= enrageHp_) ? 3 : 1;
-                    shotsLeft_  = shotsTotal_;
-                    shotTimer_  = 0.0f; // 立即发射
+                        shotsTotal_ = (hp_ <= enrageHp_) ? 3 : 1;
+                        shotsLeft_  = shotsTotal_;
+                        shotTimer_  = 0.0f; // 立即发射
+                    }
                 }
                 else if (queuedAttack_ == BossAttack::Ultimate) {
                     bossState_  = BossState::Ultimate;
                     stateTimer_ = ultimateDuration_;
                     ultimateBounces_ = 0;
                     // 大招开始就锁一个方向：先朝玩家那边冲
-                    attackFacing_ = (pPos.x - position_.x >= 0.0f) ? 1 : -1;
+                    attackFacing_ = (pPos.x - position_.x >= 0.0f) ? -1 : 1; // 与玩家相反方向
                     facing_ = attackFacing_;
                 }
                 else {
@@ -333,10 +372,11 @@ void Enemy::Update(float dt, const MapChipField& map, const Player& player)
             break;
 
         case BossState::Dash:
-            velocity_.x = attackFacing_ * dashSpeed_;
+            velocity_.x = attackFacing_ * queuedDashSpeed_;
             if (stateTimer_ <= 0.0f) {
                 bossState_  = BossState::Recover;
-                stateTimer_ = 0.65f;
+                stateTimer_ = isShortDash_ ? 0.45f : 0.65f;
+                isShortDash_ = false;
             }
             break;
 
@@ -368,6 +408,19 @@ void Enemy::Update(float dt, const MapChipField& map, const Player& player)
 
         case BossState::Shoot:
         {
+            // 玩家贴脸：不要继续射击，改为小冲刺
+            if (dist <= closeDashRange_) {
+                bossState_       = BossState::Dash;
+                queuedDashSpeed_ = closeDashSpeed_;
+                isShortDash_     = true;
+                microDashCD_     = microDashCooldown_;
+                attackFacing_    = facing_;
+                stateTimer_      = closeDashDuration_;
+                shotsLeft_       = 0;
+                break;
+            }
+
+
             // 远程射击：站定瞄准
             velocity_.x = 0.0f;
             facing_ = attackFacing_;
