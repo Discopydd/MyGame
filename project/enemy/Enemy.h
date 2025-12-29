@@ -46,7 +46,10 @@ public:
     // ====== 踩头伤害 / 死亡判定 ======
     void OnStomp();                 // 玩家从上方踩到时调用
     bool IsDead() const { return isDead_; }
-    int  GetHp()   const { return hp_; }   // Boss: 5->0
+    int  GetHp()   const { return hp_; }   // Boss: 30->0
+
+    // Boss：踩头无敌时间是否结束（用于 GameScene 避免重复扣血）
+    bool CanTakeStompDamage() const { return stompInvuln_ <= 0.0f; }
 
     // ====== Boss 远程弹幕命中检测（GameScene 调用）======
     // 命中则会“消耗”弹丸（inactive），返回 true
@@ -70,8 +73,10 @@ private:
     bool  damageBlinkVisible_  = true;
 
     // --- 死亡 ---
-    bool  isDead_ = false;
-    int   hp_     = 1;          // Boss: 5
+    bool  isDead_  = false;
+    int   maxHp_   = 1;
+    int   hp_      = 1;          // Boss: 30
+    int   enrageHp_ = 0;         // Boss 残血阈值（用于加强攻击）
     float stompInvuln_ = 0.0f;  // 防止同一帧/连续重叠多次扣血
 
     // ---------- 运动/碰撞（Boss 用：position += velocity） ----------
@@ -80,10 +85,10 @@ private:
     float   gravityBase_ = -2.20f;
 
     // ---------- Boss AI ----------
-    enum class BossState { Idle, Chase, Windup, Dash, Melee, Shoot, Recover, Stunned };
+    enum class BossState { Idle, Chase, Windup, Dash, Shoot, Ultimate, Rest, Recover, Stunned };
     BossState bossState_ = BossState::Idle;
 
-    enum class BossAttack { None, Melee, Dash, Ranged };
+    enum class BossAttack { None, Dash, Ranged, Ultimate };
     BossAttack queuedAttack_ = BossAttack::None;
 
     float stateTimer_    = 0.0f;   // 前摇/攻击/后摇/硬直计时
@@ -91,11 +96,19 @@ private:
     int   facing_        = 1;      // 1右 -1左
     int   attackFacing_  = 1;      // 本次攻击锁朝向
 
+    // Dash 的持续时间（Windup -> Dash へ渡す）
+    float queuedDashDuration_ = 0.30f;
+
+    // 记录上一帧与玩家的距离（可用于“风筝检测”等）
+    float prevDistToPlayer_ = 1e9f;
+
     // 出招节奏控制
     float globalAttackCD_ = 0.0f;  // 任意攻击最小间隔
     float meleeCD_        = 0.0f;  // 近战冷却
     float dashCD_         = 0.0f;  // 冲刺冷却
     float rangedCD_       = 0.0f;  // 远程冷却
+    float ultimateCD_     = 3.0f;  // 大招冷却（开场给一点延迟）
+    int   ultimateBounces_ = 0;    // 大招：已反弹次数
 
     // ---------- 调参区 ----------
     float moveSpeed_  = 0.18f;  // 追击速度（按“每帧位移”理解）
@@ -109,8 +122,22 @@ private:
     float dashMaxRange_ = 10.0f;
 
     // 远程攻击距离
-    float rangedMinRange_ = 5.0f;
+    float rangedMinRange_ = 4.2f;
     float rangedMaxRange_ = 14.0f;
+
+    // 近距离冲刺：玩家贴近时立刻冲刺，但不会一直冲（靠 dashCD_ 控制）
+    float closeDashRange_    = 4.8f;
+    float closeDashWindup_   = 0.18f;
+    float closeDashDuration_ = 0.24f;
+
+    // 远距离压制：距离很远时优先远程
+    float farRangedPrefer_   = 9.0f;
+
+    // 大招：来回左右冲刺（碰到方块/刺算一次“反弹”），结束后休息
+    float ultimateSpeed_      = 0.35f;
+    float ultimateDuration_   = 5.0f; // failsafe：最长持续
+    int   ultimateMaxBounces_ = 4;    // 反弹次数（4=左右来回两趟）
+    float restDuration_       = 2.8f;
 
     float leadTime_ = 0.25f;           // 追击预判：playerPos + playerVel * leadTime
     float projectileLeadTime_ = 0.35f; // 弹幕瞄准预判
@@ -138,7 +165,7 @@ private:
     float shotTimer_      = 0.0f;   // 秒（<=0 就发射）
 
 private:
-    void ResolveMapCollision(const MapChipField& map);
+    void ResolveMapCollision(const MapChipField& map, float dt);
     void UpdateBossFacing(const Player& player);
 
     void UpdateBossProjectiles(float dt, const MapChipField& map);

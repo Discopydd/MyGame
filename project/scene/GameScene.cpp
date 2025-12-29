@@ -511,7 +511,7 @@ void GameScene::Update() {
             isMapLoading_ = false;
 
             // 真正加载地图
-            LoadMap("Resources/map/map.csv", { 3,3,0 });
+            LoadMap("Resources/map/map5.csv", { 3,3,0 });
             if (sceneManager_) sceneManager_->ClearOverlayScene();
             if (fade_) fade_->SetPhase(FadePhase::FadingIn);
 
@@ -656,10 +656,19 @@ void GameScene::Update() {
                 stompMinCenterY = ePos.y - eHalfH * 0.20f;
             }
 
-            bool isStomp =
-                (pVel.y <= 0.0f) &&
-                (pPos.y >= stompMinCenterY) &&
-                (pBottom <= eTop + stompTolerance); if (isStomp) {
+           const float kStompFallSpeed = -0.05f;
+
+           bool isStomp =
+               (pVel.y < kStompFallSpeed) &&
+               (pPos.y >= stompMinCenterY) &&
+               (pBottom <= eTop + stompTolerance);
+            if (isStomp) {
+                 // Boss：踩头无敌时间内，再踩不扣血（可选：反而让玩家受伤）
+                if (enemy->GetType() == EnemyType::Boss && !enemy->CanTakeStompDamage()) {
+                    if (!player_->IsInvincible()) {
+                    }
+                    continue;
+                }
                 // ☆ 踩到敌人：敌人闪烁，玩家弹一下，不受伤
                 enemy->OnStomp();                // Boss 会扣血/硬直/死亡判定；普通敌人保持闪烁
 
@@ -675,7 +684,7 @@ void GameScene::Update() {
                 // 不给玩家伤害，处理完当前敌人就继续下一个
                 continue;
             }
-                else {
+            else {
                 // ☆ 不是从上面踩 ⇒ 视为被敌人撞到，玩家受伤
                 if (!player_->IsInvincible()) {
                     damagedByEnemyThisFrame_ = true;
@@ -683,7 +692,7 @@ void GameScene::Update() {
             }
         }
     }
-    // ========= 清理死亡敌人（Boss 被踩 5 次后会标记死亡） =========
+    // ========= 清理死亡敌人（Boss 被踩 x 次后会标记死亡） =========
     enemies_.erase(
         std::remove_if(enemies_.begin(), enemies_.end(),
             [](const std::unique_ptr<Enemy>& e) { return (!e) || e->IsDead(); }),
