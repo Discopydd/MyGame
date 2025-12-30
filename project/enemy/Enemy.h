@@ -143,7 +143,7 @@ private:
     float ultimateSpeed_      = 0.35f;
     float ultimateDuration_   = 5.0f; // failsafe：最长持续
     int   ultimateMaxBounces_ = 4;    // 反弹次数（4=左右来回两趟）
-    float restDuration_       = 2.8f;
+    float restDuration_       = 1.8f;
 
     float leadTime_ = 0.25f;           // 追击预判：playerPos + playerVel * leadTime
     float projectileLeadTime_ = 0.35f; // 弹幕瞄准预判
@@ -170,6 +170,8 @@ private:
     float shotInterval_   = 0.16f;  // 秒
     float shotTimer_      = 0.0f;   // 秒（<=0 就发射）
 
+    bool ultimateLocked_ = false;     // 是否处于“把 ultimateCD_ 拉到 399 的锁定期”
+   
 private:
     void ResolveMapCollision(const MapChipField& map, float dt);
     void UpdateBossFacing(const Player& player);
@@ -177,4 +179,6 @@ private:
     void UpdateBossProjectiles(float dt, const MapChipField& map);
     void SpawnBossProjectile(const Vector3& spawnPos, const Vector3& aimDir);
     void DrawBossProjectiles();
+
+    void FinishUltimateCooldown();    // 把 ultimateCD_ 从 399 结算成正常随机CD
 };
