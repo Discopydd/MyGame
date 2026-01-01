@@ -184,7 +184,13 @@
     <ClCompile Include="map\MovingPlatform.cpp">
       <Filter>map</Filter>
     </ClCompile>
+    <ClCompile Include="enemy\BossEnemy.cpp">
+      <Filter>enemy</Filter>
+    </ClCompile>
     <ClCompile Include="enemy\Enemy.cpp">
+      <Filter>enemy</Filter>
+    </ClCompile>
+    <ClCompile Include="enemy\NormalEnemy.cpp">
       <Filter>enemy</Filter>
     </ClCompile>
   </ItemGroup>
@@ -375,7 +381,13 @@
     <ClInclude Include="map\MovingPlatform.h">
       <Filter>map</Filter>
     </ClInclude>
+    <ClInclude Include="enemy\BossEnemy.h">
+      <Filter>enemy</Filter>
+    </ClInclude>
     <ClInclude Include="enemy\Enemy.h">
+      <Filter>enemy</Filter>
+    </ClInclude>
+    <ClInclude Include="enemy\NormalEnemy.h">
       <Filter>enemy</Filter>
     </ClInclude>
   </ItemGroup>

@@ -36,6 +36,9 @@
 #include "./map/MovingPlatform.h"
 #include "../enemy/Enemy.h"
 
+#include "../enemy/NormalEnemy.h"
+#include "../enemy/BossEnemy.h"
+
 #include <memory>
 
 class GameScene : public BaseScene {

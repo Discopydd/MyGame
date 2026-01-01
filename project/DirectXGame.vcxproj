@@ -169,7 +169,9 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="D3DResourceLeakChecker.cpp" />
+    <ClCompile Include="enemy\BossEnemy.cpp" />
     <ClCompile Include="enemy\Enemy.cpp" />
+    <ClCompile Include="enemy\NormalEnemy.cpp" />
     <ClCompile Include="engine\2d\Sprite.cpp" />
     <ClCompile Include="engine\2d\SpriteCommon.cpp" />
     <ClCompile Include="engine\3d\Camera.cpp" />
@@ -216,7 +218,9 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
   <ItemGroup>
     <ClInclude Include="D3DResourceLeakChecker.h" />
     <ClInclude Include="DebugReporter.h" />
+    <ClInclude Include="enemy\BossEnemy.h" />
     <ClInclude Include="enemy\Enemy.h" />
+    <ClInclude Include="enemy\NormalEnemy.h" />
     <ClInclude Include="engine\2d\Sprite.h" />
     <ClInclude Include="engine\2d\SpriteCommon.h" />
     <ClInclude Include="engine\3d\Camera.h" />

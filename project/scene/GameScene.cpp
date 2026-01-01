@@ -157,7 +157,13 @@ void GameScene::GenerateBlocks() {
                     eType = EnemyType::Boss;
                 }
 
-                auto enemy = std::make_unique<Enemy>();
+                std::unique_ptr<Enemy> enemy;
+                if (eType == EnemyType::Boss) {
+                    enemy = std::make_unique<BossEnemy>();
+                }
+                else {
+                    enemy = std::make_unique<NormalEnemy>();
+                }
                 enemy->Initialize(object3dCommon_.get(), camera_.get(), position, eType);
                 enemies_.push_back(std::move(enemy));
             }
