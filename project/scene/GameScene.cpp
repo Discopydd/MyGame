@@ -642,6 +642,11 @@ void GameScene::Update() {
             float   eHalfW = enemy->GetWidth() * 0.5f;
             float   eHalfH = enemy->GetHeight() * 0.5f;
 
+            // 死亡演出などで当たり判定を消している敵はスキップ
+            if (enemy->GetWidth() <= 0.01f || enemy->GetHeight() <= 0.01f) {
+                continue;
+            }
+
             float eLeft = ePos.x - eHalfW;
             float eRight = ePos.x + eHalfW;
             float eBottom = ePos.y - eHalfH;
@@ -669,6 +674,18 @@ void GameScene::Update() {
                (pPos.y >= stompMinCenterY) &&
                (pBottom <= eTop + stompTolerance);
             if (isStomp) {
+                // ★ 受击無敵中：弹起可以，但不触发敌人死亡/扣血
+                if (player_->IsInvincible()) {
+                    Vector3 newVel = pVel;
+                    newVel.y = 0.7f;
+                    player_->SetVelocity(newVel);
+
+                    Vector3 newPos = pPos;
+                    newPos.y = eTop + pHalfH + 0.01f;
+                    player_->SetPosition(newPos);
+                    continue;
+                }
+
                  // Boss：踩头无敌时间内，再踩不扣血（可选：反而让玩家受伤）
                 if (enemy->GetType() == EnemyType::Boss && !enemy->CanTakeStompDamage()) {
                     if (!player_->IsInvincible()) {

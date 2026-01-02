@@ -1,5 +1,7 @@
 #include "Enemy.h"
 
+#include "../player/Player.h"
+
 #include <algorithm>
 
 // ===========================================================
@@ -89,4 +91,42 @@ void Enemy::OnStomp()
     // 普通敌人：先保留原行为（只闪一下）
     StartHitReaction(0.40f);
     stompInvuln_ = 0.20f;
+}
+
+Enemy::PlayerContact Enemy::CheckPlayerContact(const Player& player, float stompMargin) const
+{
+    PlayerContact out{};
+
+    if (isDead_) { return out; }
+
+    const Vector3 pPos = player.GetPosition();
+    const Vector3 pVel = player.GetVelocity();
+
+    const float pHalfW = player.GetWidth() * 0.5f;
+    const float pHalfH = player.GetHeight() * 0.5f;
+
+    const float eHalfW = width_ * 0.5f;
+    const float eHalfH = height_ * 0.5f;
+
+    const float pLeft   = pPos.x - pHalfW;
+    const float pRight  = pPos.x + pHalfW;
+    const float pBottom = pPos.y - pHalfH;
+    const float pTop    = pPos.y + pHalfH;
+
+    const float eLeft   = position_.x - eHalfW;
+    const float eRight  = position_.x + eHalfW;
+    const float eBottom = position_.y - eHalfH;
+    const float eTop    = position_.y + eHalfH;
+
+    const bool overlapX = !(pRight <= eLeft || pLeft >= eRight);
+    const bool overlapY = !(pTop <= eBottom || pBottom >= eTop);
+    out.overlap = overlapX && overlapY;
+    if (!out.overlap) { return out; }
+
+    // “踩头”：玩家向下运动，且玩家底部在敌人顶部附近（允许一个 margin）
+    const bool falling = (pVel.y < -0.05f);
+    const bool fromAbove = (pBottom >= (eTop - stompMargin));
+    out.stomp = falling && fromAbove;
+
+    return out;
 }

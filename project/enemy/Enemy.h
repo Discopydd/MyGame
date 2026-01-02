@@ -62,6 +62,18 @@ public:
     // 命中则会“消耗”弹丸（inactive），返回 true
     virtual bool CheckBossProjectileHit(const Player& /*player*/) { return false; }
 
+    // ====== 与玩家的碰撞/踩头判定（普通敌人/关卡逻辑可复用） ======
+    struct PlayerContact {
+        bool overlap = false; // AABB 重叠
+        bool stomp   = false; // “踩头”判定成立（从上方下落命中）
+    };
+
+    // 不改变现有 GameScene 结构：需要时可直接调用。
+    // 说明：
+    //  - overlap：双方 AABB 是否重叠
+    //  - stomp：在 overlap 的基础上，玩家处于下落且玩家底部高于敌人顶部（带 margin）
+    PlayerContact CheckPlayerContact(const Player& player, float stompMargin = 0.10f) const;
+
 protected:
     // --- 共享初始化 / 更新 / 绘制 ---
     void InitializeCommon(Object3dCommon* common, Camera* camera, const Vector3& spawnPos, EnemyType type);

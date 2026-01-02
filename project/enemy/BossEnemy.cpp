@@ -10,7 +10,12 @@
 
 namespace {
     inline bool IsSolid(MapChipType t) {
-        return t == MapChipType::kBlock || t == MapChipType::kBlock2;
+        return t == MapChipType::kBlock
+            || t == MapChipType::kBlock2
+            || t == MapChipType::kSpike
+            || t == MapChipType::kMoveHorizontal
+            || t == MapChipType::kMoveVertical;
+
     }
     constexpr float kPi = 3.14159265358979323846f;
 
