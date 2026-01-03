@@ -98,12 +98,22 @@ void BossEnemy::Initialize(
         obj_->SetModel("enemy0/enemy0.obj");
         break;
     case EnemyType::Type1:
-        obj_->SetModel("enemy1/enemy1.obj");
+        obj_->SetModel("enemy2/enemy2.obj");
         break;
-    case EnemyType::Boss:
+    case EnemyType::Boss: {
         obj_->SetModel("enemy1/enemy1.obj"); // 没有就换成你已有的模型路径
-        width_  = 2.6f;
-        height_ = 3.0f;
+
+        // ===== 放大 Boss（模型）+ 增加碰撞体积 =====
+        // 说明：如果你的 Object3d 没有 SetScale()，请改成你工程里对应的缩放 API。
+        const float kBossScale = 1.35f;
+
+        // 碰撞体积（AABB）跟着放大
+        width_  = 2.6f * kBossScale;
+        height_ = 3.0f * kBossScale;
+
+        // 模型缩放
+        obj_->SetScale({ kBossScale, kBossScale, kBossScale });
+
         bossState_ = BossState::Idle;
         queuedAttack_ = BossAttack::None;
 
@@ -123,6 +133,9 @@ void BossEnemy::Initialize(
             p.life = 0.0f;
             p.radius = 0.35f;
         }
+        break;
+    }
+    default:
         break;
     }
 

@@ -55,6 +55,9 @@ public:
     bool IsDead() const { return isDead_; }
     int  GetHp()  const { return hp_; }
 
+    int  GetMaxHp() const { return maxHp_; }
+    float GetHpRatio() const { return (maxHp_ > 0) ? (static_cast<float>(hp_) / static_cast<float>(maxHp_)) : 0.0f; }
+
     // Boss：踩头无敌时间是否结束（用于 GameScene 避免重复扣血）
     virtual bool CanTakeStompDamage() const { return stompInvuln_ <= 0.0f; }
 

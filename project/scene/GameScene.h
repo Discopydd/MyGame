@@ -170,6 +170,19 @@ private:
     bool crushedByPlatformThisFrame_ = false;
     bool damagedByEnemyThisFrame_    = false;
 
+    
+    // ================== Boss HP（2D） ==================
+    std::unique_ptr<Sprite> bossHpDamageSprite_; // 红色：延迟扣血条
+    std::unique_ptr<Sprite> bossHpSprite_;       // 绿色：即时血条
+
+    Vector2 bossHpBarPos_{};   // 左上角坐标（屏幕像素）
+    Vector2 bossHpBarSize_{};  // 满血时的尺寸（屏幕像素）
+
+    float bossHpRatio_      = 1.0f; // 绿色条比例
+    float bossDamageRatio_  = 1.0f; // 红色条比例（缓慢追上绿色）
+    float bossDamageDropSpeed_ = 0.45f; // 每秒下降速度（0~1）
+    bool  bossHpVisible_    = false;
+
     // 敌人
     std::vector<std::unique_ptr<Enemy>> enemies_;
 };

@@ -1,5 +1,6 @@
 #include "GameScene.h"
 #include <numbers>
+#include <algorithm>
 #include <scene/LoadingScene.h>
 #include "SceneManager.h"
 #include <cstdlib>
@@ -274,6 +275,35 @@ void GameScene::Initialize() {
         static_cast<float>(WinApp::kClientHeight)
     });
 
+    // ================== Boss HP（2D） ==================
+    // 需要把你给的两张贴图放到 Resources 目录下：
+    //  - Resources/Damagebar.png（红色延迟条）
+    //  - Resources/HPbar.png（绿色即时条）
+    const std::string kBossDamageBarTex = "Resources/Damagebar.png";
+    const std::string kBossHpBarTex     = "Resources/HPbar.png";
+
+    bossHpDamageSprite_ = std::make_unique<Sprite>();
+    bossHpDamageSprite_->Initialize(spriteCommon_, kBossDamageBarTex);
+
+    bossHpSprite_ = std::make_unique<Sprite>();
+    bossHpSprite_->Initialize(spriteCommon_, kBossHpBarTex);
+
+    // 条的位置/尺寸（可按喜好调整）
+    bossHpBarSize_ = { 420.0f, 24.0f };
+    bossHpBarPos_  = { (WinApp::kClientWidth - bossHpBarSize_.x) * 0.5f, 24.0f };
+
+    bossHpDamageSprite_->SetPosition(bossHpBarPos_);
+    bossHpDamageSprite_->SetSize(bossHpBarSize_);
+    bossHpDamageSprite_->SetVisible(false);
+
+    bossHpSprite_->SetPosition(bossHpBarPos_);
+    bossHpSprite_->SetSize(bossHpBarSize_);
+    bossHpSprite_->SetVisible(false);
+
+    bossHpRatio_ = 1.0f;
+    bossDamageRatio_ = 1.0f;
+    bossHpVisible_ = false;
+
     // === ImGui 管理器 ===
     imguiManager_ = std::make_unique<ImGuiManager>();
     imguiManager_->Initialize(winApp_, dxCommon_, srvManager_);
@@ -307,7 +337,7 @@ void GameScene::Initialize() {
     ModelManager::GetInstants()->LoadModel("water/water.obj");
     ModelManager::GetInstants()->LoadModel("enemy0/enemy0.obj");
     ModelManager::GetInstants()->LoadModel("enemy1/enemy1.obj");
-
+    ModelManager::GetInstants()->LoadModel("enemy2/enemy2.obj");
     // === 玩家 ===
     player_ = std::make_unique<Player>();
     player_->Initialize(object3dCommon_.get(), camera_.get());
@@ -720,6 +750,58 @@ void GameScene::Update() {
         std::remove_if(enemies_.begin(), enemies_.end(),
             [](const std::unique_ptr<Enemy>& e) { return (!e) || e->IsDead(); }),
         enemies_.end());
+
+
+    // ================== Boss HP（2D）更新 ==================
+    if (bossHpDamageSprite_ && bossHpSprite_) {
+        Enemy* boss = nullptr;
+        for (auto& e : enemies_) {
+            if (e && e->GetType() == EnemyType::Boss) {
+                boss = e.get();
+                break;
+            }
+        }
+
+        if (boss && !boss->IsDead()) {
+            bossHpVisible_ = true;
+
+            float target = boss->GetHpRatio();
+            target = std::clamp(target, 0.0f, 1.0f);
+            bossHpRatio_ = target;
+
+            // 红色延迟条：只会慢慢下降追上绿色（如果回血则立刻拉回）
+            if (bossDamageRatio_ < target) {
+                bossDamageRatio_ = target;
+            } else {
+                bossDamageRatio_ -= bossDamageDropSpeed_ * deltaTime;
+                if (bossDamageRatio_ < target) {
+                    bossDamageRatio_ = target;
+                }
+            }
+
+            Vector2 dmgSize = bossHpBarSize_;
+            dmgSize.x = bossHpBarSize_.x * bossDamageRatio_;
+            bossHpDamageSprite_->SetPosition(bossHpBarPos_);
+            bossHpDamageSprite_->SetSize(dmgSize);
+            bossHpDamageSprite_->SetVisible(true);
+
+            Vector2 hpSize = bossHpBarSize_;
+            hpSize.x = bossHpBarSize_.x * bossHpRatio_;
+            bossHpSprite_->SetPosition(bossHpBarPos_);
+            bossHpSprite_->SetSize(hpSize);
+            bossHpSprite_->SetVisible(true);
+        }
+        else {
+            bossHpVisible_ = false;
+            bossHpRatio_ = 1.0f;
+            bossDamageRatio_ = 1.0f;
+            bossHpDamageSprite_->SetVisible(false);
+            bossHpSprite_->SetVisible(false);
+        }
+
+        bossHpDamageSprite_->Update();
+        bossHpSprite_->Update();
+    }
 
     // 先做平台上的落地 / 分离 / 搭乘
     if (!crushedByPlatformThisFrame_) {
@@ -1353,6 +1435,12 @@ void GameScene::Draw() {
     // ================== 4) 最前景 UI Sprite ==================
     spriteCommon_->CommonDraw();
 
+    // ===== Boss HP（2D）=====
+    if (!inGameClear && bossHpVisible_) {
+        if (bossHpDamageSprite_) { bossHpDamageSprite_->Draw(); }
+        if (bossHpSprite_)       { bossHpSprite_->Draw(); }
+    }
+
     // Intro / 黑边 / 暗角 / 标题 / Skip 提示
     if (intro_) {
         intro_->Draw();
@@ -1464,6 +1552,10 @@ void GameScene::Finalize() {
 
     // ==== 背景 Sprite ====
     backgroundSprite_.reset();
+
+    // ==== Boss HP（2D）Sprite ====
+    bossHpDamageSprite_.reset();
+    bossHpSprite_.reset();
 
     // ==== 3D 物体容器（方块 / 水面 / 敌人 / 平台）====
     // 里面是 unique_ptr，clear() 时会自动 delete 元素
