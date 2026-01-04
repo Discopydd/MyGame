@@ -44,11 +44,12 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
     // 每帧默认认为不在水中，后面再基于地图重算
     inWater_ = false;
     onWaterSurface_ = false;
-     // === 受伤无敌 & 闪烁处理 ===
-    if (isInvincible_) {
-        invincibleTimer_ -= deltaTime;
-        damageBlinkTimer_ += deltaTime;
+         // === 无敌计时（受伤/冲刺/踩头） & 闪烁（仅受伤无敌） ===
+    // ① 受伤无敌：带闪烁
+    if (damageInvincibleTimer_ > 0.0f) {
+        damageInvincibleTimer_ -= deltaTime;
 
+        damageBlinkTimer_ += deltaTime;
         // 每隔 damageBlinkInterval_ 翻转一次可见性
         if (damageBlinkTimer_ >= damageBlinkInterval_) {
             damageBlinkTimer_ = 0.0f;
@@ -56,13 +57,29 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
         }
 
         // 无敌时间结束
-        if (invincibleTimer_ <= 0.0f) {
-            isInvincible_ = false;
-            invincibleTimer_ = 0.0f;
+        if (damageInvincibleTimer_ <= 0.0f) {
+            damageInvincibleTimer_ = 0.0f;
             damageBlinkTimer_ = 0.0f;
             damageBlinkVisible_ = true;
         }
     }
+
+    // ② 冲刺无敌：不闪烁
+    if (dashInvincibleTimer_ > 0.0f) {
+        dashInvincibleTimer_ -= deltaTime;
+        if (dashInvincibleTimer_ < 0.0f) dashInvincibleTimer_ = 0.0f;
+    }
+
+    // ③ 踩头无敌：不闪烁
+    if (stompInvincibleTimer_ > 0.0f) {
+        stompInvincibleTimer_ -= deltaTime;
+        if (stompInvincibleTimer_ < 0.0f) stompInvincibleTimer_ = 0.0f;
+    }
+
+    isInvincible_ = (damageInvincibleTimer_ > 0.0f) ||
+                    (dashInvincibleTimer_ > 0.0f) ||
+                    (stompInvincibleTimer_ > 0.0f);
+
     // --- HP 每秒递减 ---
     if (hpDrainPerSec_ > 0.0f && hp_ > 0.0f) {
         //hp_ -= hpDrainPerSec_ * deltaTime;
@@ -239,6 +256,9 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
         dashTimer_ = 0.0f;
         dashCooldownTimer_ = dashCooldown_;
 
+
+        // 冲刺期间无敌（不闪烁）
+        StartDashInvincible(dashDuration_);
         // 确定冲刺方向
         if (lrDirection_ == LRDirection::kRight)  dashDirection_ = { 1, 0, 0 };
         else                                      dashDirection_ = { -1, 0, 0 };
@@ -586,11 +606,12 @@ void Player::ResetForMapTransition(bool keepFacing) {
     dashCooldownTimer_ = 0.0f;  // 若想保留冷却可移除此行
     canDash_ = true;
 
-    isInvincible_       = false;
-    invincibleTimer_    = 0.0f;
-    damageBlinkTimer_   = 0.0f;
-    damageBlinkVisible_ = true;
-
+    isInvincible_          = false;
+    damageInvincibleTimer_   = 0.0f;
+    dashInvincibleTimer_     = 0.0f;
+    stompInvincibleTimer_    = 0.0f;
+    damageBlinkTimer_        = 0.0f;
+    damageBlinkVisible_      = true;
     // 重力“基准”恢复（与新参数体系对齐）
     originalGravity_ = gravityBase_;
     // 离开当前地图/传送时，不保留水中状态
@@ -624,17 +645,36 @@ void Player::StartDeathFall() {
 
 void Player::StartInvincible(float duration)
 {
+    // 受伤无敌（带闪烁）
     if (duration <= 0.0f) {
-        isInvincible_ = false;
-        invincibleTimer_ = 0.0f;
+        damageInvincibleTimer_ = 0.0f;
         damageBlinkTimer_ = 0.0f;
         damageBlinkVisible_ = true;
+        isInvincible_ = (dashInvincibleTimer_ > 0.0f) || (stompInvincibleTimer_ > 0.0f);
         return;
     }
 
-    isInvincible_     = true;
-    invincibleTimer_  = duration;
+    // 不要把已有无敌“缩短”
+    damageInvincibleTimer_ = (std::max)(damageInvincibleTimer_, duration);
+
+    // 重新开始闪烁
     damageBlinkTimer_ = 0.0f;
     // 开始时就闪一下：先设为不可见
     damageBlinkVisible_ = false;
+
+    isInvincible_ = true;
+}
+
+void Player::StartDashInvincible(float duration)
+{
+    if (duration <= 0.0f) { return; }
+    dashInvincibleTimer_ = (std::max)(dashInvincibleTimer_, duration);
+    isInvincible_ = true;
+}
+
+void Player::StartStompInvincible(float duration)
+{
+    if (duration <= 0.0f) { return; }
+    stompInvincibleTimer_ = (std::max)(stompInvincibleTimer_, duration);
+    isInvincible_ = true;
 }

@@ -59,9 +59,11 @@ public:
     bool IsInWater() const { return inWater_; }
     bool IsOnWaterSurface() const { return onWaterSurface_; }
 
-    bool  IsInvincible() const { return isInvincible_; }
-    void  StartInvincible(float duration);
-
+        bool  IsInvincible() const { return isInvincible_; }
+    bool  IsDamageInvincible() const { return damageInvincibleTimer_ > 0.0f; } // 仅“受伤无敌”（带闪烁）
+    void  StartInvincible(float duration);          // 受伤无敌（带闪烁）
+    void  StartDashInvincible(float duration);      // 冲刺无敌（不闪烁）
+    void  StartStompInvincible(float duration);     // 踩头无敌（不闪烁）
     bool  IsDead() const { return isDead_; }
     void  StartDeathFall();   // 触发死亡演出（被 GameScene 调用）
 
@@ -156,14 +158,22 @@ private:
     int   maxJumpCount_ = 2;     // 最大跳跃次数（2 = 二段跳）
 
     bool  didDoubleJumpThisFrame_ = false; // 本帧是否触发了二段跳
-
-    // --- 受伤无敌 & 闪烁 ---
+    // --- 无敌（受伤/冲刺/踩头） & 闪烁（仅受伤无敌） ---
     bool  isInvincible_ = false;
-    float invincibleTimer_ = 0.0f;
+
+    // 受伤无敌：带闪烁（受伤后 1 秒无敌等）
+    float damageInvincibleTimer_ = 0.0f;
+
+    // 冲刺无敌：冲刺期间无敌（不闪烁）
+    float dashInvincibleTimer_ = 0.0f;
+
+    // 踩头无敌：踩到敌人后短暂无敌（不闪烁）
+    float stompInvincibleTimer_ = 0.0f;
+
+    // 闪烁（仅在 damageInvincibleTimer_ > 0 时生效）
     float damageBlinkTimer_ = 0.0f;
     float damageBlinkInterval_ = 0.08f; // 闪烁间隔（秒）
     bool  damageBlinkVisible_ = true;
-
      // ---- 水状态 ----
     bool inWater_ = false;        // 是否处于水块内部（按下 S 下潜）
     bool onWaterSurface_ = false; // 是否在水面上漂浮

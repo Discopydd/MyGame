@@ -704,8 +704,8 @@ void GameScene::Update() {
                (pPos.y >= stompMinCenterY) &&
                (pBottom <= eTop + stompTolerance);
             if (isStomp) {
-                // ★ 受击無敵中：弹起可以，但不触发敌人死亡/扣血
-                if (player_->IsInvincible()) {
+                // ★ 受伤无敌中：弹起可以，但不触发敌人死亡/扣血（冲刺/踩头无敌不影响踩头伤害）
+                if (player_->IsDamageInvincible()) {
                     Vector3 newVel = pVel;
                     newVel.y = 0.7f;
                     player_->SetVelocity(newVel);
@@ -733,6 +733,9 @@ void GameScene::Update() {
                 Vector3 newPos = pPos;
                 newPos.y = eTop + pHalfH + 0.01f;
                 player_->SetPosition(newPos);
+
+                // 踩头后给一点点无敌时间（不闪烁）
+                player_->StartStompInvincible(0.25f);
 
                 // 不给玩家伤害，处理完当前敌人就继续下一个
                 continue;
