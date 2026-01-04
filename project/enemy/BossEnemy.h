@@ -22,10 +22,25 @@ private:
     float   gravityBase_ = -2.20f;
 
     // ---------- Boss AI ----------
-    enum class BossState { Idle, Chase, Windup, Dash, Shoot, Ultimate, Rest, Recover, Stunned };
+    // 说明：尽量沿用原状态机，新增少量状态做“更炫酷”的招式
+    enum class BossState {
+        Idle,
+        Chase,
+        Windup,
+        Dash,
+        Shoot,
+        Barrage,   // 旋转弹幕（站桩/小范围移动的“弹幕地狱”）
+        Nova,      // 圆形爆发（多环环形弹幕，更“炸裂”）
+        Jump,      // 跳起（准备砸地）
+        Slam,      // 落地砸地（生成冲击波弹幕）
+        Ultimate,
+        Rest,
+        Recover,
+        Stunned
+    };
     BossState bossState_ = BossState::Idle;
 
-    enum class BossAttack { None, Dash, Ranged, Ultimate };
+    enum class BossAttack { None, Dash, Ranged, Barrage, Nova, Slam, Ultimate };
     BossAttack queuedAttack_ = BossAttack::None;
 
     float stateTimer_    = 0.0f;   // 前摇/攻击/后摇/硬直计时
@@ -47,6 +62,9 @@ private:
     float dashCD_         = 0.0f;  // 冲刺冷却
     float microDashCD_    = 0.0f;  // 贴脸小冲刺冷却（不占用 dashCD_）
     float rangedCD_       = 0.0f;  // 远程冷却
+    float barrageCD_      = 0.0f;  // 旋转弹幕冷却
+    float slamCD_         = 0.0f;  // 砸地冷却
+    float novaCD_         = 0.0f;  // 圆形爆发冷却
     float ultimateCD_     = 3.0f;  // 大招冷却（开场给一点延迟）
     int   ultimateBounces_ = 0;    // 大招：已反弹次数
 
@@ -94,11 +112,56 @@ private:
         bool    active = false;
     };
 
-    static constexpr int kMaxBossProjectiles_ = 12;
+    // 弹幕更密集会更炫酷，因此池子稍微加大一点
+    static constexpr int kMaxBossProjectiles_ = 48;
     std::vector<BossProjectile> projectiles_;
 
     float projectileSpeed_ = 0.25f;  // 每帧位移（跟 dashSpeed_ 同量纲）
     float projectileLife_  = 2.20f;  // 秒
+
+    // ---------- 新增：炫酷招式参数 ----------
+    // ① 旋转弹幕（Barrage）：围绕 Boss 旋转发射
+    float barrageDuration_      = 1.35f; // 秒
+    float barrageFireInterval_  = 0.055f; // 秒
+    float barrageFireTimer_     = 0.0f;
+    float barrageAngle_         = 0.0f;  // 弧度
+    float barrageAngularSpeed_  = 7.0f;  // rad/sec
+    float barrageSpinDir_       = 1.0f;  // +1/-1：旋转方向
+    float barrageProjectileSpd_ = 0.22f; // 每帧位移（可独立于 projectileSpeed_）
+    float barrageProjectileLife_= 2.10f;
+
+    // Barrage 期间追加“爆环”让画面更炫
+    float barrageBurstInterval_ = 0.38f;
+    float barrageBurstTimer_    = 0.0f;
+    int   barrageBurstCount_    = 10;
+    float barrageBurstSpeed_    = 0.18f;
+    float barrageBurstLife_     = 1.45f;
+
+    // ①.5 圆形爆发（Nova）：多环环形弹幕
+    float novaWindup_         = 0.26f;
+    float novaDuration_       = 0.95f;
+    float novaRecover_        = 0.85f;
+    int   novaRingsNormal_    = 2;
+    int   novaRingsEnrage_    = 3;
+    float novaRingInterval_   = 0.16f;
+    int   novaBulletCount_    = 18;
+    float novaProjectileSpd_  = 0.26f;
+    float novaProjectileLife_ = 1.65f;
+    float novaRingOffset_     = 0.0f;
+    float novaFireTimer_      = 0.0f;
+    int   novaRingsLeft_      = 0;
+
+    // ② 砸地（Slam）：跳起后落地生成“左右冲击波 + 破片”
+    float slamWindup_      = 0.32f;
+    float slamJumpVel_     = 0.92f;
+    float slamMaxAirTime_  = 1.60f; // failsafe
+    float slamImpactHold_  = 0.18f; // 落地停顿
+    float slamRecover_     = 0.75f;
+    float slamWaveSpeed_   = 0.38f;
+    float slamWaveLife_    = 1.70f;
+    float slamShardSpeed_  = 0.30f;
+    float slamShardLife_   = 1.40f;
+    bool  slamSpawned_     = false;
 
     // Shoot 状态内部连射
     int   shotsLeft_      = 0;
@@ -106,7 +169,16 @@ private:
     float shotInterval_   = 0.16f;  // 秒
     float shotTimer_      = 0.0f;   // 秒（<=0 就发射）
 
+    // ③ 新增：扇形散射（用 Shoot 状态内的“开关”实现，不增加额外状态）
+    bool  fanShot_        = false;
+    int   fanCount_       = 5;      // 每波弹数量
+    float fanHalfAngle_   = 0.52f;  // 半角（弧度）≈ 30°
+    float fanProjectileSpd_= 0.24f;
+
     bool ultimateLocked_ = false;     // 是否处于“把 ultimateCD_ 拉到 399 的锁定期”
+
+    // 通用：环形弹幕工具（复用对象池）
+    void SpawnRadialBurst(const Vector3& center, int count, float speed, float life, float radius, float angleOffset = 0.0f);
 
 private:
     void ResolveMapCollision(const MapChipField& map, float dt);
@@ -114,6 +186,7 @@ private:
 
     void UpdateBossProjectiles(float dt, const MapChipField& map);
     void SpawnBossProjectile(const Vector3& spawnPos, const Vector3& aimDir);
+    void SpawnBossProjectileRaw(const Vector3& spawnPos, const Vector3& velocity, float life, float radius);
     void DrawBossProjectiles();
 
     void FinishUltimateCooldown();

@@ -55,6 +55,8 @@ void BossEnemy::Initialize(
     hitReactTimer_ = 0.0f;
     damageBlinkTimer_ = 0.0f;
     damageBlinkVisible_ = true;
+    // 默认闪烁频率（Boss 会在下面覆写成更快一点）
+    damageBlinkInterval_ = 0.08f;
 
     velocity_ = { 0.0f, 0.0f, 0.0f };
     isOnGround_ = false;
@@ -76,13 +78,28 @@ void BossEnemy::Initialize(
     meleeCD_ = 0.0f;
     dashCD_ = 0.0f;
     rangedCD_ = 0.0f;
+    barrageCD_ = 0.0f;
+    slamCD_ = 0.0f;
+    novaCD_ = 0.0f;
+
+    barrageFireTimer_ = 0.0f;
+    barrageAngle_ = 0.0f;
+    barrageSpinDir_ = 1.0f;
+    barrageBurstTimer_ = 0.0f;
+    slamSpawned_ = false;
+
+    novaFireTimer_ = 0.0f;
+    novaRingsLeft_ = 0;
+    novaRingOffset_ = 0.0f;
 
     ultimateCD_ = 2.0f;
     ultimateBounces_ = 0;
 
     shotsLeft_ = 0;
     shotsTotal_ = 0;
+    shotInterval_ = 0.16f;
     shotTimer_ = 0.0f;
+    fanShot_ = false;
 
     obj_ = std::make_unique<Object3d>();
     obj_->Initialize(common);
@@ -103,6 +120,9 @@ void BossEnemy::Initialize(
     case EnemyType::Boss: {
         obj_->SetModel("enemy1/enemy1.obj"); // 没有就换成你已有的模型路径
 
+        // Boss 受击闪烁：频率更快一点，更有“打击感”
+        damageBlinkInterval_ = 0.055f;
+
         // ===== 放大 Boss（模型）+ 增加碰撞体积 =====
         // 说明：如果你的 Object3d 没有 SetScale()，请改成你工程里对应的缩放 API。
         const float kBossScale = 1.35f;
@@ -113,6 +133,12 @@ void BossEnemy::Initialize(
 
         // 模型缩放
         obj_->SetScale({ kBossScale, kBossScale, kBossScale });
+
+        // Boss 受击闪烁更“电流感”：频率略快
+        damageBlinkInterval_ = 0.055f;
+
+        // Boss 受击闪烁：更明显一点
+        damageBlinkInterval_ = 0.06f;
 
         bossState_ = BossState::Idle;
         queuedAttack_ = BossAttack::None;
@@ -198,6 +224,9 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
         dashCD_ = (std::max)(0.0f, dashCD_ - dt);
         microDashCD_ = (std::max)(0.0f, microDashCD_ - dt);
         rangedCD_ = (std::max)(0.0f, rangedCD_ - dt);
+        barrageCD_ = (std::max)(0.0f, barrageCD_ - dt);
+        slamCD_ = (std::max)(0.0f, slamCD_ - dt);
+        novaCD_ = (std::max)(0.0f, novaCD_ - dt);
         globalAttackCD_ = (std::max)(0.0f, globalAttackCD_ - dt);
         ultimateCD_ = (std::max)(0.0f, ultimateCD_ - dt);
 
@@ -267,6 +296,10 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
 
                 const bool canRanged = (!tooCloseForRanged && dist >= rangedMinRange_ && dist <= rangedMaxRange_ && rangedCD_ <= 0.0f);
                 const bool canUltimate = (ultimateCD_ <= 0.0f);
+                const bool canBarrage = (!tooCloseForRanged && dist >= 5.5f && dist <= 13.5f && barrageCD_ <= 0.0f);
+                const bool playerAbove = (pPos.y > position_.y + height_ * 0.15f);
+                const bool canSlam = (isOnGround_ && slamCD_ <= 0.0f && dist <= 6.5f);
+                const bool canNova = (!tooCloseForRanged && dist >= 4.8f && dist <= 12.8f && novaCD_ <= 0.0f);
 
                 if (canUltimate && dist >= 2.0f && dist <= 14.0f) {
                     queuedAttack_ = BossAttack::Ultimate;
@@ -280,7 +313,42 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
                     globalAttackCD_ = 1.10f;
                     decisionTimer_ = 0.35f;
                 }
-                // ② 远距离：优先远程压制
+                // ② 砸地：克制“跳头顶/贴脸绕圈”，落地会生成冲击波弹幕
+                else if (canSlam && (playerAbove || dist <= (meleeRange_ + 1.2f))) {
+                    queuedAttack_ = BossAttack::Slam;
+                    bossState_ = BossState::Windup;
+                    attackFacing_ = facing_;
+                    stateTimer_ = slamWindup_;
+
+                    slamCD_ = (hp_ <= enrageHp_) ? 3.0f : 4.2f;
+                    globalAttackCD_ = 1.15f;
+                    decisionTimer_ = 0.30f;
+                }
+                // ②.5 圆形爆发：更“炸裂”的环形弹幕（残血优先；也会惩罚玩家一直后撤）
+                else if (canNova && (hp_ <= enrageHp_ || (playerMovingAway && dist >= 8.0f) || distIncreasing)) {
+                    queuedAttack_ = BossAttack::Nova;
+                    bossState_ = BossState::Windup;
+                    attackFacing_ = facing_;
+                    stateTimer_ = novaWindup_;
+
+                    float r = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+                    novaCD_ = (hp_ <= enrageHp_) ? (3.2f + 1.0f * r) : (4.6f + 1.2f * r);
+                    globalAttackCD_ = 1.15f;
+                    decisionTimer_ = 0.32f;
+                }
+                // ③ 旋转弹幕：中远距离压制（更炫酷），玩家一直后撤时更容易触发
+                else if (canBarrage && (hp_ <= enrageHp_ || playerMovingAway || dist >= farRangedPrefer_)) {
+                    queuedAttack_ = BossAttack::Barrage;
+                    bossState_ = BossState::Windup;
+                    attackFacing_ = facing_;
+                    stateTimer_ = 0.30f;
+
+                    float r = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+                    barrageCD_ = (hp_ <= enrageHp_) ? (3.0f + 1.0f * r) : (4.0f + 1.2f * r);
+                    globalAttackCD_ = 1.05f;
+                    decisionTimer_ = 0.30f;
+                }
+                // ④ 远距离：优先远程压制
                 else if (canRanged && dist >= farRangedPrefer_ && dist > dashMaxRange_) {
                     queuedAttack_ = BossAttack::Ranged;
                     bossState_ = BossState::Windup;
@@ -377,13 +445,60 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
                     else {
                         bossState_ = BossState::Shoot;
 
-                        // Shoot 状态时长，略长一点方便连射/读招
-                        stateTimer_ = (hp_ <= enrageHp_) ? 0.85f : 0.55f;
+                        // -------- 射击模式选择 --------
+                        // 残血 & 中距离：改为“扇形散射”更炫酷
+                        fanShot_ = (hp_ <= enrageHp_) && (dist <= 9.5f);
 
-                        shotsTotal_ = (hp_ <= enrageHp_) ? 3 : 1;
+                        if (fanShot_) {
+                            stateTimer_ = 0.95f;
+                            shotsTotal_ = 2;           // 两波散射
+                            shotInterval_ = 0.22f;
+                        }
+                        else {
+                            // 原有：单发 / 三连发（纵向散射）
+                            stateTimer_ = (hp_ <= enrageHp_) ? 0.85f : 0.55f;
+                            shotsTotal_ = (hp_ <= enrageHp_) ? 3 : 1;
+                            shotInterval_ = 0.16f;
+                        }
+
                         shotsLeft_ = shotsTotal_;
                         shotTimer_ = 0.0f; // 立即发射
                     }
+                }
+                else if (queuedAttack_ == BossAttack::Barrage) {
+                    bossState_ = BossState::Barrage;
+
+                    // 残血时更久、更密集
+                    stateTimer_ = (hp_ <= enrageHp_) ? (barrageDuration_ + 0.25f) : barrageDuration_;
+                    barrageFireTimer_ = 0.0f;
+                    barrageBurstTimer_ = barrageBurstInterval_ * 0.65f;
+
+                    // 角度随机一点，避免每次都一样
+                    float r = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+                    barrageAngle_ = r * 6.283185307179586f; // 2*pi
+                    barrageSpinDir_ = (r < 0.5f) ? 1.0f : -1.0f;
+                }
+                else if (queuedAttack_ == BossAttack::Nova) {
+                    bossState_ = BossState::Nova;
+
+                    // 残血时多一环、更密集
+                    // 确保有足够时间把所有环都放完
+                    novaFireTimer_ = 0.0f; // 立即释放第一环
+                    novaRingsLeft_ = (hp_ <= enrageHp_) ? novaRingsEnrage_ : novaRingsNormal_;
+                    stateTimer_ = novaDuration_ + novaRingInterval_ * (std::max)(0, novaRingsLeft_ - 1);
+
+                    // 每次环形弹幕都转一点角度，避免“固定花纹”
+                    float r = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+                    novaRingOffset_ = r * 6.283185307179586f;
+                }
+                else if (queuedAttack_ == BossAttack::Slam) {
+                    bossState_ = BossState::Jump;
+                    stateTimer_ = slamMaxAirTime_;
+
+                    // 起跳（砸地）
+                    velocity_.x = 0.0f;
+                    velocity_.y = slamJumpVel_;
+                    slamSpawned_ = false;
                 }
                 else if (queuedAttack_ == BossAttack::Ultimate) {
                     bossState_ = BossState::Ultimate;
@@ -434,6 +549,173 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
             }
             break;
 
+        case BossState::Barrage:
+        {
+            // 旋转弹幕：站定发射，靠角度持续旋转制造“弹幕地狱”效果
+            velocity_.x = 0.0f;
+            facing_ = attackFacing_;
+
+            // 残血时更密集/旋转更快
+            const float fireInterval = (hp_ <= enrageHp_) ? (barrageFireInterval_ * 0.85f) : barrageFireInterval_;
+            const float angSpeed = (hp_ <= enrageHp_) ? (barrageAngularSpeed_ * 1.15f) : barrageAngularSpeed_;
+
+            // 追加：周期性“爆环”，让弹幕更有层次
+            barrageBurstTimer_ -= dt;
+            if (barrageBurstTimer_ <= 0.0f && stateTimer_ > 0.0f) {
+                barrageBurstTimer_ += barrageBurstInterval_;
+                const int count = (hp_ <= enrageHp_) ? (barrageBurstCount_ + 4) : barrageBurstCount_;
+                const float spd = (hp_ <= enrageHp_) ? (barrageBurstSpeed_ * 1.15f) : barrageBurstSpeed_;
+                Vector3 c = position_;
+                c.y += height_ * 0.18f;
+                SpawnRadialBurst(c, count, spd, barrageBurstLife_, 0.28f, barrageAngle_);
+            }
+
+            barrageFireTimer_ -= dt;
+            while (barrageFireTimer_ <= 0.0f && stateTimer_ > 0.0f) {
+                barrageFireTimer_ += fireInterval;
+
+                // 弹幕出生点：胸口略前
+                Vector3 spawn = position_;
+                spawn.x += attackFacing_ * (width_ * 0.15f);
+                spawn.y += height_ * 0.18f;
+
+                // 发射 1~2 发：残血时双发更炫
+                const int emitCount = (hp_ <= enrageHp_) ? 2 : 1;
+                for (int i = 0; i < emitCount; ++i) {
+                    float ang = barrageAngle_ + (i == 0 ? 0.0f : kPi);
+                    Vector3 dir{ std::cos(ang), std::sin(ang), 0.0f };
+                    Vector3 vel{ dir.x * barrageProjectileSpd_, dir.y * barrageProjectileSpd_, 0.0f };
+                    SpawnBossProjectileRaw(spawn, vel, barrageProjectileLife_, 0.32f);
+                }
+
+                // 角度推进：按旋转方向旋转
+                barrageAngle_ += angSpeed * fireInterval * barrageSpinDir_;
+            }
+
+            if (stateTimer_ <= 0.0f) {
+                bossState_ = BossState::Recover;
+                stateTimer_ = 0.70f;
+            }
+            break;
+        }
+
+        case BossState::Nova:
+        {
+            // 圆形爆发：多环环形弹幕
+            velocity_.x = 0.0f;
+            facing_ = attackFacing_;
+
+            const int totalRings = (hp_ <= enrageHp_) ? novaRingsEnrage_ : novaRingsNormal_;
+
+            auto emitRing = [&](int ringIndex) {
+                const int count = novaBulletCount_ + ((hp_ <= enrageHp_) ? 2 : 0);
+                const float speed = novaProjectileSpd_ * (1.0f + 0.08f * static_cast<float>(ringIndex));
+                const float offset = novaRingOffset_ + ((ringIndex % 2 == 0) ? 0.0f : (kPi / (float)(count)));
+
+                Vector3 c = position_;
+                c.y += height_ * 0.18f;
+                SpawnRadialBurst(c, count, speed, novaProjectileLife_, 0.30f, offset);
+
+                // 第一环额外加“十字”强子弹，画面更炸裂
+                if (ringIndex == 0) {
+                    const float spd2 = speed * 1.25f;
+                    SpawnBossProjectileRaw(c, {  spd2, 0.0f, 0.0f }, novaProjectileLife_, 0.34f);
+                    SpawnBossProjectileRaw(c, { -spd2, 0.0f, 0.0f }, novaProjectileLife_, 0.34f);
+                    SpawnBossProjectileRaw(c, { 0.0f,  spd2, 0.0f }, novaProjectileLife_, 0.34f);
+                    SpawnBossProjectileRaw(c, { 0.0f, -spd2, 0.0f }, novaProjectileLife_, 0.34f);
+                }
+
+                novaRingOffset_ += 0.35f;
+            };
+
+            // 释放每一环
+            novaFireTimer_ -= dt;
+            while (novaFireTimer_ <= 0.0f && novaRingsLeft_ > 0) {
+                novaFireTimer_ += novaRingInterval_;
+                const int ringIndex = totalRings - novaRingsLeft_;
+                emitRing(ringIndex);
+                novaRingsLeft_--;
+            }
+
+            if (stateTimer_ <= 0.0f) {
+                // 极端掉帧：一次性补齐剩余环，避免漏放
+                while (novaRingsLeft_ > 0) {
+                    const int ringIndex = totalRings - novaRingsLeft_;
+                    emitRing(ringIndex);
+                    novaRingsLeft_--;
+                }
+                bossState_ = BossState::Recover;
+                stateTimer_ = novaRecover_;
+            }
+            break;
+        }
+
+        case BossState::Jump:
+            // 跳起砸地：空中不做水平移动（更好读招）
+            velocity_.x = 0.0f;
+            facing_ = attackFacing_;
+
+            // failsafe：如果空中太久（某些地图/碰撞极端情况），强制进入 Slam
+            if (stateTimer_ <= 0.0f) {
+                bossState_ = BossState::Slam;
+                stateTimer_ = slamImpactHold_;
+                slamSpawned_ = false;
+            }
+            break;
+
+        case BossState::Slam:
+        {
+            // 落地砸地：停顿一下 + 生成冲击波弹幕
+            velocity_.x = 0.0f;
+            facing_ = attackFacing_;
+
+            if (!slamSpawned_) {
+                slamSpawned_ = true;
+
+                // 冲击波：沿地面左右扩散
+                Vector3 base = position_;
+                base.y -= height_ * 0.50f - 0.25f;
+
+                SpawnBossProjectileRaw(base, { -slamWaveSpeed_, 0.0f, 0.0f }, slamWaveLife_, 0.36f);
+                SpawnBossProjectileRaw(base, {  slamWaveSpeed_, 0.0f, 0.0f }, slamWaveLife_, 0.36f);
+
+                // 破片：向上扇形喷出（更炫酷）
+                auto emitShard = [&](float x, float y) {
+                    float len = std::sqrt(x * x + y * y);
+                    if (len < 0.001f) { len = 1.0f; }
+                    Vector3 vel{ (x / len) * slamShardSpeed_, (y / len) * slamShardSpeed_, 0.0f };
+                    SpawnBossProjectileRaw(base, vel, slamShardLife_, 0.30f);
+                };
+
+                emitShard(-1.00f, 0.85f);
+                emitShard(-0.55f, 1.00f);
+                emitShard( 0.55f, 1.00f);
+                emitShard( 1.00f, 0.85f);
+
+                // 残血再加一层小破片
+                if (hp_ <= enrageHp_) {
+                    emitShard(-0.30f, 1.20f);
+                    emitShard( 0.30f, 1.20f);
+                }
+
+                // 追加：落地冲击“爆环”（更炫）
+                {
+                    Vector3 c = base;
+                    c.y += 0.45f; // 抬高一点，避免一出生就撞地面块
+                    float r = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+                    const int count = (hp_ <= enrageHp_) ? 14 : 12;
+                    const float spd = (hp_ <= enrageHp_) ? 0.22f : 0.20f;
+                    SpawnRadialBurst(c, count, spd, 1.25f, 0.28f, r * 6.283185307179586f);
+                }
+            }
+
+            if (stateTimer_ <= 0.0f) {
+                bossState_ = BossState::Recover;
+                stateTimer_ = slamRecover_;
+            }
+            break;
+        }
+
         case BossState::Shoot:
         {
             const float pointBlankRange = meleeRange_ + 0.4f;
@@ -466,9 +748,10 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
                 // 预测目标
                 Vector3 aimTarget{ pPos.x + pVel.x * projectileLeadTime_, pPos.y + pVel.y * projectileLeadTime_, 0.0f };
 
+                // -------- 弹幕模式：扇形散射 / 原有三连发 --------
                 // 三连发：给一点纵向散射
                 int shotIndex = shotsTotal_ - shotsLeft_; // 0..shotsTotal_-1
-                if (shotsTotal_ >= 3) {
+                if (!fanShot_ && shotsTotal_ >= 3) {
                     aimTarget.y += (shotIndex - 1) * 0.55f;
                 }
 
@@ -482,7 +765,24 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
                     dir.y /= len;
                 }
 
-                SpawnBossProjectile(spawn, dir);
+                if (fanShot_) {
+                    // 基准角
+                    // 第二波略微旋转，视觉更丰富
+                    float base = std::atan2(dir.y, dir.x) + 0.18f * static_cast<float>(shotIndex);
+                    const int nBase = (fanCount_ < 2) ? 2 : fanCount_;
+                    const int n = (hp_ <= enrageHp_) ? (nBase + 2) : nBase;
+                    const float start = base - fanHalfAngle_;
+                    const float step = (n > 1) ? (2.0f * fanHalfAngle_ / static_cast<float>(n - 1)) : 0.0f;
+                    for (int i = 0; i < n; ++i) {
+                        float a = start + step * static_cast<float>(i);
+                        Vector3 d{ std::cos(a), std::sin(a), 0.0f };
+                        Vector3 vel{ d.x * fanProjectileSpd_, d.y * fanProjectileSpd_, 0.0f };
+                        SpawnBossProjectileRaw(spawn, vel, projectileLife_, 0.32f);
+                    }
+                }
+                else {
+                    SpawnBossProjectile(spawn, dir);
+                }
 
                 shotsLeft_--;
                 shotTimer_ = shotInterval_;
@@ -510,7 +810,15 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
         }
 
         // 地图碰撞：按“先X后Y扫格子修正”
+        const bool wasOnGround = isOnGround_;
         ResolveMapCollision(map, dt);
+
+        // Jump -> Slam：检测落地瞬间触发砸地
+        if (bossState_ == BossState::Jump && !wasOnGround && isOnGround_) {
+            bossState_ = BossState::Slam;
+            stateTimer_ = slamImpactHold_;
+            slamSpawned_ = false;
+        }
 
         // Dash：撞墙惩罚
         if (bossState_ == BossState::Dash && std::fabs(velocity_.x) < 0.0001f && stateTimer_ > 0.0f) {
@@ -529,9 +837,19 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
                 if (t == MapChipType::kSpike) {
                     bossState_ = BossState::Rest;
                     stateTimer_ = restDuration_;
-                    float r = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
-                    if (hp_ <= enrageHp_) { ultimateCD_ = 2.8f + 1.4f * r; }
-                    else { ultimateCD_ = 4.0f + 2.0f * r; }
+                    // 结束大招：恢复 CD
+                    FinishUltimateCooldown();
+                    ultimateLocked_ = false;
+
+                    // 额外来一圈“终结爆环”，更炫
+                    {
+                        Vector3 c = position_;
+                        c.y += height_ * 0.18f;
+                        float r = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+                        const int count = (hp_ <= enrageHp_) ? 14 : 12;
+                        const float spd = (hp_ <= enrageHp_) ? 0.22f : 0.20f;
+                        SpawnRadialBurst(c, count, spd, 1.10f, 0.28f, r * 6.283185307179586f);
+                    }
                 }
             }
 
@@ -541,12 +859,21 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
                 attackFacing_ *= -1;
                 facing_ = attackFacing_;
 
+                // 每次反弹喷一圈，打击感更强
+                {
+                    Vector3 c = position_;
+                    c.y += height_ * 0.18f;
+                    float r = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+                    const int count = (hp_ <= enrageHp_) ? 12 : 10;
+                    const float spd = (hp_ <= enrageHp_) ? 0.21f : 0.19f;
+                    SpawnRadialBurst(c, count, spd, 1.05f, 0.28f, r * 6.283185307179586f);
+                }
+
                 if (ultimateBounces_ >= ultimateMaxBounces_) {
                     bossState_ = BossState::Rest;
                     stateTimer_ = restDuration_;
-                    float r = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
-                    if (hp_ <= enrageHp_) { ultimateCD_ = 2.8f + 1.4f * r; }
-                    else { ultimateCD_ = 4.0f + 2.0f * r; }
+                    FinishUltimateCooldown();
+                    ultimateLocked_ = false;
                 }
             }
         }
@@ -596,8 +923,8 @@ void BossEnemy::OnStomp()
         // Boss：踩头 30 次死亡（默认）
         hp_ -= 1;
 
-        // 受击反馈：闪烁 + 短硬直（更容易连续踩）
-        StartHitReaction(0.35f);
+        // 受击反馈：闪烁更久一点 + 短硬直（更容易连续踩）
+        StartHitReaction(0.55f);
         bossState_ = BossState::Stunned;
         stateTimer_ = 0.60f;
         decisionTimer_ = 0.20f;
@@ -719,6 +1046,10 @@ void BossEnemy::UpdateBossFacing(const Player& player)
     if (bossState_ == BossState::Dash ||
         bossState_ == BossState::Windup ||
         bossState_ == BossState::Shoot ||
+        bossState_ == BossState::Barrage ||
+        bossState_ == BossState::Nova ||
+        bossState_ == BossState::Jump ||
+        bossState_ == BossState::Slam ||
         bossState_ == BossState::Ultimate) {
         return;
     }
@@ -767,14 +1098,21 @@ void BossEnemy::UpdateBossProjectiles(float dt, const MapChipField& map)
 
 void BossEnemy::SpawnBossProjectile(const Vector3& spawnPos, const Vector3& aimDir)
 {
+    Vector3 vel{ aimDir.x * projectileSpeed_, aimDir.y * projectileSpeed_, 0.0f };
+    SpawnBossProjectileRaw(spawnPos, vel, projectileLife_, 0.35f);
+}
+
+void BossEnemy::SpawnBossProjectileRaw(const Vector3& spawnPos, const Vector3& velocity, float life, float radius)
+{
     // 找一个空槽
     for (auto& p : projectiles_) {
         if (p.active) { continue; }
 
         p.active = true;
-        p.life = projectileLife_;
+        p.life = life;
+        p.radius = radius;
         p.pos = spawnPos;
-        p.vel = { aimDir.x * projectileSpeed_, aimDir.y * projectileSpeed_, 0.0f };
+        p.vel = velocity;
 
         if (p.obj) {
             p.obj->SetTranslate(p.pos);
@@ -784,6 +1122,22 @@ void BossEnemy::SpawnBossProjectile(const Vector3& spawnPos, const Vector3& aimD
     }
 
     // 全满则丢弃（避免无限增长）
+}
+
+void BossEnemy::SpawnRadialBurst(const Vector3& center, int count, float speed, float life, float radius, float angleOffset)
+{
+    if (type_ != EnemyType::Boss) { return; }
+    if (count <= 0) { return; }
+
+    const float twoPi = 6.283185307179586f;
+    const float step = twoPi / static_cast<float>(count);
+
+    for (int i = 0; i < count; ++i) {
+        float a = angleOffset + step * static_cast<float>(i);
+        Vector3 d{ std::cos(a), std::sin(a), 0.0f };
+        Vector3 vel{ d.x * speed, d.y * speed, 0.0f };
+        SpawnBossProjectileRaw(center, vel, life, radius);
+    }
 }
 
 void BossEnemy::DrawBossProjectiles()
