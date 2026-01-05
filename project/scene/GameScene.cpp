@@ -547,7 +547,7 @@ void GameScene::Update() {
             isMapLoading_ = false;
 
             // 真正加载地图
-            LoadMap("Resources/map/map5.csv", { 3,3,0 });
+            LoadMap("Resources/map/map6.csv", { 3,3,0 });
             if (sceneManager_) sceneManager_->ClearOverlayScene();
             if (fade_) fade_->SetPhase(FadePhase::FadingIn);
 
@@ -766,35 +766,49 @@ void GameScene::Update() {
         }
 
         if (boss && !boss->IsDead()) {
-            bossHpVisible_ = true;
-
-            float target = boss->GetHpRatio();
-            target = std::clamp(target, 0.0f, 1.0f);
-            bossHpRatio_ = target;
-
-            // 红色延迟条：只会慢慢下降追上绿色（如果回血则立刻拉回）
-            if (bossDamageRatio_ < target) {
-                bossDamageRatio_ = target;
-            } else {
-                bossDamageRatio_ -= bossDamageDropSpeed_ * deltaTime;
-                if (bossDamageRatio_ < target) {
-                    bossDamageRatio_ = target;
-                }
+            // 只有“接近 Boss（或触发 Boss 战）”才显示血条：逻辑交给 BossEnemy 自己决定
+            bool shouldShow = true;
+            if (auto* b = dynamic_cast<BossEnemy*>(boss)) {
+                shouldShow = b->ShouldShowBossHp(*player_, mapChipField_);
             }
 
-            Vector2 dmgSize = bossHpBarSize_;
-            dmgSize.x = bossHpBarSize_.x * bossDamageRatio_;
-            bossHpDamageSprite_->SetPosition(bossHpBarPos_);
-            bossHpDamageSprite_->SetSize(dmgSize);
-            bossHpDamageSprite_->SetVisible(true);
+            if (shouldShow) {
+                bossHpVisible_ = true;
 
-            Vector2 hpSize = bossHpBarSize_;
-            hpSize.x = bossHpBarSize_.x * bossHpRatio_;
-            bossHpSprite_->SetPosition(bossHpBarPos_);
-            bossHpSprite_->SetSize(hpSize);
-            bossHpSprite_->SetVisible(true);
+                float target = boss->GetHpRatio();
+                target = std::clamp(target, 0.0f, 1.0f);
+                bossHpRatio_ = target;
+
+                // 红色延迟条：只会慢慢下降追上绿色（如果回血则立刻拉回）
+                if (bossDamageRatio_ < target) {
+                    bossDamageRatio_ = target;
+                } else {
+                    bossDamageRatio_ -= bossDamageDropSpeed_ * deltaTime;
+                    if (bossDamageRatio_ < target) {
+                        bossDamageRatio_ = target;
+                    }
+                }
+
+                Vector2 dmgSize = bossHpBarSize_;
+                dmgSize.x = bossHpBarSize_.x * bossDamageRatio_;
+                bossHpDamageSprite_->SetPosition(bossHpBarPos_);
+                bossHpDamageSprite_->SetSize(dmgSize);
+                bossHpDamageSprite_->SetVisible(true);
+
+                Vector2 hpSize = bossHpBarSize_;
+                hpSize.x = bossHpBarSize_.x * bossHpRatio_;
+                bossHpSprite_->SetPosition(bossHpBarPos_);
+                bossHpSprite_->SetSize(hpSize);
+                bossHpSprite_->SetVisible(true);
+            } else {
+                // Boss 还活着，但未接近/未进入 Boss 区域：隐藏血条（不重置比例，避免闪烁时回血条跳满）
+                bossHpVisible_ = false;
+                bossHpDamageSprite_->SetVisible(false);
+                bossHpSprite_->SetVisible(false);
+            }
         }
         else {
+            // Boss 不存在或已死亡：隐藏并重置
             bossHpVisible_ = false;
             bossHpRatio_ = 1.0f;
             bossDamageRatio_ = 1.0f;

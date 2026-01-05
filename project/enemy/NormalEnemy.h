@@ -20,8 +20,17 @@ private:
     float   gravity_ = -2.20f;           // 与 Boss 同量纲（每秒）
     float   moveSpeed_ = 0.12f;          // 与 Boss moveSpeed_ 同量纲（按 60fps 每帧位移）
 
+    // Type1（E1）用：追踪玩家 + 跳跃越障
+    float chaseSpeed_ = 0.10f;         // Type1 横向速度（比巡逻略快）
+    float smallJumpVelocity_ = 0.36f;   // 低跳：主要跨地刺/小台阶
+    float highJumpVelocity_ = 0.52f;   // 高跳：跨 kBlock/kBlock2/移动平台等
+
+    float jumpCooldown_ = 0.0f;
+    float jumpCooldownTime_ = 0.70f;
+
+    float stopRange_ = 0.90f;
     // 死亡动画时保持与地形的碰撞（避免“穿地”），玩家碰撞则用 width_/height_（会被置 0）
-    float aliveWidth_  = 1.5f;
+    float aliveWidth_ = 1.5f;
     float aliveHeight_ = 1.5f;
 
     // ---------- 死亡动画 ----------

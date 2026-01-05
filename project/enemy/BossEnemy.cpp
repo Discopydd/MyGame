@@ -37,6 +37,9 @@ void BossEnemy::Initialize(
     type_     = type;
     position_ = spawnPos;
 
+    // Boss：默认先“睡眠”，等玩家进入指定区域再唤醒（见 Update 里的触发条件）
+    battleTriggered_ = (type != EnemyType::Boss);
+
     // ===== 生命值 =====
     isDead_ = false;
     stompInvuln_ = 0.0f;
@@ -165,6 +168,14 @@ void BossEnemy::Initialize(
         break;
     }
 
+    // --- 判定尺寸初始化 ---
+    // 以当前 width_/height_ 为“基础玩家判定”与“地图碰撞体积”。
+    // Dash 时会临时缩小 width_/height_（玩家判定），但地图碰撞会始终用 mapColliderW_/H_。
+    baseHurtW_ = width_;
+    baseHurtH_ = height_;
+    mapColliderW_ = width_;
+    mapColliderH_ = height_;
+
     obj_->SetTranslate(position_);
     // 初始朝向：右=0，左=PI（和 Player 逻辑一致）
     obj_->SetRotate({ 0.0f, 0.0f, 0.0f });
@@ -196,6 +207,38 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
 
     // ===== Boss AI =====
     if (type_ == EnemyType::Boss) {
+// ===== 战斗触发：玩家越过指定列并“站到地面”后才唤醒 Boss =====
+// 默认触发列：AH（0-based=33）。如果你关卡里不是 AH，调用 SetBattleTriggerXIndex() 或直接改 battleTriggerXIndex_。
+if (!battleTriggered_) {
+    const auto pIdx = map.GetMapChipIndexByPosition(player.GetPosition());
+    const bool passedX = (pIdx.xIndex >= battleTriggerXIndex_);
+    const bool onGround = (!requirePlayerOnGroundToTrigger_) ? true : IsPlayerOnGround(map, player);
+
+    if (passedX && onGround) {
+        battleTriggered_ = true;
+
+        // 刚进入战斗：重置一下节奏，避免“刚触发就立刻贴脸大招”
+        bossState_ = BossState::Idle;
+        queuedAttack_ = BossAttack::None;
+        stateTimer_ = 0.0f;
+        decisionTimer_ = 0.30f;
+        globalAttackCD_ = (std::max)(globalAttackCD_, 0.60f);
+
+        // 清掉残留弹幕（以防复用对象/读档等情况）
+        for (auto& p : projectiles_) {
+            p.active = false;
+            p.life = 0.0f;
+        }
+    } else {
+        // 未触发：不更新 AI/弹幕，只更新渲染（Boss 可以当作“雕像/待机”）
+        if (obj_) {
+            obj_->SetTranslate(position_);
+            obj_->Update();
+        }
+        return;
+    }
+}
+
 
         // 先更新弹幕（不依赖 Boss 身体是否与玩家重叠）
         UpdateBossProjectiles(dt, map);
@@ -243,7 +286,7 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
 
         case BossState::Idle:
             velocity_.x = 0.0f;
-            if (dist < detectRange_) {
+            if (IsInEngageRange(map, player)) {
                 bossState_ = BossState::Chase;
                 decisionTimer_ = 0.0f;
             }
@@ -277,8 +320,9 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
                 if (velocity_.x > 0.01f) moveDir = 1;
                 if (velocity_.x < -0.01f) moveDir = -1;
 
-                float checkX = position_.x + moveDir * (width_ * 0.5f + 0.15f);
-                float checkY = position_.y - height_ * 0.5f + 0.10f;
+                // 地形探测用“身体体积”（不要受 Dash hurtbox 缩放影响）
+                float checkX = position_.x + moveDir * (mapColliderW_ * 0.5f + 0.15f);
+                float checkY = position_.y - mapColliderH_ * 0.5f + 0.10f;
 
                 auto idx = map.GetMapChipIndexByPosition({ checkX, checkY, 0.0f });
                 if (IsSolid(map.GetMapChipTypeByIndex(idx.xIndex, idx.yIndex))) {
@@ -831,7 +875,8 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
             // 地刺判定：脚下那格是刺就立刻结束大招
             {
                 Vector3 foot = position_;
-                foot.y -= height_ * 0.5f - 0.05f;
+                // 地形判定用身体体积（不要受 Dash hurtbox 缩放影响）
+                foot.y -= mapColliderH_ * 0.5f - 0.05f;
                 auto idx = map.GetMapChipIndexByPosition(foot);
                 MapChipType t = map.GetMapChipTypeByIndex(idx.xIndex, idx.yIndex);
                 if (t == MapChipType::kSpike) {
@@ -882,6 +927,18 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
     if (ultimateLocked_ && bossState_ != BossState::Ultimate && ultimateCD_ > 100.0f) {
         FinishUltimateCooldown();
         ultimateLocked_ = false;
+    }
+
+    // ===== Dash 时缩小与玩家的判定（hurtbox） =====
+    // 说明：这里缩的是 width_/height_（玩家交互判定），地图碰撞仍然用 mapColliderW_/H_。
+    if (type_ == EnemyType::Boss) {
+        if (bossState_ == BossState::Dash) {
+            width_  = baseHurtW_ * dashHurtScaleX_;
+            height_ = baseHurtH_ * dashHurtScaleY_;
+        } else {
+            width_  = baseHurtW_;
+            height_ = baseHurtH_;
+        }
     }
     // ===== 渲染更新 =====
     if (obj_) {
@@ -953,8 +1010,9 @@ void BossEnemy::OnStomp()
 void BossEnemy::ResolveMapCollision(const MapChipField& map, float dt)
 {
     const float step = StepScale(dt);
-    const float kHalfW = width_  * 0.5f;
-    const float kHalfH = height_ * 0.5f;
+    // 地图碰撞只使用“固定体积”，不要被 Dash 的 hurtbox 缩放影响
+    const float kHalfW = mapColliderW_ * 0.5f;
+    const float kHalfH = mapColliderH_ * 0.5f;
 
     bool onGround = false;
 
@@ -1038,6 +1096,59 @@ void BossEnemy::ResolveMapCollision(const MapChipField& map, float dt)
     }
 
     isOnGround_ = onGround;
+}
+
+
+bool BossEnemy::IsPlayerOnGround(const MapChipField& map, const Player& player) const
+{
+    // 用地图格子判断“脚下是否有实体块”
+    const Vector3 pPos = player.GetPosition();
+    const float halfW = player.GetWidth()  * 0.5f;
+    const float halfH = player.GetHeight() * 0.5f;
+
+    // 往下探一点点，避免因为浮点误差刚好踩在边界上
+    const float probeY = 0.06f;
+
+    Vector3 probes[3] = {
+        { pPos.x,                 pPos.y - halfH - probeY, 0.0f }, // 脚底中点
+        { pPos.x - halfW * 0.80f, pPos.y - halfH - probeY, 0.0f }, // 左脚
+        { pPos.x + halfW * 0.80f, pPos.y - halfH - probeY, 0.0f }, // 右脚
+    };
+
+    for (const auto& q : probes) {
+        auto idx = map.GetMapChipIndexByPosition(q);
+        MapChipType t = map.GetMapChipTypeByIndex(idx.xIndex, idx.yIndex);
+        if (IsSolid(t)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool BossEnemy::IsInEngageRange(const MapChipField& map, const Player& player) const
+{
+    if (!battleTriggered_) { return false; }
+
+    const Vector3 pPos = player.GetPosition();
+    const float dx = std::fabs(pPos.x - position_.x);
+    const float dy = std::fabs(pPos.y - position_.y);
+
+    if (dx > detectRange_) { return false; }
+    if (dy > engageVerticalRange_) { return false; }
+
+    if (requirePlayerOnGroundToEngage_ && !IsPlayerOnGround(map, player)) {
+        return false;
+    }
+    return true;
+}
+
+bool BossEnemy::ShouldShowBossHp(const Player& player, const MapChipField& map) const
+{
+    // 方案 A（按你需求）：只有“接近 Boss”才显示血条
+    //return IsInEngageRange(map, player);
+
+    // 方案 B（更常见）：一旦触发 Boss 战就一直显示（不跟距离闪烁）
+    return battleTriggered_;
 }
 
 void BossEnemy::UpdateBossFacing(const Player& player)
@@ -1160,6 +1271,7 @@ void BossEnemy::FinishUltimateCooldown()
 bool BossEnemy::CheckBossProjectileHit(const Player& player)
 {
     if (type_ != EnemyType::Boss) { return false; }
+    if (!battleTriggered_) { return false; }
 
     Vector3 pPos = player.GetPosition();
     float   pHalfW = player.GetWidth() * 0.5f;

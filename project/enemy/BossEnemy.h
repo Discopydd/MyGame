@@ -15,11 +15,54 @@ public:
     void OnStomp() override;
     bool CheckBossProjectileHit(const Player& player) override;
 
+// ================== Boss battle 触发 / 血条显示 ==================
+// 目的：
+//  - 只有玩家“进入 Boss 区域/接近 Boss”后，Boss 才开始攻击
+//  - 只有接近 Boss 时才显示 Boss 血条（由 GameScene 调用）
+bool IsBattleTriggered() const { return battleTriggered_; }
+
+// GameScene 用：决定是否显示 Boss 血条（你也可以把逻辑改成“触发后一直显示”）
+bool ShouldShowBossHp(const Player& player, const MapChipField& map) const;
+
+// 可选：修改“触发列”（0-based）。例如 AH 列是 33。
+void SetBattleTriggerXIndex(uint32_t xIndex) { battleTriggerXIndex_ = xIndex; }
+
+
 private:
     // ---------- 运动/碰撞（Boss 用：position += velocity） ----------
     Vector3 velocity_{ 0,0,0 };
     bool    isOnGround_ = false;
     float   gravityBase_ = -2.20f;
+
+    // ---------- 判定（玩家交互）与地图碰撞分离 ----------
+    // 目标：Dash 时缩小“与玩家的判定”，但不要影响 Boss 的地图碰撞（否则会出现穿墙/卡墙手感变化）。
+    // 约定：
+    //  - width_/height_：用于玩家交互（受伤/踩头/近战命中 等）
+    //  - mapColliderW_/mapColliderH_：仅用于 ResolveMapCollision（和地图方块的碰撞）
+    float mapColliderW_ = 0.0f;
+    float mapColliderH_ = 0.0f;
+
+    // 非 Dash 时的基础“玩家判定”尺寸（用于每帧恢复）
+    float baseHurtW_ = 0.0f;
+    float baseHurtH_ = 0.0f;
+
+    // Dash 时缩小判定比例（想更难打中就再调小一点，比如 0.60/0.75）
+    float dashHurtScaleX_ = 0.70f;
+    float dashHurtScaleY_ = 0.85f;
+
+// ---------- Boss 战斗触发（未触发前：不更新 AI/不发弹/不显示血条） ----------
+// 默认：玩家 xIndex >= 33（AH列，0-based）且站在地面上才唤醒 Boss
+bool     battleTriggered_ = false;
+uint32_t battleTriggerXIndex_ = 33;              // AH (0-based)
+bool     requirePlayerOnGroundToTrigger_ = true; // 触发时要求玩家“在地面上”
+
+// “接近 Boss 才攻击/显示血条”的判定（防止玩家在天上/隔层就把 Boss 激活）
+bool  requirePlayerOnGroundToEngage_ = true; // 接近判定也要求玩家在地面
+float engageVerticalRange_ = 6.0f;           // 允许的 |dy|（世界坐标）
+
+bool IsPlayerOnGround(const MapChipField& map, const Player& player) const;
+bool IsInEngageRange(const MapChipField& map, const Player& player) const;
+
 
     // ---------- Boss AI ----------
     // 说明：尽量沿用原状态机，新增少量状态做“更炫酷”的招式
