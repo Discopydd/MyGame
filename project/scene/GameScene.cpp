@@ -1,18 +1,44 @@
 #include "GameScene.h"
 #include <numbers>
 #include <algorithm>
+#include <cmath>
 #include <scene/LoadingScene.h>
 #include "SceneManager.h"
 #include <cstdlib>
 namespace {
     // 0.0f = 完全没有伤害高度, 1.0f = 整个格子都算刺
     constexpr float kSpikeHeightRatio = 0.5f;
+
+    // Boss 演出期间：冻结玩家位置，避免重力/惯性/碰撞造成位移
+    bool    gBossIntroFreezePlayer = false;
+    Vector3 gBossIntroFrozenPlayerPos{};
 }
 
 static float RandRangeFloat(float a, float b)
 {
     float t = static_cast<float>(rand()) / RAND_MAX;
     return a + (b - a) * t;
+}
+
+static float SmoothStep01(float t)
+{
+    if (t < 0.0f) t = 0.0f;
+    if (t > 1.0f) t = 1.0f;
+    return t * t * (3.0f - 2.0f * t);
+}
+
+static float LerpFloat(float a, float b, float t)
+{
+    return a + (b - a) * t;
+}
+
+static Vector3 LerpVec3(const Vector3& a, const Vector3& b, float t)
+{
+    return {
+        a.x + (b.x - a.x) * t,
+        a.y + (b.y - a.y) * t,
+        a.z + (b.z - a.z) * t
+    };
 }
 // 将3D世界坐标转换为屏幕坐标
 Vector3 WorldToScreen(const Vector3& worldPos, Camera* camera)
@@ -304,6 +330,20 @@ void GameScene::Initialize() {
     bossDamageRatio_ = 1.0f;
     bossHpVisible_ = false;
 
+    // ================== Boss 名字（2D Sprite） ==================
+    // 需要把 Boss 名字贴图放到 Resources/BossName.png（或改成你自己的路径）
+    const std::string kBossNameTex = "Resources/Boss_name.png";
+    bossNameSprite_ = std::make_unique<Sprite>();
+    bossNameSprite_->Initialize(spriteCommon_, kBossNameTex);
+    // 顶部居中显示（位置你可以自己微调）
+    const Vector2 bossNameSize = { 420.0f, 64.0f };
+    const Vector2 bossNamePos  = { (WinApp::kClientWidth - bossNameSize.x) * 0.5f, 16.0f };
+    bossNameSprite_->SetPosition(bossNamePos);
+    bossNameSprite_->SetSize(bossNameSize);
+    bossNameSprite_->SetVisible(false);
+    bossNameVisible_ = false;
+
+
     // === ImGui 管理器 ===
     imguiManager_ = std::make_unique<ImGuiManager>();
     imguiManager_->Initialize(winApp_, dxCommon_, srvManager_);
@@ -338,6 +378,7 @@ void GameScene::Initialize() {
     ModelManager::GetInstants()->LoadModel("enemy0/enemy0.obj");
     ModelManager::GetInstants()->LoadModel("enemy1/enemy1.obj");
     ModelManager::GetInstants()->LoadModel("enemy2/enemy2.obj");
+    ModelManager::GetInstants()->LoadModel("enemyBullet/enemyBullet.obj");
     // === 玩家 ===
     player_ = std::make_unique<Player>();
     player_->Initialize(object3dCommon_.get(), camera_.get());
@@ -439,6 +480,8 @@ void GameScene::Initialize() {
     hubProgress_      = 0;
     allStagesCleared_ = false;
 
+
+    bossDefeated_ = false;
     playerIndexHistoryCursor_      = 0;
     playerIndexHistoryInitialized_ = false;
     playerIndexOneSecAgo_          = MapChipField::IndexSet{};
@@ -448,12 +491,18 @@ void GameScene::Update() {
     const float deltaTime = 1.0f / 60.0f;
     input_->Update();
     backgroundSprite_->Update();
+
+    if (bossNameSprite_) {
+        bossNameSprite_->SetVisible(bossNameVisible_);
+        bossNameSprite_->Update();
+    }
     // —— 是否允许玩家操作（淡出/加载/淡入期间 & 开场演出期间都禁止）——
     const bool isFading = (fade_ && fade_->GetPhase() != FadePhase::None);
     const bool inIntro = (intro_ && intro_->IsPlaying());
     const bool inGameOver = (gameOver_ && gameOver_->IsPlaying());
     const bool inGameClear = (gameClear_ && gameClear_->IsPlaying());
-    const bool canControl = !(isFading || inIntro || inGameOver || inGameClear);
+    bool inBossIntro = (bossIntroPhase_ != BossIntroPhase::None);
+    bool canControl = !(isFading || inIntro || inGameOver || inGameClear || inBossIntro);
 
     // ===== Intro 驱动（在加载/淡出等早退之前执行，但不盖过Loading）=====
     if (fade_ && fade_->GetPhase() == FadePhase::None && intro_) {
@@ -591,13 +640,20 @@ void GameScene::Update() {
         }
     }
     imguiManager_->Begin();
-    playerCamera_->Update();
+
+    // ===== Boss 触发演出：演出中不跑玩家跟随镜头 =====
+    if (bossIntroPhase_ != BossIntroPhase::None) {
+        UpdateBossIntro(deltaTime);
+    } else {
+        playerCamera_->Update();
+    }
 
     std::vector<MovingPlatform*> platformPtrs;
     platformPtrs.reserve(movingPlatforms_.size());
     for (auto& mp : movingPlatforms_) {
         platformPtrs.push_back(mp.get());
     }
+    if (!inBossIntro) {
 
     // 平台自身 Update（传 platformPtrs 给它做平台-平台碰撞）
     for (auto* p : platformPtrs) {
@@ -605,20 +661,61 @@ void GameScene::Update() {
             p->Update(deltaTime, mapChipField_, platformPtrs);
         }
     }
-
+    }
     // 敌人 Update
-    for (auto& e : enemies_) {
-        if (e) {
-            e->Update(deltaTime, mapChipField_, *player_);
+    // Boss 演出中为了“定格世界”，我们不更新所有敌人。
+    // 但 Boss 本体至少要继续把 Object3d 的 Transform/闪烁计时更新掉，否则可能会“卡在不可见帧”。
+    if (!inBossIntro) {
+        for (auto& e : enemies_) {
+            if (e) {
+                e->Update(deltaTime, mapChipField_, *player_);
+            }
+        }
+    } else {
+        if (introBoss_) {
+            introBoss_->Update(deltaTime, mapChipField_, *player_);
+        } else {
+            if (BossEnemy* b = FindBossEnemy()) {
+                b->Update(deltaTime, mapChipField_, *player_);
+            }
         }
     }
-    // 淡入淡出/加载/演出期间都不可操作
-    player_->Update(canControl ? input_ : nullptr, mapChipField_);
+    // ===== Boss 演出期间：让玩家完全静止（不受重力/惯性影响）=====
+    if (inBossIntro) {
+        if (!gBossIntroFreezePlayer) {
+            gBossIntroFreezePlayer = true;
+            gBossIntroFrozenPlayerPos = player_->GetPosition();
+        }
+
+        // 仍然让 Player 自己跑一帧（更新计时/动画等），但随后把位置/速度强制拉回
+        player_->Update(nullptr, mapChipField_);
+
+        player_->SetPosition(gBossIntroFrozenPlayerPos);
+        player_->SetVelocity({ 0.0f, 0.0f, 0.0f });
+    }
+    else {
+        gBossIntroFreezePlayer = false;
+        player_->Update(canControl ? input_ : nullptr, mapChipField_);
+    }
+
+    // ================== Boss 触发演出：检测触发点并开始镜头演出 ==================
+    if (bossIntroPhase_ == BossIntroPhase::None && canControl) {
+        BossEnemy* boss = FindBossEnemy();
+        if (boss && !boss->IsBattleTriggered() && boss->IsBattleTriggerReady(*player_, mapChipField_)) {
+            StartBossIntro(boss);
+            // ★ 这一帧开始就视为进入演出：后续逻辑（伤害/平台/碰撞等）全部跳过
+            inBossIntro = true;
+            canControl = false;
+            // 立刻推进一帧镜头，让画面从触发帧就开始推镜头
+            UpdateBossIntro(deltaTime);
+        }
+    }
 
     // ========= 阶段1：两条移动平台互相夹住玩家 =========
     crushedByPlatformThisFrame_ = false;
     damagedByEnemyThisFrame_ = false;
-    if (player_ && !player_->IsDead() && !player_->IsInvincible()) {
+    if (!inBossIntro) {
+        if (player_ && !player_->IsDead() && !player_->IsInvincible()) {
 
         Vector3 pPos = player_->GetPosition();
         float halfW = player_->GetWidth() * 0.5f;
@@ -645,8 +742,9 @@ void GameScene::Update() {
             }
         }
     }
+    }
     // ========= 玩家与敌人的碰撞 =========
-    if (player_ && !player_->IsDead()) {
+    if (!inBossIntro && player_ && !player_->IsDead()) {
 
         Vector3 pPos = player_->GetPosition();
         float   pHalfW = player_->GetWidth() * 0.5f;
@@ -748,7 +846,41 @@ void GameScene::Update() {
             }
         }
     }
-    // ========= 清理死亡敌人（Boss 被踩 x 次后会标记死亡） =========
+        // ========= Boss 击败判定：通关条件改为“击败 Boss” =========
+    if (!bossDefeated_ && !pendingGameClear_ && gameClear_ && !gameClear_->IsPlaying()) {
+        bool bossJustDied = false;
+        for (auto& e : enemies_) {
+            if (!e) { continue; }
+            if (e->GetType() == EnemyType::Boss && e->IsDead()) {
+                bossJustDied = true;
+                break;
+            }
+        }
+
+        if (bossJustDied) {
+            bossDefeated_ = true;
+
+            // 触发通关演出：先淡出到全黑，再在全黑上启动 GameClear
+            if (fade_) {
+                pendingGameClear_ = true;
+
+                fade_->SetAlpha(0.0f);
+                fade_->SetReachedBlack(false);
+                fade_->SetBlackHoldFrames(0);
+                fade_->SetOverlayPushed(false);
+
+                fade_->SetPhase(FadePhase::FadingOut);
+                if (Sprite* s = fade_->GetSprite()) {
+                    s->SetVisible(true);
+                }
+            } else {
+                // 万一没有 FadeManager，就直接开始胜利演出
+                gameClear_->Start();
+            }
+        }
+    }
+
+// ========= 清理死亡敌人（Boss 被踩 x 次后会标记死亡） =========
     enemies_.erase(
         std::remove_if(enemies_.begin(), enemies_.end(),
             [](const std::unique_ptr<Enemy>& e) { return (!e) || e->IsDead(); }),
@@ -820,11 +952,12 @@ void GameScene::Update() {
         bossHpSprite_->Update();
     }
 
-    // 先做平台上的落地 / 分离 / 搭乘
-    if (!crushedByPlatformThisFrame_) {
+    // 先做平台上的落地 / 分离 / 搭乘（Boss 演出期间全部冻结）
+    if (!inBossIntro && !crushedByPlatformThisFrame_) {
         HandlePlayerOnMovingPlatforms();
     }
 
+        if (!inBossIntro) {
     // ========= 阶段2：被平台推进方块 / 刺 / 门，或者推出地图边界 =========
     if (player_ && !player_->IsDead() && !player_->IsInvincible()) {
         Vector3 pPos = player_->GetPosition();
@@ -890,7 +1023,9 @@ void GameScene::Update() {
         }
     }
 
-    if (particleMgr_ && emitter3D_ && player_->ConsumeDoubleJumpEvent()) {
+    }
+
+    if (!inBossIntro && particleMgr_ && emitter3D_ && player_->ConsumeDoubleJumpEvent()) {
         Vector3 playerPos = player_->GetPosition();
 
         // 可以微微抬高一点，让粒子从身体附近炸开
@@ -908,7 +1043,7 @@ void GameScene::Update() {
 
     camera_->Update();
     // === 冲刺星星尾气 ===
-    if (dashStarEmitter_ && player_->IsDashing()) {
+    if (!inBossIntro && dashStarEmitter_ && player_->IsDashing()) {
         Vector3 pos = player_->GetPosition();
         float h = player_->GetHeight();
 
@@ -1140,7 +1275,7 @@ void GameScene::Update() {
         }
 
         // 被平台夹死照旧用 crushedByPlatformThisFrame_（全格判定）
-        if ((onSpike || crushedByPlatformThisFrame_ || damagedByEnemyThisFrame_) &&
+        if (!inBossIntro && (onSpike || crushedByPlatformThisFrame_ || damagedByEnemyThisFrame_) &&
             !player_->IsDead() && !player_->IsInvincible()) {
 
             MapChipField::IndexSet safeIndex = playerIndexOneSecAgo_;
@@ -1206,51 +1341,32 @@ void GameScene::Update() {
     if (currentPortal) {
         // 玩家正站在某个门格子上
         if (canControl && input_->TriggerKey(DIK_E)) {
-            // ==== 如果是从子关卡回到 Hub(map2)，更新解锁进度 ====
+                        // ==== 如果是从子关卡回到 Hub(map2)，更新解锁进度（仅用于解锁，不再作为通关条件）====
             auto itStage = hubStageByMap_.find(currentMapPath_);
-            bool triggerGameClear = false;
             if (currentPortal->targetMap == "Resources/map/map2.csv" && itStage != hubStageByMap_.end()) {
                 int stageIndex = itStage->second;   // 这是第几关(0~3)
                 if (hubProgress_ < stageIndex + 1) {
                     hubProgress_ = stageIndex + 1;
                     if (hubProgress_ >= 4) {
                         allStagesCleared_ = true;
-                        triggerGameClear = true;
                     }
                 }
             }
 
-            if (triggerGameClear) {
-                if (!pendingGameClear_ && gameClear_ && !gameClear_->IsPlaying() && fade_) {
-                    pendingGameClear_ = true;
+            // ==== 普通传送处理 ====
+            pendingPortalMapPath_ = currentPortal->targetMap;
+            pendingPortalStartPos_ = currentPortal->targetStartPos;
+            pendingPortalLoad_ = true;
 
-                    fade_->SetAlpha(0.0f);
-                    fade_->SetReachedBlack(false);
-                    fade_->SetBlackHoldFrames(0);
-                    fade_->SetOverlayPushed(false);
+            if (fade_) {
+                fade_->SetAlpha(0.0f);
+                fade_->SetReachedBlack(false);
+                fade_->SetBlackHoldFrames(0);
+                fade_->SetOverlayPushed(false);
 
-                    fade_->SetPhase(FadePhase::FadingOut);
-                    if (Sprite* s = fade_->GetSprite()) {
-                        s->SetVisible(true);
-                    }
-                }
-            }
-            else {
-                // ==== 普通传送处理 ====
-                pendingPortalMapPath_ = currentPortal->targetMap;
-                pendingPortalStartPos_ = currentPortal->targetStartPos;
-                pendingPortalLoad_ = true;
-
-                if (fade_) {
-                    fade_->SetAlpha(0.0f);
-                    fade_->SetReachedBlack(false);
-                    fade_->SetBlackHoldFrames(0);
-                    fade_->SetOverlayPushed(false);
-
-                    fade_->SetPhase(FadePhase::FadingOut);
-                    if (Sprite* s = fade_->GetSprite()) {
-                        s->SetVisible(true);
-                    }
+                fade_->SetPhase(FadePhase::FadingOut);
+                if (Sprite* s = fade_->GetSprite()) {
+                    s->SetVisible(true);
                 }
             }
         }
@@ -1452,6 +1568,11 @@ void GameScene::Draw() {
     // ================== 4) 最前景 UI Sprite ==================
     spriteCommon_->CommonDraw();
 
+    // ===== Boss Name（2D）=====
+    if (!inGameClear && bossNameVisible_) {
+        if (bossNameSprite_) { bossNameSprite_->Draw(); }
+    }
+
     // ===== Boss HP（2D）=====
     if (!inGameClear && bossHpVisible_) {
         if (bossHpDamageSprite_) { bossHpDamageSprite_->Draw(); }
@@ -1573,6 +1694,8 @@ void GameScene::Finalize() {
     // ==== Boss HP（2D）Sprite ====
     bossHpDamageSprite_.reset();
     bossHpSprite_.reset();
+    bossNameSprite_.reset();
+    bossNameVisible_ = false;
 
     // ==== 3D 物体容器（方块 / 水面 / 敌人 / 平台）====
     // 里面是 unique_ptr，clear() 时会自动 delete 元素
@@ -1929,3 +2052,204 @@ void GameScene::HandlePlayerOnMovingPlatforms()
     player_->SetVelocity(vel);
 }
 
+
+
+// ================== Boss 触发演出（镜头推 Boss + 名字 + 回玩家） ==================
+BossEnemy* GameScene::FindBossEnemy()
+{
+    for (auto& e : enemies_) {
+        if (!e) { continue; }
+        if (e->GetType() != EnemyType::Boss) { continue; }
+        if (auto* b = dynamic_cast<BossEnemy*>(e.get())) {
+            return b;
+        }
+    }
+    return nullptr;
+}
+
+Vector3 GameScene::ConstrainCameraToMap(const Vector3& desiredPos, float fovY, float cameraZ) const
+{
+    if (!camera_) { return desiredPos; }
+
+    Vector3 mapMin = mapChipField_.GetMapMinPosition();
+    Vector3 mapMax = mapChipField_.GetMapMaxPosition();
+
+    float halfViewHeight = std::abs(cameraZ) * std::tan(fovY * 0.5f);
+    float halfViewWidth  = halfViewHeight * camera_->GetAspectRatio();
+
+    float minX = mapMin.x + halfViewWidth;
+    float maxX = mapMax.x - halfViewWidth;
+    float minY = mapMin.y + halfViewHeight;
+    float maxY = mapMax.y - halfViewHeight;
+
+    // 地图太小：让相机固定在中心
+    if (maxX < minX) { minX = maxX = (mapMin.x + mapMax.x) * 0.5f; }
+    if (maxY < minY) { minY = maxY = (mapMin.y + mapMax.y) * 0.5f; }
+
+    Vector3 out = desiredPos;
+    out.x = std::clamp(out.x, minX, maxX);
+    out.y = std::clamp(out.y, minY, maxY);
+    return out;
+}
+
+void GameScene::StartBossIntro(BossEnemy* boss)
+{
+    if (!boss || !camera_) { return; }
+    introBoss_ = boss;
+    bossIntroPhase_ = BossIntroPhase::ToBoss;
+    bossIntroTimer_ = 0.0f;
+
+    // 冻结玩家：演出期间玩家保持在触发瞬间的位置
+    if (player_) {
+        gBossIntroFreezePlayer = true;
+        gBossIntroFrozenPlayerPos = player_->GetPosition();
+        player_->SetVelocity({ 0.0f, 0.0f, 0.0f });
+        player_->SetPosition(gBossIntroFrozenPlayerPos);
+    }
+
+    bossIntroStartCamPos_ = camera_->GetTransform().translate;
+    bossIntroStartFovY_   = camera_->GetFovY();
+
+    // 回拉阶段的默认终点：回到触发时玩家镜头（如果你想“回到当前玩家跟随镜头”，也可以把终点每帧重算）
+    bossIntroBackStartCamPos_ = bossIntroStartCamPos_;
+    bossIntroBackStartFovY_   = bossIntroStartFovY_;
+
+    bossNameVisible_ = false;
+}
+
+void GameScene::UpdateBossIntro(float dt)
+{
+    if (!camera_) { return; }
+    if (bossIntroPhase_ == BossIntroPhase::None) { return; }
+
+    // Boss 被提前干掉/不存在：直接退出演出
+    if (!introBoss_ || introBoss_->IsDead()) {
+        bossIntroPhase_ = BossIntroPhase::None;
+        introBoss_ = nullptr;
+        bossNameVisible_ = false;
+        gBossIntroFreezePlayer = false;
+        return;
+    }
+
+    bossIntroTimer_ += dt;
+
+    const Vector3 bossPos = introBoss_->GetPosition();
+
+    switch (bossIntroPhase_) {
+    case BossIntroPhase::ToBoss:
+    {
+        float t = bossIntroToBossDur_ > 0.0f ? (bossIntroTimer_ / bossIntroToBossDur_) : 1.0f;
+        if (t > 1.0f) { t = 1.0f; }
+        float s = SmoothStep01(t);
+
+        float fov = LerpFloat(bossIntroStartFovY_, bossIntroBossFovY_, s);
+        float z   = LerpFloat(bossIntroStartCamPos_.z, bossIntroBossZ_, s);
+
+        // 目标点（★ 整体向下挪一点：bossIntroBossCamOffset_.y 为负）
+        Vector3 desiredTarget = {
+            bossPos.x + bossIntroBossCamOffset_.x,
+            bossPos.y + bossIntroBossCamOffset_.y,
+            z
+        };
+
+        // ★ 先约束目标，再插值：靠近边界时会“沿边界滑动”，不会突然被截断
+        Vector3 target = ConstrainCameraToMap(desiredTarget, fov, z);
+
+        Vector3 newPos = LerpVec3(bossIntroStartCamPos_, target, s);
+        newPos.z = z;
+
+        camera_->SetFovY(fov);
+        camera_->SetTranslate(newPos);
+        camera_->Update();
+
+        if (t >= 1.0f) {
+            bossIntroPhase_ = BossIntroPhase::ShowName;
+            bossIntroTimer_ = 0.0f;
+            bossNameVisible_ = true;
+        }
+        break;
+    }
+
+    case BossIntroPhase::ShowName:
+    {
+        bossNameVisible_ = true;
+
+        float fov = bossIntroBossFovY_;
+        float z   = bossIntroBossZ_;
+
+        Vector3 desiredTarget = {
+            bossPos.x + bossIntroBossCamOffset_.x,
+            bossPos.y + bossIntroBossCamOffset_.y,
+            z
+        };
+        Vector3 target = ConstrainCameraToMap(desiredTarget, fov, z);
+
+        camera_->SetFovY(fov);
+        camera_->SetTranslate(target);
+        camera_->Update();
+
+        if (bossIntroTimer_ >= bossIntroShowDur_) {
+            bossIntroPhase_ = BossIntroPhase::BackToPlayer;
+            bossIntroTimer_ = 0.0f;
+
+            bossIntroBackStartCamPos_ = camera_->GetTransform().translate;
+            bossIntroBackStartFovY_   = camera_->GetFovY();
+
+            bossNameVisible_ = false;
+        }
+        break;
+    }
+
+    case BossIntroPhase::BackToPlayer:
+    {
+        bossNameVisible_ = false;
+
+        float t = bossIntroBackDur_ > 0.0f ? (bossIntroTimer_ / bossIntroBackDur_) : 1.0f;
+        if (t > 1.0f) { t = 1.0f; }
+        float s = SmoothStep01(t);
+
+        // 目标：回到“玩家跟随镜头”的位置（这里用与你 Initialize 里 SetOffset 一致的 offset）
+        Vector3 playerPos = player_ ? player_->GetPosition() : Vector3{ 0,0,0 };
+        Vector3 desiredTarget = {
+            playerPos.x,
+            playerPos.y,
+            0.0f
+        };
+
+        // FOV / Z 同步拉回（用触发瞬间的玩家镜头作为终点）
+        float fov = LerpFloat(bossIntroBackStartFovY_, bossIntroStartFovY_, s);
+        float z   = LerpFloat(bossIntroBackStartCamPos_.z, bossIntroStartCamPos_.z, s);
+
+        desiredTarget.z = z;
+
+        // ★ 同样：先约束目标，再插值（并且把“起点”也用当前 fov/z 约束一下）
+        //    这样在靠近边界时，随着视口变化会顺滑地沿边界滑动，不会突然被截断
+        Vector3 startPos = { bossIntroBackStartCamPos_.x, bossIntroBackStartCamPos_.y, z };
+        startPos = ConstrainCameraToMap(startPos, fov, z);
+
+        Vector3 target = ConstrainCameraToMap(desiredTarget, fov, z);
+        Vector3 newPos = LerpVec3(startPos, target, s);
+        newPos.z = z;
+
+        camera_->SetFovY(fov);
+        camera_->SetTranslate(newPos);
+        camera_->Update();
+
+        if (t >= 1.0f) {
+            bossIntroPhase_ = BossIntroPhase::None;
+            gBossIntroFreezePlayer = false;
+
+            // 正式开战
+            if (introBoss_) {
+                introBoss_->TriggerBattleNow();
+            }
+            introBoss_ = nullptr;
+            bossNameVisible_ = false;
+        }
+        break;
+    }
+
+    default:
+        break;
+    }
+}

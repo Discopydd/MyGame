@@ -111,6 +111,9 @@ private:
     bool pendingGameClear_ = false;  // 按 E 触发通关时，用来等黑幕到纯黑再进入胜利演出
     bool returnToTitle_    = false;  // 在胜利画面按 Space 后，黑幕淡出回 Title
 
+    // === Victory condition ===
+    bool bossDefeated_   = false;  // Boss 被击败后只触发一次通关
+
     // ===== HP 3D 条 =====
     float hpNdcZ_ = 0.08f;  // 贴近相机，避免被遮挡
 
@@ -182,6 +185,53 @@ private:
     float bossDamageRatio_  = 1.0f; // 红色条比例（缓慢追上绿色）
     float bossDamageDropSpeed_ = 0.45f; // 每秒下降速度（0~1）
     bool  bossHpVisible_    = false;
+
+
+    // ================== Boss 触发演出（镜头推 Boss + 名字 + 回玩家） ==================
+    enum class BossIntroPhase {
+        None,
+        ToBoss,      // 镜头从玩家推到 Boss（拉近）
+        ShowName,    // 顶部显示 Boss 名字
+        BackToPlayer // 镜头回到玩家
+    };
+
+    BossIntroPhase bossIntroPhase_ = BossIntroPhase::None;
+    float   bossIntroTimer_ = 0.0f;
+
+    // 触发瞬间：记录玩家跟随镜头的起点
+    Vector3 bossIntroStartCamPos_{};
+    float   bossIntroStartFovY_ = 0.45f;
+
+    // 回玩家阶段：记录回拉起点
+    Vector3 bossIntroBackStartCamPos_{};
+    float   bossIntroBackStartFovY_ = 0.45f;
+
+    // 目标 Boss（借用指针，生命周期由 enemies_ 管理）
+    BossEnemy* introBoss_ = nullptr;
+
+    // —— 可调参数（想要“更电影感”就改这里）——
+    float bossIntroBossFovY_   = 0.28f;            // 推到 Boss 时的 FOV（更小=更近）
+    float bossIntroBossZ_      = -25.0f;           // 推到 Boss 时相机 Z（更接近 0=更近）
+    // ★ 推镜头/展示名时：整体镜头向下挪一点
+    // 注意：你这个项目的世界坐标 Y 轴更像是“向下为正”，所以“向下”用 +Y。
+    // 若你的场景是 Y 向上为正，把这个值改成负数即可。
+    Vector3 bossIntroBossCamOffset_ = {0.0f, 2.0f, 0.0f};
+
+    float bossIntroToBossDur_  = 0.85f;            // 推镜头时长
+    float bossIntroShowDur_    = 1.10f;            // 显示名字停留时长
+    float bossIntroBackDur_    = 0.85f;            // 回玩家时长
+
+    // Boss 名字（Sprite 贴图）
+    std::unique_ptr<Sprite> bossNameSprite_;
+    bool bossNameVisible_ = false;
+
+    void StartBossIntro(BossEnemy* boss);
+    void UpdateBossIntro(float dt);
+
+    BossEnemy* FindBossEnemy();
+
+    // 把相机目标点限制在地图边界（★ 先约束目标，再插值，沿边界滑动更顺）
+    Vector3 ConstrainCameraToMap(const Vector3& desiredPos, float fovY, float cameraZ) const;
 
     // 敌人
     std::vector<std::unique_ptr<Enemy>> enemies_;

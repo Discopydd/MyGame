@@ -21,6 +21,12 @@ public:
 //  - 只有接近 Boss 时才显示 Boss 血条（由 GameScene 调用）
 bool IsBattleTriggered() const { return battleTriggered_; }
 
+    // GameScene 用：当玩家到达 Boss 触发点时，先播“镜头演出”，
+    // 演出结束后再调用 TriggerBattleNow() 让 Boss 正式开打。
+    // 这样可以保证：镜头推到 Boss → 显示名字 → 镜头回玩家 → Boss 开始 AI/攻击 + 血条出现。
+    bool IsBattleTriggerReady(const Player& player, const MapChipField& map) const;
+    void TriggerBattleNow();
+
 // GameScene 用：决定是否显示 Boss 血条（你也可以把逻辑改成“触发后一直显示”）
 bool ShouldShowBossHp(const Player& player, const MapChipField& map) const;
 

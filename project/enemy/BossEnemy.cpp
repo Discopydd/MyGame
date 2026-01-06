@@ -154,13 +154,14 @@ void BossEnemy::Initialize(
             p.obj->Initialize(common);
             p.obj->SetCamera(camera);
             // 用现有模型顶一下（你也可以换成 fireball.obj 之类）
-            p.obj->SetModel("star/star.obj");
+            p.obj->SetModel("enemyBullet/enemyBullet.obj");
             p.pos = spawnPos;
             p.obj->SetTranslate(p.pos);
             p.obj->Update();
             p.active = false;
             p.life = 0.0f;
             p.radius = 0.35f;
+            p.obj->SetColor({ 1.0f, 0.4f, 0.0f, 1.0f });
         }
         break;
     }
@@ -207,37 +208,15 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
 
     // ===== Boss AI =====
     if (type_ == EnemyType::Boss) {
-// ===== 战斗触发：玩家越过指定列并“站到地面”后才唤醒 Boss =====
-// 默认触发列：AH（0-based=33）。如果你关卡里不是 AH，调用 SetBattleTriggerXIndex() 或直接改 battleTriggerXIndex_。
-if (!battleTriggered_) {
-    const auto pIdx = map.GetMapChipIndexByPosition(player.GetPosition());
-    const bool passedX = (pIdx.xIndex >= battleTriggerXIndex_);
-    const bool onGround = (!requirePlayerOnGroundToTrigger_) ? true : IsPlayerOnGround(map, player);
-
-    if (passedX && onGround) {
-        battleTriggered_ = true;
-
-        // 刚进入战斗：重置一下节奏，避免“刚触发就立刻贴脸大招”
-        bossState_ = BossState::Idle;
-        queuedAttack_ = BossAttack::None;
-        stateTimer_ = 0.0f;
-        decisionTimer_ = 0.30f;
-        globalAttackCD_ = (std::max)(globalAttackCD_, 0.60f);
-
-        // 清掉残留弹幕（以防复用对象/读档等情况）
-        for (auto& p : projectiles_) {
-            p.active = false;
-            p.life = 0.0f;
-        }
-    } else {
         // 未触发：不更新 AI/弹幕，只更新渲染（Boss 可以当作“雕像/待机”）
-        if (obj_) {
-            obj_->SetTranslate(position_);
-            obj_->Update();
+        // 触发逻辑交给 GameScene：先播镜头演出，演出结束后再调用 TriggerBattleNow()。
+        if (!battleTriggered_) {
+            if (obj_) {
+                obj_->SetTranslate(position_);
+                obj_->Update();
+            }
+            return;
         }
-        return;
-    }
-}
 
 
         // 先更新弹幕（不依赖 Boss 身体是否与玩家重叠）
@@ -1123,6 +1102,37 @@ bool BossEnemy::IsPlayerOnGround(const MapChipField& map, const Player& player) 
         }
     }
     return false;
+}
+
+bool BossEnemy::IsBattleTriggerReady(const Player& player, const MapChipField& map) const
+{
+    if (type_ != EnemyType::Boss) { return false; }
+    if (battleTriggered_) { return false; }
+
+    const auto pIdx = map.GetMapChipIndexByPosition(player.GetPosition());
+    const bool passedX = (pIdx.xIndex >= battleTriggerXIndex_);
+    const bool onGround = (!requirePlayerOnGroundToTrigger_) ? true : IsPlayerOnGround(map, player);
+    return passedX && onGround;
+}
+
+void BossEnemy::TriggerBattleNow()
+{
+    if (type_ != EnemyType::Boss) { return; }
+    if (battleTriggered_) { return; }
+    battleTriggered_ = true;
+
+    // 刚进入战斗：重置一下节奏，避免“刚触发就立刻贴脸大招”
+    bossState_ = BossState::Idle;
+    queuedAttack_ = BossAttack::None;
+    stateTimer_ = 0.0f;
+    decisionTimer_ = 0.30f;
+    globalAttackCD_ = (std::max)(globalAttackCD_, 0.60f);
+
+    // 清掉残留弹幕（以防复用对象/读档等情况）
+    for (auto& p : projectiles_) {
+        p.active = false;
+        p.life = 0.0f;
+    }
 }
 
 bool BossEnemy::IsInEngageRange(const MapChipField& map, const Player& player) const
