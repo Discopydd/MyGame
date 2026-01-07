@@ -98,6 +98,9 @@ void BossEnemy::Initialize(
 
     ultimateCD_ = 2.0f;
     ultimateBounces_ = 0;
+    ultimateWindupTotal_ = 0.0f;
+    ultimateWindupBackstepMoved_ = 0.0f;
+
 
     shotsLeft_ = 0;
     shotsTotal_ = 0;
@@ -347,6 +350,9 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
                     attackFacing_ = facing_;
                     stateTimer_ = 0.40f; // 大招前摇更明显
 
+                    ultimateWindupTotal_ = stateTimer_;
+                    ultimateWindupBackstepMoved_ = 0.0f;
+
                     // 先把 CD 拉高，等大招结束再重新设置一个随机 CD
                     ultimateCD_ = 399.0f;
                     ultimateLocked_ = true;
@@ -410,6 +416,9 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
                     isShortDash_ = true;
                     microDashCD_ = microDashCooldown_;
 
+
+                    dashWindupTotal_ = stateTimer_;
+                    dashBackstepMoved_ = 0.0f;
                     dashCD_ = 2.70f;
                     globalAttackCD_ = 1.05f;
                     decisionTimer_ = 0.25f;
@@ -425,6 +434,9 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
                     isShortDash_ = true;
 
                     microDashCD_ = microDashCooldown_;
+
+                    dashWindupTotal_ = stateTimer_;
+                    dashBackstepMoved_ = 0.0f;
                     globalAttackCD_ = 0.95f;
                     decisionTimer_ = 0.20f;
                 }
@@ -439,6 +451,9 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
                     queuedDashDuration_ = 0.30f;
                     queuedDashSpeed_ = dashSpeed_;
                     isShortDash_ = false;
+
+                    dashWindupTotal_ = stateTimer_;
+                    dashBackstepMoved_ = 0.0f;
 
                     dashCD_ = 2.10f;
                     globalAttackCD_ = 1.00f;
@@ -465,10 +480,67 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
             velocity_.x = 0.0f;
             facing_ = attackFacing_;
 
+
+            // Dash：Windup 期间先小幅后撤，再释放冲刺（更好读招）
+            if (queuedAttack_ == BossAttack::Dash && stateTimer_ > 0.0f) {
+                const float targetDist = isShortDash_ ? dashBackstepDistShort_ : dashBackstepDist_;
+                const float step = StepScale(dt);
+
+                float total = dashWindupTotal_;
+                if (total < 0.001f) { total = (std::max)(stateTimer_, 0.001f); }
+
+                // 按 Windup 总时长均匀后撤：确保不同 Windup 时长都有“差不多”的后撤距离
+                float baseVel = targetDist / (total * 60.0f); // 以 60fps 为基准的“每帧位移”
+                baseVel = (std::min)(baseVel, dashBackstepMaxSpeed_);
+                baseVel = (std::max)(baseVel, dashBackstepMinSpeed_);
+
+                float remaining = (std::max)(0.0f, targetDist - dashBackstepMoved_);
+                float v = baseVel;
+
+                // 掉帧时避免一次退太远
+                if (remaining <= 0.0f) {
+                    v = 0.0f;
+                } else if (v * step > remaining) {
+                    v = remaining / step;
+                }
+
+                // 面向玩家，反方向后撤
+                velocity_.x = -static_cast<float>(attackFacing_) * v;
+            }
+
+
+            // Ultimate：Windup 期间也先后撤一下（距离更长），再启动左右来回冲刺
+            if (queuedAttack_ == BossAttack::Ultimate && stateTimer_ > 0.0f) {
+                const float targetDist = ultimateWindupBackstepDist_;
+                const float step = StepScale(dt);
+
+                float total = ultimateWindupTotal_;
+                if (total < 0.001f) { total = (std::max)(stateTimer_, 0.001f); }
+
+                // 按 Windup 总时长均匀后撤
+                float baseVel = targetDist / (total * 60.0f); // 以 60fps 为基准的“每帧位移”
+                baseVel = (std::min)(baseVel, ultimateWindupBackstepMaxSpeed_);
+                baseVel = (std::max)(baseVel, ultimateWindupBackstepMinSpeed_);
+
+                float remaining = (std::max)(0.0f, targetDist - ultimateWindupBackstepMoved_);
+                float v = baseVel;
+
+                // 掉帧时避免一次退太远
+                if (remaining <= 0.0f) {
+                    v = 0.0f;
+                } else if (v * step > remaining) {
+                    v = remaining / step;
+                }
+
+                // 面向冲刺方向，反方向后撤（起势）
+                velocity_.x = -static_cast<float>(attackFacing_) * v;
+            }
             if (stateTimer_ <= 0.0f) {
                 if (queuedAttack_ == BossAttack::Dash) {
                     bossState_ = BossState::Dash;
                     stateTimer_ = queuedDashDuration_;
+                    // 同一帧直接开始 Dash（不会多等 1 帧）
+                    velocity_.x = static_cast<float>(attackFacing_) * queuedDashSpeed_;
                 }
                 else if (queuedAttack_ == BossAttack::Ranged) {
                     // 玩家贴脸：不要近距离弹幕（反应不过来），改为向前小冲刺
@@ -545,7 +617,7 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
                     stateTimer_ = ultimateDuration_;
                     ultimateBounces_ = 0;
                     // 大招开始就锁一个方向：先朝玩家那边冲
-                    attackFacing_ = (pPos.x - position_.x >= 0.0f) ? -1 : 1; // 与玩家相反方向
+                    attackFacing_ = (pPos.x - position_.x >= 0.0f) ? -1 : 1; // 朝玩家方向
                     facing_ = attackFacing_;
                 }
                 else {
@@ -565,20 +637,21 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
             break;
 
         case BossState::Ultimate:
-        {
-            // 大招：左右来回冲刺
-            velocity_.x = attackFacing_ * ultimateSpeed_;
+{
+    // 大招：左右来回冲刺
+    // 需求：仅在释放大招前（Windup）后撤一次；大招进行中来回反弹不再额外后撤
+    velocity_.x = attackFacing_ * ultimateSpeed_;
 
-            // failsafe：最长持续
-            if (stateTimer_ <= 0.0f) {
-                bossState_ = BossState::Rest;
-                stateTimer_ = restDuration_;
+    // failsafe：最长持续
+    if (stateTimer_ <= 0.0f) {
+        bossState_ = BossState::Rest;
+        stateTimer_ = restDuration_;
 
-                FinishUltimateCooldown();
-                ultimateLocked_ = false;
-            }
-            break;
-        }
+        FinishUltimateCooldown();
+        ultimateLocked_ = false;
+    }
+    break;
+}
 
         case BossState::Rest:
             // 大招后休息几秒
@@ -848,10 +921,20 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
             bossState_ = BossState::Chase;
             break;
         }
-
         // 地图碰撞：按“先X后Y扫格子修正”
+        const float prevXBeforeMove = position_.x;
         const bool wasOnGround = isOnGround_;
         ResolveMapCollision(map, dt);
+
+        // Dash Windup：累计后撤距离（用于截断）
+        if (bossState_ == BossState::Windup && queuedAttack_ == BossAttack::Dash) {
+            dashBackstepMoved_ += std::fabs(position_.x - prevXBeforeMove);
+        }
+        // Ultimate Windup：累计后撤距离（用于截断）
+        if (bossState_ == BossState::Windup && queuedAttack_ == BossAttack::Ultimate) {
+            ultimateWindupBackstepMoved_ += std::fabs(position_.x - prevXBeforeMove);
+        }
+
 
         // Jump -> Slam：检测落地瞬间触发砸地
         if (bossState_ == BossState::Jump && !wasOnGround && isOnGround_) {
