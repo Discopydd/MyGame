@@ -833,7 +833,7 @@ void GameScene::Update() {
                 player_->SetPosition(newPos);
 
                 // 踩头后给一点点无敌时间（不闪烁）
-                player_->StartStompInvincible(0.25f);
+                player_->StartStompInvincible(0.40f);
 
                 // 不给玩家伤害，处理完当前敌人就继续下一个
                 continue;

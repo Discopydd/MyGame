@@ -37,6 +37,17 @@ void Player::Initialize(Object3dCommon* object3dCommon, Camera* camera) {
 void Player::Update(Input* input, const MapChipField& mapChipField) {
     const float deltaTime = 1.0f / 60.0f; // 先按 60FPS 固定，后续可外部传参
     didDoubleJumpThisFrame_ = false;
+// ---- Jump spam timer decay ----
+// 只要在 jumpSpamResetSec_ 秒内持续起跳，就会累加 jumpSpamCount_；
+// 超过窗口没跳则清零。
+if (jumpSpamTimer_ > 0.0f) {
+    jumpSpamTimer_ -= deltaTime;
+    if (jumpSpamTimer_ <= 0.0f) {
+        jumpSpamTimer_ = 0.0f;
+        jumpSpamCount_ = 0;
+    }
+}
+
    // 记录上一帧的水状态，用于判断“刚刚进入水中”
     bool wasInWater        = inWater_;
     bool wasOnWaterSurface = onWaterSurface_;
@@ -323,6 +334,12 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
   const bool isSpacePressed   = input->PushKey(DIK_SPACE);
     const bool justPressedJump  = input->TriggerKey(DIK_SPACE);
 
+
+auto RegisterJumpSpam = [&]() {
+    jumpSpamTimer_ = jumpSpamResetSec_;
+    if (jumpSpamCount_ < 999) { jumpSpamCount_++; }
+};
+
     // 起跳 & 二段跳 / 水中无限跳
     if (justPressedJump) {
 
@@ -340,6 +357,11 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
                 velocity_.y *= kWaterJumpVelScale;
             }
             jumpCount_ = 1; // 已经用掉第一段
+
+// 只统计空气中的“地面跳/二段跳”；不统计水中无限跳
+if (!inWater_) {
+    RegisterJumpSpam();
+}
 
             if (isDashing_) {
                 velocity_.x = dashDirection_.x * (moveSpeed_ * dashSpeedMultiplier_);
@@ -367,6 +389,11 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
             if (jumpCount_ < maxJumpCount_) {
                 jumpCount_++;
             }
+
+// 只统计空气中的“地面跳/二段跳”；不统计水中无限跳
+if (!inWater_) {
+    RegisterJumpSpam();
+}
 
             didDoubleJumpThisFrame_ = true; // 水中额外跳也当成“二段跳事件”，方便播特效
         }
@@ -677,4 +704,34 @@ void Player::StartStompInvincible(float duration)
     if (duration <= 0.0f) { return; }
     stompInvincibleTimer_ = (std::max)(stompInvincibleTimer_, duration);
     isInvincible_ = true;
+}
+
+
+float Player::GetJumpSpam01() const {
+    // timer 已经过期就视为不连跳（保险）
+    if (jumpSpamTimer_ <= 0.0f) {
+        return 0.0f;
+    }
+
+    // 只统计空气中的连跳，水里无限跳不计（额外保险）
+    if (inWater_) {
+        return 0.0f;
+    }
+
+    if (jumpSpamCount_ <= jumpSpamStartCount_) {
+        return 0.0f;
+    }
+    if (jumpSpamCount_ >= jumpSpamFullCount_) {
+        return 1.0f;
+    }
+
+    float denom = float(jumpSpamFullCount_ - jumpSpamStartCount_);
+    if (denom <= 0.0f) {
+        return 1.0f;
+    }
+
+    float t = float(jumpSpamCount_ - jumpSpamStartCount_) / denom;
+    if (t < 0.0f) t = 0.0f;
+    if (t > 1.0f) t = 1.0f;
+    return t;
 }

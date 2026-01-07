@@ -36,6 +36,7 @@ void BossEnemy::Initialize(
 ) {
     type_     = type;
     position_ = spawnPos;
+    visualOffsetY_ = 0.0f;
 
     // Boss：默认先“睡眠”，等玩家进入指定区域再唤醒（见 Update 里的触发条件）
     battleTriggered_ = (type != EnemyType::Boss);
@@ -130,6 +131,9 @@ void BossEnemy::Initialize(
         // 说明：如果你的 Object3d 没有 SetScale()，请改成你工程里对应的缩放 API。
         const float kBossScale = 1.35f;
 
+        // 見た目だけ下げる（モデル原点が足元に無い＆拡大で浮いて見える対策）
+        visualOffsetY_ = -0.85f;
+
         // 碰撞体积（AABB）跟着放大
         width_  = 2.6f * kBossScale;
         height_ = 3.0f * kBossScale;
@@ -177,7 +181,7 @@ void BossEnemy::Initialize(
     mapColliderW_ = width_;
     mapColliderH_ = height_;
 
-    obj_->SetTranslate(position_);
+    obj_->SetTranslate(GetRenderPosition());
     // 初始朝向：右=0，左=PI（和 Player 逻辑一致）
     obj_->SetRotate({ 0.0f, 0.0f, 0.0f });
     obj_->Update();
@@ -211,8 +215,18 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
         // 未触发：不更新 AI/弹幕，只更新渲染（Boss 可以当作“雕像/待机”）
         // 触发逻辑交给 GameScene：先播镜头演出，演出结束后再调用 TriggerBattleNow()。
         if (!battleTriggered_) {
+            // 未触发 Boss 战：不做 AI / 攻击，但仍然要做重力 + 地图碰撞，
+            // 否则 Boss 的中心点会停在“刷怪点”高度，镜头推近时容易看起来“陷入地面/飘空”。
+            velocity_.x = 0.0f;
+
+            // 让 Boss 自然落到地面上（避免静态穿插，必须先给一个向下速度/重力）
+            velocity_.y += gravityBase_ * dt;
+            if (velocity_.y < -2.5f) { velocity_.y = -2.5f; }
+            ResolveMapCollision(map, dt);
+            if (isOnGround_) { velocity_.y = 0.0f; }
+
             if (obj_) {
-                obj_->SetTranslate(position_);
+                obj_->SetTranslate(GetRenderPosition());
                 obj_->Update();
             }
             return;
@@ -324,6 +338,22 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
                 const bool canSlam = (isOnGround_ && slamCD_ <= 0.0f && dist <= 6.5f);
                 const bool canNova = (!tooCloseForRanged && dist >= 4.8f && dist <= 12.8f && novaCD_ <= 0.0f);
 
+
+// 玩家“连跳”检测：连跳越频繁，Boss 越倾向于用 Slam（Jump->Slam）惩罚
+const float jumpSpam01 = player.GetJumpSpam01(); // 0~1
+
+const bool slamForced = (playerAbove || dist <= (meleeRange_ + 1.2f));
+bool slamBoostRoll = false;
+if (canSlam && !slamForced && jumpSpam01 > 0.0f) {
+    // 连跳越严重，概率越高（大幅提高）
+    const float baseProb = 0.15f; // 刚开始连跳就有 15%
+    const float maxProb  = 0.85f; // 连跳拉满接近 85%
+    float slamProb = baseProb + (maxProb - baseProb) * jumpSpam01;
+
+    float r = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+    slamBoostRoll = (r < slamProb);
+}
+
                 if (canUltimate && dist >= 2.0f && dist <= 14.0f) {
                     queuedAttack_ = BossAttack::Ultimate;
                     bossState_ = BossState::Windup;
@@ -337,7 +367,7 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
                     decisionTimer_ = 0.35f;
                 }
                 // ② 砸地：克制“跳头顶/贴脸绕圈”，落地会生成冲击波弹幕
-                else if (canSlam && (playerAbove || dist <= (meleeRange_ + 1.2f))) {
+                else if (canSlam && (slamForced || slamBoostRoll)) {
                     queuedAttack_ = BossAttack::Slam;
                     bossState_ = BossState::Windup;
                     attackFacing_ = facing_;
@@ -926,7 +956,7 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
             const float rotY = (facing_ >= 0) ? kPi : 0.0f;
             obj_->SetRotate({ 0.0f, rotY, 0.0f });
         }
-        obj_->SetTranslate(position_);
+        obj_->SetTranslate(GetRenderPosition());
         obj_->Update();
     }
 }

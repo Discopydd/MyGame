@@ -215,7 +215,7 @@ private:
     // ★ 推镜头/展示名时：整体镜头向下挪一点
     // 注意：你这个项目的世界坐标 Y 轴更像是“向下为正”，所以“向下”用 +Y。
     // 若你的场景是 Y 向上为正，把这个值改成负数即可。
-    Vector3 bossIntroBossCamOffset_ = {0.0f, 2.0f, 0.0f};
+    Vector3 bossIntroBossCamOffset_ = {0.0f, 0.0f, 0.0f};
 
     float bossIntroToBossDur_  = 0.85f;            // 推镜头时长
     float bossIntroShowDur_    = 1.10f;            // 显示名字停留时长

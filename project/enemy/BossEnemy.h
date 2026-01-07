@@ -35,6 +35,18 @@ void SetBattleTriggerXIndex(uint32_t xIndex) { battleTriggerXIndex_ = xIndex; }
 
 
 private:
+    // ----- 見た目(モデル)のY補正 -----
+    // NOTE: position_ は当たり判定(AABB)の中心を想定しているが、
+    //       モデルの原点(pivot)が足元に無い場合、拡大時に「浮いて見える」ことがある。
+    //       この値は“描画のみ”に効かせる（当たり判定/物理には影響しない）。
+    float visualOffsetY_ = 0.0f;
+
+    Vector3 GetRenderPosition() const {
+        Vector3 p = position_;
+        p.y += visualOffsetY_;
+        return p;
+    }
+
     // ---------- 运动/碰撞（Boss 用：position += velocity） ----------
     Vector3 velocity_{ 0,0,0 };
     bool    isOnGround_ = false;
