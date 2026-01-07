@@ -75,12 +75,6 @@ public:
     // 玩家是否面向右
     bool IsFacingRight() const { return lrDirection_ == LRDirection::kRight; }
 
-
-// ---- Jump spam tracking (for Boss AI) ----
-// 0.0~1.0：玩家越“连跳”，数值越接近 1（只统计空气中的地面跳/二段跳；不统计水中无限跳）
-float GetJumpSpam01() const;
-int   GetJumpSpamCount() const { return jumpSpamCount_; }
-
     const Vector3& GetDashDirection() const { return dashDirection_; }
 private:
     std::unique_ptr<Object3d> model_;
@@ -162,17 +156,6 @@ private:
     // ---- Jump / Double Jump ----
     int   jumpCount_ = 0;        // 已使用的跳跃次数
     int   maxJumpCount_ = 2;     // 最大跳跃次数（2 = 二段跳）
-
-// ---- Jump spam tracking ----
-// 若玩家在 jumpSpamResetSec_ 秒内又跳一次，就认为“在连跳”，计数累加；
-// 若超过该时间没跳，计数清零。
-float jumpSpamTimer_ = 0.0f;
-int   jumpSpamCount_ = 0;
-
-// 参数：按手感调
-float jumpSpamResetSec_   = 2.0f; // 多久不跳就清零（连跳窗口）
-int   jumpSpamStartCount_ = 4;    // 从第几次开始认为“在连跳”
-int   jumpSpamFullCount_  = 8;    // 到第几次视为“连跳拉满”
 
 
     bool  didDoubleJumpThisFrame_ = false; // 本帧是否触发了二段跳

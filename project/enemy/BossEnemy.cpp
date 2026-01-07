@@ -339,20 +339,7 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
                 const bool canNova = (!tooCloseForRanged && dist >= 4.8f && dist <= 12.8f && novaCD_ <= 0.0f);
 
 
-// 玩家“连跳”检测：连跳越频繁，Boss 越倾向于用 Slam（Jump->Slam）惩罚
-const float jumpSpam01 = player.GetJumpSpam01(); // 0~1
 
-const bool slamForced = (playerAbove || dist <= (meleeRange_ + 1.2f));
-bool slamBoostRoll = false;
-if (canSlam && !slamForced && jumpSpam01 > 0.0f) {
-    // 连跳越严重，概率越高（大幅提高）
-    const float baseProb = 0.15f; // 刚开始连跳就有 15%
-    const float maxProb  = 0.85f; // 连跳拉满接近 85%
-    float slamProb = baseProb + (maxProb - baseProb) * jumpSpam01;
-
-    float r = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
-    slamBoostRoll = (r < slamProb);
-}
 
                 if (canUltimate && dist >= 2.0f && dist <= 14.0f) {
                     queuedAttack_ = BossAttack::Ultimate;
@@ -367,7 +354,7 @@ if (canSlam && !slamForced && jumpSpam01 > 0.0f) {
                     decisionTimer_ = 0.35f;
                 }
                 // ② 砸地：克制“跳头顶/贴脸绕圈”，落地会生成冲击波弹幕
-                else if (canSlam && (slamForced || slamBoostRoll)) {
+                else if (canSlam && (playerAbove || dist <= (meleeRange_ + 1.2f))){
                     queuedAttack_ = BossAttack::Slam;
                     bossState_ = BossState::Windup;
                     attackFacing_ = facing_;
