@@ -41,9 +41,30 @@ private:
     //       この値は“描画のみ”に効かせる（当たり判定/物理には影響しない）。
     float visualOffsetY_ = 0.0f;
 
+
+    // ----- 微抖动前摇（只影响渲染，不影响碰撞/物理/弹幕出生点） -----
+    Vector3 preAttackJitter_{ 0.0f, 0.0f, 0.0f };
+    float   preAttackJitterTime_ = 0.0f;
+
+    // 进入“最后 X 秒”时开始抖动（秒）
+    float preJitterLeadBarrage_ = 0.18f;
+    float preJitterLeadNova_    = 0.18f;
+    float preJitterLeadJump_    = 0.18f; // Slam 的起跳前（Jump 前摇）
+
+    
+
+    // 抖动结束后留一点“定住”的时间，再出招（秒）
+    float preJitterSettle_ = 0.08f;
+// 抖动幅度（世界坐标，建议很小）
+    float preJitterAmpX_ = 0.06f;
+    float preJitterAmpY_ = 0.04f;
+
+
     Vector3 GetRenderPosition() const {
         Vector3 p = position_;
-        p.y += visualOffsetY_;
+        p.x += preAttackJitter_.x;
+        p.y += visualOffsetY_ + preAttackJitter_.y;
+        p.z += preAttackJitter_.z;
         return p;
     }
 
@@ -260,6 +281,8 @@ private:
     void SpawnRadialBurst(const Vector3& center, int count, float speed, float life, float radius, float angleOffset = 0.0f);
 
 private:
+    void UpdatePreAttackJitter(float dt);
+
     void ResolveMapCollision(const MapChipField& map, float dt);
     void UpdateBossFacing(const Player& player);
 

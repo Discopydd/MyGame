@@ -38,6 +38,10 @@ void BossEnemy::Initialize(
     position_ = spawnPos;
     visualOffsetY_ = 0.0f;
 
+
+preAttackJitter_ = { 0.0f, 0.0f, 0.0f };
+preAttackJitterTime_ = 0.0f;
+
     // Boss：默认先“睡眠”，等玩家进入指定区域再唤醒（见 Update 里的触发条件）
     battleTriggered_ = (type != EnemyType::Boss);
 
@@ -218,6 +222,9 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
         // 未触发：不更新 AI/弹幕，只更新渲染（Boss 可以当作“雕像/待机”）
         // 触发逻辑交给 GameScene：先播镜头演出，演出结束后再调用 TriggerBattleNow()。
         if (!battleTriggered_) {
+preAttackJitter_ = { 0.0f, 0.0f, 0.0f };
+preAttackJitterTime_ = 0.0f;
+
             // 未触发 Boss 战：不做 AI / 攻击，但仍然要做重力 + 地图碰撞，
             // 否则 Boss 的中心点会停在“刷怪点”高度，镜头推近时容易看起来“陷入地面/飘空”。
             velocity_.x = 0.0f;
@@ -268,6 +275,14 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
         novaCD_ = (std::max)(0.0f, novaCD_ - dt);
         globalAttackCD_ = (std::max)(0.0f, globalAttackCD_ - dt);
         ultimateCD_ = (std::max)(0.0f, ultimateCD_ - dt);
+
+// 默认每帧清掉“渲染抖动”；只有在特定前摇窗口里才会被 UpdatePreAttackJitter() 写入
+preAttackJitter_ = { 0.0f, 0.0f, 0.0f };
+const bool wantsJitter = (bossState_ == BossState::Windup) &&
+    (queuedAttack_ == BossAttack::Barrage || queuedAttack_ == BossAttack::Nova || queuedAttack_ == BossAttack::Slam);
+if (!wantsJitter) {
+    preAttackJitterTime_ = 0.0f;
+}
 
         switch (bossState_) {
 
@@ -481,6 +496,9 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
             facing_ = attackFacing_;
 
 
+
+            UpdatePreAttackJitter(dt);
+
             // Dash：Windup 期间先小幅后撤，再释放冲刺（更好读招）
             if (queuedAttack_ == BossAttack::Dash && stateTimer_ > 0.0f) {
                 const float targetDist = isShortDash_ ? dashBackstepDistShort_ : dashBackstepDist_;
@@ -536,6 +554,10 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
                 velocity_.x = -static_cast<float>(attackFacing_) * v;
             }
             if (stateTimer_ <= 0.0f) {
+                // 确保出招开始时不再带着“前摇抖动”
+                preAttackJitter_ = { 0.0f, 0.0f, 0.0f };
+                preAttackJitterTime_ = 0.0f;
+
                 if (queuedAttack_ == BossAttack::Dash) {
                     bossState_ = BossState::Dash;
                     stateTimer_ = queuedDashDuration_;
@@ -664,6 +686,11 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
 
         case BossState::Barrage:
         {
+            // 保险：攻击阶段强制关闭前摇抖动（避免与发射重叠）
+            preAttackJitter_ = { 0.0f, 0.0f, 0.0f };
+            preAttackJitterTime_ = 0.0f;
+
+
             // 旋转弹幕：站定发射，靠角度持续旋转制造“弹幕地狱”效果
             velocity_.x = 0.0f;
             facing_ = attackFacing_;
@@ -714,6 +741,10 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
 
         case BossState::Nova:
         {
+            // 保险：攻击阶段强制关闭前摇抖动（避免与发射重叠）
+            preAttackJitter_ = { 0.0f, 0.0f, 0.0f };
+            preAttackJitterTime_ = 0.0f;
+
             // 圆形爆发：多环环形弹幕
             velocity_.x = 0.0f;
             facing_ = attackFacing_;
@@ -764,12 +795,17 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
         }
 
         case BossState::Jump:
+            // 保险：攻击阶段强制关闭前摇抖动（避免与发射重叠）
+            preAttackJitter_ = { 0.0f, 0.0f, 0.0f };
+            preAttackJitterTime_ = 0.0f;
+
             // 跳起砸地：空中不做水平移动（更好读招）
             velocity_.x = 0.0f;
             facing_ = attackFacing_;
 
             // failsafe：如果空中太久（某些地图/碰撞极端情况），强制进入 Slam
             if (stateTimer_ <= 0.0f) {
+
                 bossState_ = BossState::Slam;
                 stateTimer_ = slamImpactHold_;
                 slamSpawned_ = false;
@@ -1283,6 +1319,52 @@ void BossEnemy::UpdateBossFacing(const Player& player)
     }
 
     facing_ = (dx >= 0.0f) ? 1 : -1;
+}
+
+void BossEnemy::UpdatePreAttackJitter(float dt)
+{
+    if (bossState_ != BossState::Windup) { return; }
+
+    float lead = 0.0f;
+    if (queuedAttack_ == BossAttack::Barrage) { lead = preJitterLeadBarrage_; }
+    else if (queuedAttack_ == BossAttack::Nova) { lead = preJitterLeadNova_; }
+    else if (queuedAttack_ == BossAttack::Slam) { lead = preJitterLeadJump_; } // Slam->Jump 前
+    else { return; }
+
+    if (lead <= 0.0f) { return; }
+
+    const float settle = std::clamp(preJitterSettle_, 0.0f, lead);
+
+    // 还没进入“最后 lead 秒”时不抖，并把相位清零，避免突然跳相位
+    if (stateTimer_ > lead || stateTimer_ <= 0.0f) {
+        if (stateTimer_ > lead) { preAttackJitterTime_ = 0.0f; }
+        return;
+    }
+
+    // 进入最后 settle 秒：抖动结束，留一个“定住”的瞬间，再出招
+    if (stateTimer_ <= settle) {
+        preAttackJitterTime_ = 0.0f;
+        return;
+    }
+
+    preAttackJitterTime_ += dt;
+
+    // jitter 生效区间： (settle, lead]
+    const float seg = (std::max)(0.0001f, lead - settle);
+    float k = 1.0f - ((stateTimer_ - settle) / seg); // 0 -> 1
+    k = std::clamp(k, 0.0f, 1.0f);
+
+    const float ampX = preJitterAmpX_ * k;
+    const float ampY = preJitterAmpY_ * k;
+    const float t = preAttackJitterTime_;
+
+    // 组合不同频率的正弦，做“微抖动”而不是单摆
+    const float nx = std::sin(t * 97.0f) + 0.35f * std::sin(t * 211.0f + 1.1f);
+    const float ny = std::sin(t * 131.0f + 2.7f) + 0.35f * std::sin(t * 233.0f + 0.2f);
+
+    preAttackJitter_.x = nx * ampX;
+    preAttackJitter_.y = ny * ampY;
+    preAttackJitter_.z = 0.0f;
 }
 
 void BossEnemy::UpdateBossProjectiles(float dt, const MapChipField& map)
