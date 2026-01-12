@@ -596,7 +596,7 @@ void GameScene::Update() {
             isMapLoading_ = false;
 
             // 真正加载地图
-            LoadMap("Resources/map/map6.csv", { 3,3,0 });
+            LoadMap("Resources/map/map.csv", { 3,3,0 });
             if (sceneManager_) sceneManager_->ClearOverlayScene();
             if (fade_) fade_->SetPhase(FadePhase::FadingIn);
 

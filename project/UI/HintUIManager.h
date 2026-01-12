@@ -48,4 +48,10 @@ private:
     float bobTime_      = 0.0f;
     float bobAmplitude_ = 6.0f;   // 位移像素（上下±6）
     float bobSpeed_     = 3.0f;   // 频率（越大晃得越快）
+
+    // Move hint icons (key_A / arrow_left / key_D / arrow_right)
+    std::unique_ptr<Sprite> moveKeyA_;
+    std::unique_ptr<Sprite> moveArrowL_;
+    std::unique_ptr<Sprite> moveKeyD_;
+    std::unique_ptr<Sprite> moveArrowR_;
 };

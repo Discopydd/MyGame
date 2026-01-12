@@ -1,4 +1,3 @@
-// HintUIManager.cpp
 #include "HintUIManager.h"
 #include <cmath>
 
@@ -10,12 +9,27 @@ void HintUIManager::Initialize(SpriteCommon* spriteCommon, Camera* camera)
     bobTime_      = 0.0f;
     bobAmplitude_ = 6.0f;
     bobSpeed_     = 3.0f;
+
+    moveKeyA_ = std::make_unique<Sprite>();
+    moveKeyA_->Initialize(spriteCommon_, "Resources/key_A.png");
+    moveKeyA_->SetSize({ 48.0f, 48.0f });
+
+    moveKeyD_ = std::make_unique<Sprite>();
+    moveKeyD_->Initialize(spriteCommon_, "Resources/key_D.png");
+    moveKeyD_->SetSize({ 48.0f, 48.0f });
+
+    moveArrowL_ = std::make_unique<Sprite>();
+    moveArrowL_->Initialize(spriteCommon_, "Resources/arrow_left.png");
+    moveArrowL_->SetSize({ 48.0f, 48.0f });
+
+    moveArrowR_ = std::make_unique<Sprite>();
+    moveArrowR_->Initialize(spriteCommon_, "Resources/arrow_right.png");
+    moveArrowR_->SetSize({ 48.0f, 48.0f });
 }
 
 void HintUIManager::Finalize()
 {
-    // 注意：这里不 delete 任何 Sprite
-    // Sprite 的生命周期还是由 GameScene 管理
+
 }
 
 void HintUIManager::Update(float dt)
@@ -31,6 +45,36 @@ void HintUIManager::Update(float dt)
         spaceHint_->sprite->SetPosition({ s.x, s.y + offset });
         spaceHint_->sprite->Update();
     }
+    if (spaceHint_ && spaceHint_->sprite && moveKeyA_ && moveKeyD_ && moveArrowL_ && moveArrowR_) {
+        Vector3 s = WorldToScreen(spaceHint_->worldPos, camera_);
+
+        constexpr float kSpaceSize     = 64.0f;
+        constexpr float kIconSize      = 48.0f;
+        constexpr float kGap           = 6.0f;   // between icons
+        constexpr float kPadFromSpace  = 10.0f;  // distance from Space hint (pixels)
+
+        float y = s.y + offset + (kSpaceSize - kIconSize) * 0.5f;
+
+        // Layout: [A][←][D][→]
+        float totalW = kIconSize * 4.0f + kGap * 3.0f;
+        float x = s.x - kPadFromSpace - totalW;
+
+        moveKeyA_->SetPosition({ x, y });
+        moveKeyA_->Update();
+        x += kIconSize + kGap;
+
+        moveArrowL_->SetPosition({ x, y });
+        moveArrowL_->Update();
+        x += kIconSize + kGap;
+
+        moveKeyD_->SetPosition({ x, y });
+        moveKeyD_->Update();
+        x += kIconSize + kGap;
+
+        moveArrowR_->SetPosition({ x, y });
+        moveArrowR_->Update();
+    }
+
 
     // Up 一组
     if (upHints_) {
@@ -62,6 +106,13 @@ void HintUIManager::Draw()
     // 这里默认 GameScene 已经调用过 spriteCommon_->CommonDraw()
 
     if (spaceHint_ && spaceHint_->sprite) {
+        // Move hint icons placed left of Space hint
+        if (moveKeyA_ && moveKeyD_ && moveArrowL_ && moveArrowR_) {
+            moveKeyA_->Draw();
+            moveArrowL_->Draw();
+            moveKeyD_->Draw();
+            moveArrowR_->Draw();
+        }
         spaceHint_->sprite->Draw();
     }
 
