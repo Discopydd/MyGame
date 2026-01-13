@@ -1772,14 +1772,14 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
         // (5,2) → space.png
         spaceHint_.sprite = std::make_unique<Sprite>();
         spaceHint_.sprite->Initialize(spriteCommon_, "Resources/space2.png");
-        spaceHint_.sprite->SetSize({ 64.0f, 64.0f });
+        spaceHint_.sprite->SetSize({ 48.0f, 32.0f });
         spaceHint_.worldPos = mapChipField_.GetMapChipPositionByIndex(5, 2);
         spaceHint_.worldPos.y += 0.4f;
 
         // (19,6) → shift.png
         shiftHint_.sprite = std::make_unique<Sprite>();
         shiftHint_.sprite->Initialize(spriteCommon_, "Resources/shift.png");
-        shiftHint_.sprite->SetSize({ 64.0f, 48.0f });
+        shiftHint_.sprite->SetSize({ 48.0f, 32.0f });
         shiftHint_.worldPos = mapChipField_.GetMapChipPositionByIndex(19, 6);
         shiftHint_.worldPos.x -= 0.2f;
         shiftHint_.worldPos.y += 0.5f;

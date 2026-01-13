@@ -12,19 +12,19 @@ void HintUIManager::Initialize(SpriteCommon* spriteCommon, Camera* camera)
 
     moveKeyA_ = std::make_unique<Sprite>();
     moveKeyA_->Initialize(spriteCommon_, "Resources/key_A.png");
-    moveKeyA_->SetSize({ 48.0f, 48.0f });
+    moveKeyA_->SetSize({ 32.0f, 32.0f });
 
     moveKeyD_ = std::make_unique<Sprite>();
     moveKeyD_->Initialize(spriteCommon_, "Resources/key_D.png");
-    moveKeyD_->SetSize({ 48.0f, 48.0f });
+    moveKeyD_->SetSize({ 32.0f, 32.0f });
 
     moveArrowL_ = std::make_unique<Sprite>();
     moveArrowL_->Initialize(spriteCommon_, "Resources/arrow_left.png");
-    moveArrowL_->SetSize({ 48.0f, 48.0f });
+    moveArrowL_->SetSize({ 32.0f, 32.0f });
 
     moveArrowR_ = std::make_unique<Sprite>();
     moveArrowR_->Initialize(spriteCommon_, "Resources/arrow_right.png");
-    moveArrowR_->SetSize({ 48.0f, 48.0f });
+    moveArrowR_->SetSize({ 32.0f, 32.0f });
 }
 
 void HintUIManager::Finalize()
@@ -42,7 +42,7 @@ void HintUIManager::Update(float dt)
     // Space
     if (spaceHint_ && spaceHint_->sprite) {
         Vector3 s = WorldToScreen(spaceHint_->worldPos, camera_);
-        spaceHint_->sprite->SetPosition({ s.x, s.y + offset });
+        spaceHint_->sprite->SetPosition({ s.x, s.y + offset + 8.0f });
         spaceHint_->sprite->Update();
     }
     if (spaceHint_ && spaceHint_->sprite && moveKeyA_ && moveKeyD_ && moveArrowL_ && moveArrowR_) {
@@ -81,7 +81,7 @@ void HintUIManager::Update(float dt)
         for (auto& h : *upHints_) {
             if (!h.sprite) continue;
             Vector3 s = WorldToScreen(h.worldPos, camera_);
-            h.sprite->SetPosition({ s.x, s.y + offset });
+            h.sprite->SetPosition({ s.x, s.y + offset - 8.0f });
             h.sprite->Update();
         }
     }

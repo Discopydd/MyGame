@@ -3,6 +3,7 @@
 #include "Sprite.h"
 #include <player/Player.h>
 #include <memory>
+
 class DashUIManager {
 public:
     DashUIManager() = default;
@@ -20,4 +21,6 @@ private:
 
     std::unique_ptr<Sprite> icon_;    // 技能图标
     std::unique_ptr<Sprite> overlay_; // 冷却灰罩
+
+    Vector2 overlayFullTexSize_{ 0.0f, 0.0f };
 };

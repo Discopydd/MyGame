@@ -25,7 +25,7 @@ void IntroManager::Initialize(SpriteCommon* spriteCommon, Input* input)
 
     // 暗角
     vignette_ = std::make_unique<Sprite>();
-    vignette_->Initialize(spriteCommon_, "Resources/gray.png");
+    vignette_->Initialize(spriteCommon_, "Resources/gray2.png");
     vignette_->SetSize({ W, H });
     vignette_->SetPosition({ 0.0f, 0.0f });
     vignette_->SetColor({ 1,1,1,0.0f });
