@@ -64,6 +64,14 @@ public:
     void  StartInvincible(float duration);          // 受伤无敌（带闪烁）
     void  StartDashInvincible(float duration);      // 冲刺无敌（不闪烁）
     void  StartStompInvincible(float duration);     // 踩头无敌（不闪烁）
+    
+    // 踩头冷却：用于防止在 Boss 头顶原地无限连踩
+    bool  IsStompCooldown() const { return stompCooldownTimer_ > 0.0f; }
+    void  StartStompCooldown(float duration);
+
+    // 踩头击退：让踩踏后的横向弹开在短时间内稳定生效（不影响日常空中手感）
+    void  StartStompKick(float vx, float duration);
+
     bool  IsDead() const { return isDead_; }
     void  StartDeathFall();   // 触发死亡演出（被 GameScene 调用）
 
@@ -171,6 +179,14 @@ private:
     // 踩头无敌：踩到敌人后短暂无敌（不闪烁）
     float stompInvincibleTimer_ = 0.0f;
 
+
+    // 踩头冷却：防止在 Boss 头顶原地无限连踩
+    float stompCooldownTimer_ = 0.0f;
+
+    // 踩头击退：短时间内覆盖/混合水平速度，避免“站桩踩头”且手感更自然
+    float stompKickTimer_ = 0.0f;
+    float stompKickTotal_ = 0.0f;
+    float stompKickVx_    = 0.0f;
     // 闪烁（仅在 damageInvincibleTimer_ > 0 时生效）
     float damageBlinkTimer_ = 0.0f;
     float damageBlinkInterval_ = 0.08f; // 闪烁间隔（秒）

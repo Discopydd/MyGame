@@ -32,6 +32,12 @@ void Player::Initialize(Object3dCommon* object3dCommon, Camera* camera) {
     // 让“旧的 originalGravity_”与当前新参数对齐
     originalGravity_ = gravityBase_;
     dashGravity_ = 0.0f;
+
+    stompCooldownTimer_ = 0.0f;
+
+    stompKickTimer_ = 0.0f;
+    stompKickTotal_ = 0.0f;
+    stompKickVx_ = 0.0f;
 }
 
 void Player::Update(Input* input, const MapChipField& mapChipField) {
@@ -77,6 +83,18 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
         if (stompInvincibleTimer_ < 0.0f) stompInvincibleTimer_ = 0.0f;
     }
 
+
+    // ④ 踩头冷却：防止在 Boss 头顶原地无限连踩
+    if (stompCooldownTimer_ > 0.0f) {
+        stompCooldownTimer_ -= deltaTime;
+        if (stompCooldownTimer_ < 0.0f) stompCooldownTimer_ = 0.0f;
+    }
+
+    // ⑤ 踩头击退计时：仅踩头后短时间生效（避免影响日常空中手感）
+    if (stompKickTimer_ > 0.0f) {
+        stompKickTimer_ -= deltaTime;
+        if (stompKickTimer_ < 0.0f) stompKickTimer_ = 0.0f;
+    }
     isInvincible_ = (damageInvincibleTimer_ > 0.0f) ||
                     (dashInvincibleTimer_ > 0.0f) ||
                     (stompInvincibleTimer_ > 0.0f);
@@ -291,9 +309,7 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
             turnTargetRotationY_ = DirectX::XM_PI;
             turnCurrentFrame_ = 0;
         }
-    } else {
-        velocity_.x = 0.0f;
-    }
+    } 
 
     // ---- 水中物理倍率（可以按手感调整）----
     const float kWaterMoveSpeedScale  = 0.4f;  // 水里移动速度 40%
@@ -319,7 +335,17 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
         }
     }
 
-    velocity_.x = moveVelocity.x;
+    float finalVx = moveVelocity.x;
+
+    // 踩头击退：短时间内稳定生效，用 ease-out 让弹开更自然
+    if (stompKickTimer_ > 0.0f) {
+        float denom = (stompKickTotal_ > 0.0f) ? stompKickTotal_ : 1.0f;
+        float r = stompKickTimer_ / denom; // 1 -> 0
+        float ease = r * r;                // ease-out
+        finalVx = stompKickVx_ * ease + moveVelocity.x * 0.25f; // 允许少量空中修正
+    }
+
+    velocity_.x = finalVx;
 
   const bool isSpacePressed   = input->PushKey(DIK_SPACE);
     const bool justPressedJump  = input->TriggerKey(DIK_SPACE);
@@ -679,4 +705,26 @@ void Player::StartStompInvincible(float duration)
     stompInvincibleTimer_ = (std::max)(stompInvincibleTimer_, duration);
     isInvincible_ = true;
 }
+
+void Player::StartStompCooldown(float duration)
+{
+    // duration <= 0 也允许作为清零
+    if (duration <= 0.0f) {
+        stompCooldownTimer_ = 0.0f;
+        return;
+    }
+    stompCooldownTimer_ = (std::max)(stompCooldownTimer_, duration);
+}
+
+
+void Player::StartStompKick(float vx, float duration)
+{
+    if (duration <= 0.0f) { return; }
+
+    // 不要把已有击退“缩短”
+    stompKickTimer_ = (std::max)(stompKickTimer_, duration);
+    stompKickTotal_ = (std::max)(stompKickTotal_, duration);
+    stompKickVx_ = vx;
+}
+
 

@@ -596,7 +596,7 @@ void GameScene::Update() {
             isMapLoading_ = false;
 
             // 真正加载地图
-            LoadMap("Resources/map/map.csv", { 3,3,0 });
+            LoadMap("Resources/map/map6.csv", { 3,3,0 });
             if (sceneManager_) sceneManager_->ClearOverlayScene();
             if (fade_) fade_->SetPhase(FadePhase::FadingIn);
 
@@ -756,6 +756,15 @@ void GameScene::Update() {
         float pBottom = pPos.y - pHalfH;
         float pTop = pPos.y + pHalfH;
 
+        // stomp lock：如果锁定的敌人已不在列表里，清空
+        if (stompLockEnemy_) {
+            bool found = false;
+            for (auto& e : enemies_) {
+                if (e.get() == stompLockEnemy_) { found = true; break; }
+            }
+            if (!found) { stompLockEnemy_ = nullptr; }
+        }
+
         for (auto& enemyPtr : enemies_) {
             Enemy* enemy = enemyPtr.get();
             if (!enemy) { continue; }
@@ -782,6 +791,15 @@ void GameScene::Update() {
 
             bool overlapX = !(pRight <= eLeft || pLeft >= eRight);
             bool overlapY = !(pTop <= eBottom || pBottom >= eTop);
+
+            // 踩头锁：同一个敌人，在玩家还没离开它的碰撞盒之前不重复判定
+            if (enemy == stompLockEnemy_) {
+                if (overlapX && overlapY) {
+                    continue;
+                } else {
+                    stompLockEnemy_ = nullptr;
+                }
+            }
             if (!overlapX || !overlapY) {
                 continue;
             }
@@ -802,41 +820,62 @@ void GameScene::Update() {
                (pPos.y >= stompMinCenterY) &&
                (pBottom <= eTop + stompTolerance);
             if (isStomp) {
-                // ★ 受伤无敌中：弹起可以，但不触发敌人死亡/扣血（冲刺/踩头无敌不影响踩头伤害）
-                if (player_->IsDamageInvincible()) {
+                stompLockEnemy_ = enemy;
+
+                const bool isBoss = (enemy->GetType() == EnemyType::Boss);
+
+                auto BounceAndLift = [&](float bounceY, float kickX) {
                     Vector3 newVel = pVel;
-                    newVel.y = 0.7f;
+                    newVel.y = bounceY;
                     player_->SetVelocity(newVel);
 
                     Vector3 newPos = pPos;
                     newPos.y = eTop + pHalfH + 0.01f;
                     player_->SetPosition(newPos);
-                    continue;
-                }
 
-                 // Boss：踩头无敌时间内，再踩不扣血（可选：反而让玩家受伤）
-                if (enemy->GetType() == EnemyType::Boss && !enemy->CanTakeStompDamage()) {
-                    if (!player_->IsInvincible()) {
+                    if (kickX != 0.0f) {
+                        // 优先沿玩家当前水平速度方向弹开；若几乎静止，再按相对 Boss 位置决定方向
+                        float dir = (std::fabs(pVel.x) > 0.02f) ? (pVel.x > 0.0f ? 1.0f : -1.0f)
+                                                               : (pPos.x >= ePos.x ? 1.0f : -1.0f);
+
+                        float vx = pVel.x * 0.35f + dir * kickX;
+                        vx = std::clamp(vx, -0.45f, 0.45f);
+
+                        // 让击退在短时间内稳定生效（不依赖玩家是否按方向键），并用 ease-out 衰减更自然
+                        player_->StartStompKick(vx, 0.18f);
+
+                        Vector3 v = player_->GetVelocity();
+                        v.x = vx;
+                        player_->SetVelocity(v);
                     }
-                    continue;
+                };
+
+                // ★ 受伤无敌中：弹起可以，但不触发敌人死亡/扣血
+                if (player_->IsDamageInvincible()) {
+                    BounceAndLift(0.70f, isBoss ? 0.32f : 0.0f);
+                    break; // 本帧只处理一次踩踏，避免后续用旧 pPos/pVel 继续判定
                 }
-                // ☆ 踩到敌人：敌人闪烁，玩家弹一下，不受伤
-                enemy->OnStomp();                // Boss 会扣血/硬直/死亡判定；普通敌人保持闪烁
 
-                Vector3 newVel = pVel;
-                newVel.y = 0.7f;                // 踩完向上弹的力度，可自己调手感
-                player_->SetVelocity(newVel);
+                // ★ Boss：Boss 踩踏无敌 or 玩家踩踏冷却期间
+                // 仍可弹起，但强制横向踢开，避免“站桩在头上无限踩/无限安全”
+                if (isBoss && (!enemy->CanTakeStompDamage() || player_->IsStompCooldown())) {
+                    BounceAndLift(0.55f, 0.40f);
+                    player_->StartStompInvincible(0.08f);
+                    break;
+                }
 
-                // 把玩家“抬”到敌人头顶，避免侧面重叠导致下一帧又被判成撞到
-                Vector3 newPos = pPos;
-                newPos.y = eTop + pHalfH + 0.01f;
-                player_->SetPosition(newPos);
+                // ☆ 正常踩头：敌人扣血/硬直/死亡判定
+                enemy->OnStomp();
 
-                // 踩头后给一点点无敌时间（不闪烁）
-                player_->StartStompInvincible(0.40f);
+                BounceAndLift(0.70f, isBoss ? 0.32f : 0.0f);
 
-                // 不给玩家伤害，处理完当前敌人就继续下一个
-                continue;
+                // 踩头后给一点点无敌时间（不闪烁）：主要用于防“踩完那一下误伤”
+                player_->StartStompInvincible(0.12f);
+
+                // 防止连踩过于简单：冷却期间不再触发 Boss 的再次踩踏伤害
+                player_->StartStompCooldown(isBoss ? 0.45f : 0.25f);
+
+                break;
             }
             else {
                 // ☆ 不是从上面踩 ⇒ 视为被敌人撞到，玩家受伤

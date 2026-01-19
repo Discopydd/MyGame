@@ -173,6 +173,9 @@ private:
     bool crushedByPlatformThisFrame_ = false;
     bool damagedByEnemyThisFrame_    = false;
 
+    // 踩头锁：同一个敌人，在玩家还没离开它的碰撞盒之前不重复判定（防止站桩无限踩）
+    Enemy* stompLockEnemy_ = nullptr;
+
     
     // ================== Boss HP（2D） ==================
     std::unique_ptr<Sprite> bossHpDamageSprite_; // 红色：延迟扣血条
