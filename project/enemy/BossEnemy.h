@@ -277,6 +277,7 @@ private:
 
     bool ultimateLocked_ = false;     // 是否处于“把 ultimateCD_ 拉到 399 的锁定期”
 
+    float battleTriggerVerticalRange_ = 2.5f;
     // 通用：环形弹幕工具（复用对象池）
     void SpawnRadialBurst(const Vector3& center, int count, float speed, float life, float radius, float angleOffset = 0.0f);
 

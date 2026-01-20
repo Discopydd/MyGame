@@ -1245,11 +1245,47 @@ bool BossEnemy::IsBattleTriggerReady(const Player& player, const MapChipField& m
     if (type_ != EnemyType::Boss) { return false; }
     if (battleTriggered_) { return false; }
 
-    const auto pIdx = map.GetMapChipIndexByPosition(player.GetPosition());
-    const bool passedX = (pIdx.xIndex >= battleTriggerXIndex_);
-    const bool onGround = (!requirePlayerOnGroundToTrigger_) ? true : IsPlayerOnGround(map, player);
-    return passedX && onGround;
+    const Vector3 pPos = player.GetPosition();
+    const float halfW = player.GetWidth()  * 0.5f;
+    const float halfH = player.GetHeight() * 0.5f;
+
+    // ① 横向：用“左边界”而不是中心点判断是否跨过触发列（防止边缘触发）
+    const float edgeEps = 0.02f; // 小余量，避免浮点刚好卡边
+    auto leftIdx = map.GetMapChipIndexByPosition({ pPos.x - halfW + edgeEps, pPos.y, 0.0f });
+    const bool passedX = (leftIdx.xIndex >= battleTriggerXIndex_);
+
+    // ② 纵向：玩家必须落到Boss场地附近（避免在上层平台触发）
+    const float dy = std::fabs(pPos.y - position_.y);
+    const bool passedY = (dy <= battleTriggerVerticalRange_);
+
+    // ③ 地面：要求“脚下支撑块”也在触发列之后（避免站在外侧地面触发）
+    bool onGroundInBossArea = true;
+    if (requirePlayerOnGroundToTrigger_) {
+        const float probeY = 0.06f;
+        Vector3 probes[3] = {
+            { pPos.x,                 pPos.y - halfH - probeY, 0.0f },
+            { pPos.x - halfW * 0.80f, pPos.y - halfH - probeY, 0.0f },
+            { pPos.x + halfW * 0.80f, pPos.y - halfH - probeY, 0.0f },
+        };
+
+        onGroundInBossArea = false;
+        for (const auto& q : probes) {
+            auto idx = map.GetMapChipIndexByPosition(q);
+
+            // 关键：必须踩在触发列之后的地面才算
+            if (idx.xIndex < battleTriggerXIndex_) { continue; }
+
+            MapChipType t = map.GetMapChipTypeByIndex(idx.xIndex, idx.yIndex);
+            if (IsSolid(t)) {
+                onGroundInBossArea = true;
+                break;
+            }
+        }
+    }
+
+    return passedX && passedY && onGroundInBossArea;
 }
+
 
 void BossEnemy::TriggerBattleNow()
 {
