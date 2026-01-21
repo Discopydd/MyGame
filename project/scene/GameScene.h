@@ -173,6 +173,9 @@ private:
     bool crushedByPlatformThisFrame_ = false;
     bool damagedByEnemyThisFrame_    = false;
 
+    // 本帧造成玩家受伤的敌人（用于受伤时做轻微“分离”，避免玩家被顶飞/反复卡在敌人里）
+    Enemy* damageSourceEnemy_ = nullptr;
+
     // 踩头锁：同一个敌人，在玩家还没离开它的碰撞盒之前不重复判定（防止站桩无限踩）
     Enemy* stompLockEnemy_ = nullptr;
 

@@ -714,6 +714,7 @@ void GameScene::Update() {
     // ========= 阶段1：两条移动平台互相夹住玩家 =========
     crushedByPlatformThisFrame_ = false;
     damagedByEnemyThisFrame_ = false;
+    damageSourceEnemy_ = nullptr;
     if (!inBossIntro) {
         if (player_ && !player_->IsDead() && !player_->IsInvincible()) {
 
@@ -773,6 +774,7 @@ void GameScene::Update() {
             if (enemy->CheckBossProjectileHit(*player_)) {
                 if (!player_->IsInvincible()) {
                     damagedByEnemyThisFrame_ = true;
+                    if (!damageSourceEnemy_) { damageSourceEnemy_ = enemy; }
                 }
             }
             Vector3 ePos = enemy->GetPosition();
@@ -850,11 +852,7 @@ void GameScene::Update() {
                     }
                 };
 
-                // ★ 受伤无敌中：弹起可以，但不触发敌人死亡/扣血
-                if (player_->IsDamageInvincible()) {
-                    BounceAndLift(0.70f, isBoss ? 0.32f : 0.0f);
-                    break; // 本帧只处理一次踩踏，避免后续用旧 pPos/pVel 继续判定
-                }
+                // ✅受伤无敌中也允许踩头击杀/扣血（无敌只影响“玩家受伤”，不影响“玩家攻击敌人”）
 
                 // ★ Boss：Boss 踩踏无敌 or 玩家踩踏冷却期间
                 // 仍可弹起，但强制横向踢开，避免“站桩在头上无限踩/无限安全”
@@ -881,6 +879,7 @@ void GameScene::Update() {
                 // ☆ 不是从上面踩 ⇒ 视为被敌人撞到，玩家受伤
                 if (!player_->IsInvincible()) {
                     damagedByEnemyThisFrame_ = true;
+                    if (!damageSourceEnemy_) { damageSourceEnemy_ = enemy; }
                 }
             }
         }
@@ -1317,48 +1316,80 @@ void GameScene::Update() {
         if (!inBossIntro && (onSpike || crushedByPlatformThisFrame_ || damagedByEnemyThisFrame_) &&
             !player_->IsDead() && !player_->IsInvincible()) {
 
-            MapChipField::IndexSet safeIndex = playerIndexOneSecAgo_;
+            // ✅敌人撞到玩家：不把玩家“弹起/传送到 1 秒前”，只扣血 + 无敌，并做轻微分离，避免卡在敌人身体里
+            const bool enemyHitOnly = (damagedByEnemyThisFrame_ && !onSpike && !crushedByPlatformThisFrame_);
+            if (enemyHitOnly) {
+                player_->TakeDamage(static_cast<float>(player_->GetMaxHp() * 0.2f));
+                player_->StartInvincible(1.0f);
 
-            // 如果 1 秒前也在地刺上，就再往更早找一个“不是地刺”的格子
-            MapChipType safeType =
-                mapChipField_.GetMapChipTypeByIndex(safeIndex.xIndex, safeIndex.yIndex);
+                // 取消“被顶飞”（如果 TakeDamage 内部给了向上的速度，这里强制压掉）
+                {
+                    Vector3 v = player_->GetVelocity();
+                    if (v.y > 0.0f) { v.y = 0.0f; }
+                    player_->SetVelocity(v);
+                }
 
-            if (safeType == MapChipType::kSpike || safeType == MapChipType::kEnemy) {
-                MapChipField::IndexSet firstNonSpike{};
-                bool found = false;
+                // 轻微把玩家从敌人身上推开，避免无敌结束瞬间又立即受伤
+                if (damageSourceEnemy_) {
+                    Vector3 p = player_->GetPosition();
+                    Vector3 e = damageSourceEnemy_->GetPosition();
+                    const float pHalfW = player_->GetWidth() * 0.5f;
+                    const float eHalfW = damageSourceEnemy_->GetWidth() * 0.5f;
+                    const float eps = 0.03f;
+                    if (p.x < e.x) {
+                        p.x = e.x - eHalfW - pHalfW - eps;
+                    }
+                    else {
+                        p.x = e.x + eHalfW + pHalfW + eps;
+                    }
+                    player_->SetPosition(p);
+                }
+            }
+            else {
+                // 地刺/被夹死：维持原逻辑——回到 1 秒前所在格子再扣血
+                MapChipField::IndexSet safeIndex = playerIndexOneSecAgo_;
 
-                for (int i = 0; i < kPlayerIndexHistoryFrameCount_; ++i) {
-                    const auto& candidate = playerIndexHistory_[i];
-                    MapChipType type =
-                        mapChipField_.GetMapChipTypeByIndex(candidate.xIndex, candidate.yIndex);
-                    if (type != MapChipType::kSpike && type != MapChipType::kEnemy) {
-                        firstNonSpike = candidate;
-                        found = true;
-                        break;
+                // 如果 1 秒前也在地刺上，就再往更早找一个“不是地刺”的格子
+                MapChipType safeType =
+                    mapChipField_.GetMapChipTypeByIndex(safeIndex.xIndex, safeIndex.yIndex);
+
+                if (safeType == MapChipType::kSpike || safeType == MapChipType::kEnemy) {
+                    MapChipField::IndexSet firstNonSpike{};
+                    bool found = false;
+
+                    for (int i = 0; i < kPlayerIndexHistoryFrameCount_; ++i) {
+                        const auto& candidate = playerIndexHistory_[i];
+                        MapChipType type =
+                            mapChipField_.GetMapChipTypeByIndex(candidate.xIndex, candidate.yIndex);
+                        if (type != MapChipType::kSpike && type != MapChipType::kEnemy) {
+                            firstNonSpike = candidate;
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    if (found) {
+                        safeIndex = firstNonSpike;
                     }
                 }
 
-                if (found) {
-                    safeIndex = firstNonSpike;
-                }
+                auto rectPrev = mapChipField_.GetRectByIndex(
+                    safeIndex.xIndex, safeIndex.yIndex);
+
+                // 让玩家站在这个格子的“上表面”
+                Vector3 targetPos{};
+                targetPos.x = (rectPrev.left + rectPrev.right) * 0.5f;
+
+                float halfH = player_->GetHeight() * 0.5f;
+                targetPos.y = rectPrev.top + halfH;
+                targetPos.z = player_->GetPosition().z;
+
+                player_->SetPosition(targetPos);
+                player_->ResetForMapTransition(true);
+
+                player_->TakeDamage(static_cast<float>(player_->GetMaxHp() * 0.2f));
+                player_->StartInvincible(1.0f);
             }
-
-            auto rectPrev = mapChipField_.GetRectByIndex(
-                safeIndex.xIndex, safeIndex.yIndex);
-
-            // 让玩家站在这个格子的“上表面”
-            Vector3 targetPos{};
-            targetPos.x = (rectPrev.left + rectPrev.right) * 0.5f;
-
-            float halfH = player_->GetHeight() * 0.5f;
-            targetPos.y = rectPrev.top + halfH;
-            targetPos.z = player_->GetPosition().z;
-
-            player_->SetPosition(targetPos);
-            player_->ResetForMapTransition(true);
-
-            player_->TakeDamage(static_cast<float>(player_->GetMaxHp() * 0.2f));
-            player_->StartInvincible(1.0f);
         }
     }
     // 更新传送门提示图标（是否显示 + 位置）
