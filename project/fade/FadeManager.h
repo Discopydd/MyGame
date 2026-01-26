@@ -27,7 +27,7 @@ public:
         if (alpha_ < 0.0f) alpha_ = 0.0f;
         if (alpha_ > 1.0f) alpha_ = 1.0f;
         if (sprite_) {
-            sprite_->SetColor({ 1.0f, 1.0f, 1.0f, alpha_ });
+            sprite_->SetColor({ 0.0f, 0.0f, 0.0f, alpha_ });
             sprite_->Update();
         }
     }

@@ -12,7 +12,8 @@ void FadeManager::Initialize(SpriteCommon* spriteCommon)
         (float)WinApp::kClientHeight
     });
     sprite_->SetVisible(false);
-    sprite_->SetColor({ 1.0f, 1.0f, 1.0f, 0.0f });
+    sprite_->SetColor({ 0.0f, 0.0f, 0.0f, 0.0f });
+    sprite_->Update();
 
     phase_   = FadePhase::None;
     alpha_   = 0.0f;
@@ -37,7 +38,7 @@ void FadeManager::StartFadeOut()
 
     if (sprite_) {
         sprite_->SetVisible(true);
-        sprite_->SetColor({ 1.0f, 1.0f, 1.0f, alpha_ });
+        sprite_->SetColor({ 0.0f, 0.0f, 0.0f, alpha_ });
     }
 }
 
@@ -48,7 +49,7 @@ void FadeManager::StartFadeIn()
 
     if (sprite_) {
         sprite_->SetVisible(true);
-        sprite_->SetColor({ 1.0f, 1.0f, 1.0f, alpha_ });
+        sprite_->SetColor({ 0.0f, 0.0f, 0.0f, alpha_ });
     }
 }
 
@@ -61,7 +62,7 @@ void FadeManager::SetBlack()
 
     if (sprite_) {
         sprite_->SetVisible(true);
-        sprite_->SetColor({ 1.0f, 1.0f, 1.0f, alpha_ });
+        sprite_->SetColor({ 0.0f, 0.0f, 0.0f, alpha_ });
     }
 }
 
@@ -74,7 +75,7 @@ void FadeManager::Clear()
 
     if (sprite_) {
         sprite_->SetVisible(false);
-        sprite_->SetColor({ 1.0f, 1.0f, 1.0f, 0.0f });
+        sprite_->SetColor({ 0.0f, 0.0f, 0.0f, 0.0f });
     }
 }
 
@@ -84,7 +85,7 @@ void FadeManager::Update(float dt)
 
     if (!sprite_) { return; }
 
-    sprite_->SetColor({ 1.0f, 1.0f, 1.0f, alpha_ });
+    sprite_->SetColor({ 0.0f, 0.0f, 0.0f, alpha_ });
     sprite_->Update();
 }
 

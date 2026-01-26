@@ -301,6 +301,66 @@ void GameScene::Initialize() {
         static_cast<float>(WinApp::kClientHeight)
     });
 
+    // ================== Pause Menu（ESC） ==================
+    // ※ 下記4枚の画像を Resources/ 配下に配置してください
+    //  - Resources/button_continue_game_q_2x.png
+    //  - Resources/button_back_to_title_q_2x.png
+    //  - Resources/selected_continue_game_2x.png
+    //  - Resources/selected_back_to_title_2x.png
+    {
+        const std::string kContinueNormalTex  = "Resources/button_continue_game_q_2x.png";
+        const std::string kBackNormalTex      = "Resources/button_back_to_title_q_2x.png";
+        const std::string kContinueSelectTex  = "Resources/selected_continue_game_2x.png";
+        const std::string kBackSelectTex      = "Resources/selected_back_to_title_2x.png";
+
+        const Vector2 kBtnSize = { 416.0f / 2.0f, 168.0f / 2.0f };
+        const float   kGapY = 18.0f;
+        const float   totalH = kBtnSize.y * 2.0f + kGapY;
+        const float   startY = (WinApp::kClientHeight - totalH) * 0.5f;
+        const float   posX   = (WinApp::kClientWidth - kBtnSize.x) * 0.5f;
+        const Vector2 continuePos = { posX, startY };
+        const Vector2 backPos     = { posX, startY + kBtnSize.y + kGapY };
+
+        pauseContinueNormal_ = std::make_unique<Sprite>();
+        pauseContinueNormal_->Initialize(spriteCommon_, kContinueNormalTex);
+        pauseContinueNormal_->SetPosition(continuePos);
+        pauseContinueNormal_->SetSize(kBtnSize);
+
+        pauseContinueSelected_ = std::make_unique<Sprite>();
+        pauseContinueSelected_->Initialize(spriteCommon_, kContinueSelectTex);
+        pauseContinueSelected_->SetPosition(continuePos);
+        pauseContinueSelected_->SetSize(kBtnSize);
+
+        pauseBackNormal_ = std::make_unique<Sprite>();
+        pauseBackNormal_->Initialize(spriteCommon_, kBackNormalTex);
+        pauseBackNormal_->SetPosition(backPos);
+        pauseBackNormal_->SetSize(kBtnSize);
+
+        pauseBackSelected_ = std::make_unique<Sprite>();
+        pauseBackSelected_->Initialize(spriteCommon_, kBackSelectTex);
+        pauseBackSelected_->SetPosition(backPos);
+        pauseBackSelected_->SetSize(kBtnSize);
+
+        isPaused_ = false;
+        pauseCursor_ = 0;
+    }
+
+
+    // —— Pause 中用的暗幕（独立 Sprite，不复用 FadeManager）——
+    {
+        const std::string kPauseDimTex = "Resources/black.png"; // 1x1 黑图也可
+        pauseDimSprite_ = std::make_unique<Sprite>();
+        pauseDimSprite_->Initialize(spriteCommon_, kPauseDimTex);
+        pauseDimSprite_->SetPosition({ 0.0f, 0.0f });
+        pauseDimSprite_->SetSize({
+            static_cast<float>(WinApp::kClientWidth),
+            static_cast<float>(WinApp::kClientHeight)
+        });
+        pauseDimSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 0.6f }); // 0.5~0.7 推荐
+        pauseDimSprite_->SetVisible(true); // 仅在暂停时调用 Draw()
+        pauseDimSprite_->Update();
+    }
+
     // ================== Boss HP（2D） ==================
     // 需要把你给的两张贴图放到 Resources 目录下：
     //  - Resources/Damagebar.png（红色延迟条）
@@ -503,6 +563,77 @@ void GameScene::Update() {
     const bool inGameClear = (gameClear_ && gameClear_->IsPlaying());
     bool inBossIntro = (bossIntroPhase_ != BossIntroPhase::None);
     bool canControl = !(isFading || inIntro || inGameOver || inGameClear || inBossIntro);
+
+    // ================== Pause Menu（ESC） ==================
+    // ・ESCで一時停止/再開
+    // ・W/S or ↑/↓で選択（上下端はループ）
+    // ・SPACE/ENTERで決定
+    bool wasPaused = isPaused_;
+    if (canControl) {
+        if (!isPaused_ && input_ && input_->TriggerKey(DIK_ESCAPE)) {
+            isPaused_ = true;
+            pauseCursor_ = 0; // デフォルトは Continue
+        }
+    }
+
+    if (isPaused_) {
+        if (!wasPaused) {
+            // 刚进入暂停的这一帧，不处理 ESC 退出，避免同帧开关
+            return;
+        }
+        // Pause中はゲーム進行を止め、メニュー入力だけを処理する
+        if (input_) {
+            if (input_->TriggerKey(DIK_ESCAPE)) {
+                isPaused_ = false;
+                return;
+            }
+
+            constexpr int kPauseItemCount = 2;
+            if (input_->TriggerKey(DIK_W) || input_->TriggerKey(DIK_UP)) {
+                pauseCursor_ = (pauseCursor_ + kPauseItemCount - 1) % kPauseItemCount;
+            }
+            if (input_->TriggerKey(DIK_S) || input_->TriggerKey(DIK_DOWN)) {
+                pauseCursor_ = (pauseCursor_ + 1) % kPauseItemCount;
+            }
+
+            if (input_->TriggerKey(DIK_SPACE) || input_->TriggerKey(DIK_RETURN)) {
+                if (pauseCursor_ == 0) {
+                    // Continue
+                    isPaused_ = false;
+                    input_->ResetAllKeys();
+                    return;
+                }
+                else {
+                    // Back to Title（Fadeで戻る）
+                    isPaused_ = false;
+
+                    if (!returnToTitle_ && fade_) {
+                        returnToTitle_ = true;
+
+                        // 重置黑幕参数，开始淡出到纯黑
+                        fade_->SetAlpha(0.0f);
+                        fade_->SetReachedBlack(false);
+                        fade_->SetBlackHoldFrames(0);
+                        fade_->SetOverlayPushed(false);
+
+                        fade_->SetPhase(FadePhase::FadingOut);
+                        if (Sprite* s = fade_->GetSprite()) {
+                            s->SetVisible(true);
+                        }
+                    }
+                    input_->ResetAllKeys();
+                    return;
+                }
+            }
+        }
+
+        // PauseメニューのSpriteは動かないが、今後の拡張のためUpdateしておく
+        if (pauseContinueNormal_) { pauseContinueNormal_->Update(); }
+        if (pauseContinueSelected_) { pauseContinueSelected_->Update(); }
+        if (pauseBackNormal_) { pauseBackNormal_->Update(); }
+        if (pauseBackSelected_) { pauseBackSelected_->Update(); }
+        return;
+    }
 
     // ===== Intro 驱动（在加载/淡出等早退之前执行，但不盖过Loading）=====
     if (fade_ && fade_->GetPhase() == FadePhase::None && intro_) {
@@ -1674,6 +1805,30 @@ void GameScene::Draw() {
         particleMgr_->Draw2D();
     }
 
+    // ================== Pause Menu（ESC） ==================
+    if (isPaused_ && !inGameClear) {
+        spriteCommon_->CommonDraw();
+
+        // 1) 背景を暗くする（Fade用の黒幕Spriteを一時的に借りて描画）
+        if (pauseDimSprite_) {
+            pauseDimSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 0.6f });
+            pauseDimSprite_->Update();
+            pauseDimSprite_->Draw();
+        }
+
+
+
+        // 2) ボタン（選択中のみ金枠）
+        if (pauseCursor_ == 0) {
+            if (pauseContinueSelected_) { pauseContinueSelected_->Draw(); }
+            if (pauseBackNormal_) { pauseBackNormal_->Draw(); }
+        }
+        else {
+            if (pauseContinueNormal_) { pauseContinueNormal_->Draw(); }
+            if (pauseBackSelected_) { pauseBackSelected_->Draw(); }
+        }
+    }
+
     // ImGui（debug UI）
     if (imguiManager_) {
         imguiManager_->Draw();
@@ -1760,6 +1915,15 @@ void GameScene::Finalize() {
 
     // ==== 背景 Sprite ====
     backgroundSprite_.reset();
+
+    // ==== Pause Menu Sprites ====
+    pauseContinueNormal_.reset();
+    pauseContinueSelected_.reset();
+    pauseBackNormal_.reset();
+    pauseBackSelected_.reset();
+    pauseDimSprite_.reset();
+    isPaused_ = false;
+    pauseCursor_ = 0;
 
     // ==== Boss HP（2D）Sprite ====
     bossHpDamageSprite_.reset();

@@ -239,6 +239,17 @@ private:
     // 把相机目标点限制在地图边界（★ 先约束目标，再插值，沿边界滑动更顺）
     Vector3 ConstrainCameraToMap(const Vector3& desiredPos, float fovY, float cameraZ) const;
 
+    // ================== Pause Menu（ESC） ==================
+    bool isPaused_ = false;
+    int  pauseCursor_ = 0; // 0: Continue, 1: Back to Title
+    // 继续/回标题按钮（普通/选中）
+    std::unique_ptr<Sprite> pauseContinueNormal_;
+    std::unique_ptr<Sprite> pauseContinueSelected_;
+    std::unique_ptr<Sprite> pauseBackNormal_;
+    std::unique_ptr<Sprite> pauseBackSelected_;
+    // 暂停时的暗色覆盖层（不借用 FadeManager，避免状态互相影响）
+    std::unique_ptr<Sprite> pauseDimSprite_;
+
     // 敌人
     std::vector<std::unique_ptr<Enemy>> enemies_;
 };
