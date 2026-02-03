@@ -727,7 +727,7 @@ void GameScene::Update() {
             isMapLoading_ = false;
 
             // 真正加载地图
-            LoadMap("Resources/map/map6.csv", { 3,3,0 });
+            LoadMap("Resources/map/map.csv", { 3,3,0 });
             if (sceneManager_) sceneManager_->ClearOverlayScene();
             if (fade_) fade_->SetPhase(FadePhase::FadingIn);
 
@@ -2035,7 +2035,7 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
             h.worldPos = mapChipField_.GetMapChipPositionByIndex(x, y);
             // vector 里有 unique_ptr，必须 move
             upHints_.push_back(std::move(h));
-        };
+            };
 
         // (6,2), (11,4), (12,4)
         makeUpHint(6, 2);
@@ -2045,8 +2045,8 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
     // === Hub 地图（map2）：只显示一个方向箭头，指向“下一关的门” ===
     else if (mapPath == "Resources/map/map2.csv") {
         // 教学用的 Space/Shift 提示在 Hub 不显示，只清掉位置
-        spaceHint_.worldPos  = { 0,0,0 };
-        shiftHint_.worldPos  = { 0,0,0 };
+        spaceHint_.worldPos = { 0,0,0 };
+        shiftHint_.worldPos = { 0,0,0 };
         sprintHint_.worldPos = { 0,0,0 };
 
         int nextX = -1;
@@ -2087,8 +2087,8 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
     }
     else {
         // 不是 map1 / map2：确保不画教学提示
-        spaceHint_.worldPos  = { 0,0,0 };
-        shiftHint_.worldPos  = { 0,0,0 };
+        spaceHint_.worldPos = { 0,0,0 };
+        shiftHint_.worldPos = { 0,0,0 };
         sprintHint_.worldPos = { 0,0,0 };
     }
 
@@ -2102,9 +2102,9 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
     for (int i = 0; i < kPlayerIndexHistoryFrameCount_; ++i) {
         playerIndexHistory_[i] = startIndex;
     }
-    playerIndexHistoryCursor_      = 0;
+    playerIndexHistoryCursor_ = 0;
     playerIndexHistoryInitialized_ = true;
-    playerIndexOneSecAgo_          = startIndex;
+    playerIndexOneSecAgo_ = startIndex;
 
     // 相机同步
     if (camera_) {
@@ -2176,32 +2176,20 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
     else {
         if (portalMgr_) {
             if (mapPath == "Resources/map/map3.csv") {
-                portalMgr_->AddPortal(
-                    { 2, 1 },
-                    "Resources/map/map2.csv",
-                    mapChipField_.GetMapChipPositionByIndex(11, 5)
-                );
+                portalMgr_->AddPortal({ 61, 1 }, "Resources/map/map2.csv",
+                    mapChipField_.GetMapChipPositionByIndex(11, 5));
             }
             else if (mapPath == "Resources/map/map4.csv") {
-                portalMgr_->AddPortal(
-                    { 2, 1 },
-                    "Resources/map/map2.csv",
-                    mapChipField_.GetMapChipPositionByIndex(14, 5)
-                );
+                portalMgr_->AddPortal({ 69, 1 }, "Resources/map/map2.csv",
+                    mapChipField_.GetMapChipPositionByIndex(14, 5));
             }
             else if (mapPath == "Resources/map/map5.csv") {
-                portalMgr_->AddPortal(
-                    { 2, 1 },
-                    "Resources/map/map2.csv",
-                    mapChipField_.GetMapChipPositionByIndex(23, 1)
-                );
+                portalMgr_->AddPortal({ 81, 1 }, "Resources/map/map2.csv",
+                    mapChipField_.GetMapChipPositionByIndex(23, 1));
             }
             else if (mapPath == "Resources/map/map6.csv") {
-                portalMgr_->AddPortal(
-                    { 2, 1 },
-                    "Resources/map/map2.csv",
-                    mapChipField_.GetMapChipPositionByIndex(12, 14)
-                );
+                portalMgr_->AddPortal({ 89, 1 }, "Resources/map/map2.csv",
+                    mapChipField_.GetMapChipPositionByIndex(12, 14));
             }
         }
     }

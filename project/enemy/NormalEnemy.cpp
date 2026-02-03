@@ -215,6 +215,10 @@ void NormalEnemy::Initialize(Object3dCommon* common, Camera* camera, const Vecto
     // 记录“存活时碰撞尺寸”（用于死亡动画期间与地图碰撞）
     aliveWidth_ = width_;
     aliveHeight_ = height_;
+
+    // Type1（E1）区域限制：记录出生点（家）并初始化状态
+    homePos_ = spawnPos;
+    type1State_ = Type1State::Patrol;
 }
 
 void NormalEnemy::Update(float dt, const MapChipField& map, const Player& player)
@@ -262,31 +266,89 @@ void NormalEnemy::Update(float dt, const MapChipField& map, const Player& player
     // 行为：Type1 追玩家；Type0 巡逻
     // =====================================================
     if (type_ == EnemyType::Type1) {
-        const float px = player.GetPosition().x;
-        const float dx = px - position_.x;
-        const float absDx = std::fabs(dx);
+        const float playerX = player.GetPosition().x;
 
-        constexpr float kDeadZone = 0.10f;
-        if (dx > kDeadZone) { facing_ = 1; }
-        else if (dx < -kDeadZone) { facing_ = -1; }
+        // 以“出生点 homePos_”为中心的区域限制：玩家进入警戒范围才追，追出牵引范围则脱战回家
+        const float distPlayerHome = std::fabs(playerX - homePos_.x);
+        const float distEnemyHome  = std::fabs(position_.x - homePos_.x);
 
-        const bool nearPlayer = (absDx < stopRange_);
+        const bool canAggro = (distPlayerHome <= aggroRange_);
+        // 牵引判定：玩家离开牵引范围 或 敌人离家太远 -> 放弃追击
+        const bool inLeash  = (distPlayerHome <= leashRange_) && (distEnemyHome <= leashRange_ * 1.2f);
 
-        if (nearPlayer) {
-            velocity_.x = 0.0f;
-        }
-        else {
-            velocity_.x = static_cast<float>(facing_) * chaseSpeed_;
+        const float homeLeft  = homePos_.x - leashRange_;
+        const float homeRight = homePos_.x + leashRange_;
+        const float chaseTargetX = std::clamp(playerX, homeLeft, homeRight);
 
-            // 遇障起跳（两档）
-            if (isOnGround_ && jumpCooldown_ <= 0.0f) {
-                JumpKind k = NeedJumpAheadKind(position_, facing_, width_, height_, map);
-                if (k != JumpKind::None) {
-                    velocity_.y = (k == JumpKind::High) ? highJumpVelocity_ : smallJumpVelocity_;
-                    isOnGround_ = false;
-                    jumpCooldown_ = jumpCooldownTime_;
+        auto MoveToX = [&](float targetX, float speed) {
+            const float dx = targetX - position_.x;
+            constexpr float kDeadZone = 0.10f;
+
+            if (dx > kDeadZone) { facing_ = 1; }
+            else if (dx < -kDeadZone) { facing_ = -1; }
+
+            const bool nearTarget = (std::fabs(dx) < stopRange_);
+            if (nearTarget) {
+                velocity_.x = 0.0f;
+            }
+            else {
+                velocity_.x = static_cast<float>(facing_) * speed;
+
+                // 遇障起跳（两档）
+                if (isOnGround_ && jumpCooldown_ <= 0.0f) {
+                    JumpKind k = NeedJumpAheadKind(position_, facing_, width_, height_, map);
+                    if (k != JumpKind::None) {
+                        velocity_.y = (k == JumpKind::High) ? highJumpVelocity_ : smallJumpVelocity_;
+                        isOnGround_ = false;
+                        jumpCooldown_ = jumpCooldownTime_;
+                    }
                 }
             }
+        };
+
+        // ---------- 状态机 ----------
+        switch (type1State_) {
+        case Type1State::Patrol:
+            // 玩家进入警戒范围 -> 追击
+            if (canAggro) {
+                type1State_ = Type1State::Chase;
+                break;
+            }
+
+            // 默认站桩（patrolHalfWidth_==0），想巡逻就把 patrolHalfWidth_ 设成 >0
+            if (patrolHalfWidth_ <= 0.0f) {
+                velocity_.x = 0.0f;
+            }
+            else {
+                velocity_.x = static_cast<float>(facing_) * moveSpeed_;
+                if (position_.x < homePos_.x - patrolHalfWidth_) { facing_ = 1; }
+                if (position_.x > homePos_.x + patrolHalfWidth_) { facing_ = -1; }
+            }
+            break;
+
+        case Type1State::Chase:
+            // 脱战：玩家/敌人离开牵引范围
+            if (!inLeash) {
+                type1State_ = Type1State::Return;
+                break;
+            }
+            MoveToX(chaseTargetX, chaseSpeed_);
+            break;
+
+        case Type1State::Return:
+            // 玩家重新回到警戒范围 -> 继续追击（可按需求删掉）
+            if (canAggro) {
+                type1State_ = Type1State::Chase;
+                break;
+            }
+            // 回到家附近 -> 恢复巡逻/站桩
+            if (std::fabs(position_.x - homePos_.x) <= returnStopDist_) {
+                velocity_.x = 0.0f;
+                type1State_ = Type1State::Patrol;
+                break;
+            }
+            MoveToX(homePos_.x, moveSpeed_);
+            break;
         }
     }
     else {
@@ -315,10 +377,27 @@ void NormalEnemy::Update(float dt, const MapChipField& map, const Player& player
     // 碰撞后处理：Type1 卡墙补跳；Type0 撞墙掉头
     // =====================================================
     if (type_ == EnemyType::Type1) {
-        const float absDx2 = std::fabs(player.GetPosition().x - position_.x);
-        const bool nearPlayer2 = (absDx2 < stopRange_);
+        const float playerX = player.GetPosition().x;
+        const float homeLeft  = homePos_.x - leashRange_;
+        const float homeRight = homePos_.x + leashRange_;
 
-        if (!nearPlayer2 &&
+        float targetX = 0.0f;
+        if (type1State_ == Type1State::Return) {
+            targetX = homePos_.x;
+        }
+        else if (type1State_ == Type1State::Patrol) {
+            // 站桩时就把目标当作当前位置；巡逻时当作边界方向
+            targetX = (patrolHalfWidth_ <= 0.0f)
+                ? position_.x
+                : (homePos_.x + static_cast<float>(facing_) * patrolHalfWidth_);
+        }
+        else {
+            targetX = std::clamp(playerX, homeLeft, homeRight);
+        }
+
+        const bool nearTarget = (std::fabs(targetX - position_.x) < stopRange_);
+
+        if (!nearTarget &&
             isOnGround_ && jumpCooldown_ <= 0.0f &&
             std::fabs(prevVX) > 0.0001f && std::fabs(velocity_.x) < 0.0001f)
         {

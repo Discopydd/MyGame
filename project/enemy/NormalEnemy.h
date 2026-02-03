@@ -33,6 +33,16 @@ private:
     float aliveWidth_ = 1.5f;
     float aliveHeight_ = 1.5f;
 
+    // ---------- Type1（E1）：区域限制（警戒/牵引）+ 脱战返回 ----------
+    enum class Type1State { Patrol, Chase, Return };
+    Type1State type1State_ = Type1State::Patrol;
+
+    Vector3 homePos_{};            // 出生点（“家”）
+    float aggroRange_ = 12.0f;      // 警戒范围：玩家进入才追
+    float leashRange_ = 20.0f;     // 牵引范围：超出就放弃追击返回（建议 >= aggroRange_）
+    float patrolHalfWidth_ = 0.0f; // 家附近巡逻半宽；0=站桩
+    float returnStopDist_ = 0.25f; // 回家判定距离
+
     // ---------- 死亡动画 ----------
     bool  isDying_ = false;
     float deathTimer_ = 0.0f;
