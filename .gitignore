@@ -316,3 +316,17 @@ DirectXGame/imgui.ini
 
 # DirectXTex Compiled Shaders
 **/DirectXTex/Shaders/Compiled/
+
+# --- Project cleanup (added) ---
+**/Bin/
+**/[Bb]in/
+*.pdb
+**/[Dd]ebug/
+**/[Rr]elease/
+**/x64/
+**/x86/
+*.tlog
+*.ilk
+*.idb
+*.pch
+*.lastbuildstate
