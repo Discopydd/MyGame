@@ -113,7 +113,6 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <PostBuildEvent />
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="D3DResourceLeakChecker.cpp" />
     <ClCompile Include="enemy\BossEnemy.cpp" />
     <ClCompile Include="enemy\Enemy.cpp" />
     <ClCompile Include="enemy\NormalEnemy.cpp" />
@@ -161,7 +160,6 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="UI\HPBar3DManager.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="D3DResourceLeakChecker.h" />
     <ClInclude Include="DebugReporter.h" />
     <ClInclude Include="enemy\BossEnemy.h" />
     <ClInclude Include="enemy\Enemy.h" />

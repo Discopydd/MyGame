@@ -121,9 +121,6 @@
     <ClCompile Include="engine\base\WinApp.cpp">
       <Filter>engine\base</Filter>
     </ClCompile>
-    <ClCompile Include="D3DResourceLeakChecker.cpp">
-      <Filter>engine</Filter>
-    </ClCompile>
     <ClCompile Include="main.cpp">
       <Filter>main</Filter>
     </ClCompile>
@@ -300,12 +297,6 @@
     <ClInclude Include="engine\base\BaseScene.h">
       <Filter>engine\base</Filter>
     </ClInclude>
-    <ClInclude Include="D3DResourceLeakChecker.h">
-      <Filter>engine</Filter>
-    </ClInclude>
-    <ClInclude Include="DebugReporter.h">
-      <Filter>engine</Filter>
-    </ClInclude>
     <ClInclude Include="MyGame.h">
       <Filter>main</Filter>
     </ClInclude>
@@ -389,6 +380,9 @@
     </ClInclude>
     <ClInclude Include="enemy\NormalEnemy.h">
       <Filter>enemy</Filter>
+    </ClInclude>
+    <ClInclude Include="DebugReporter.h">
+      <Filter>engine\base</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
