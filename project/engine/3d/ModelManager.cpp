@@ -1,25 +1,24 @@
 #include "ModelManager.h"
-ModelManager* ModelManager::instance = nullptr;
 
-ModelManager* ModelManager::GetInstants()
+ModelManager& ModelManager::Instance()
 {
-	if (instance == nullptr) {
-		instance = new ModelManager;
-	}
+	static ModelManager instance;
 	return instance;
 }
 
 
 void ModelManager::Finalize()
 {
-	delete instance;
-	instance = nullptr;
+	models.clear();
+	modelCommon.reset();
 }
 
 
 void ModelManager::Initialize(DirectXCommon* dxcommon)
 {
-	modelCommon = new ModelCommon;
+	if (!modelCommon) {
+		modelCommon = std::make_unique<ModelCommon>();
+	}
 	modelCommon->Initialize(dxcommon);
 }
 
@@ -41,7 +40,7 @@ void ModelManager::LoadModel(const std::string& filePath)
         filePath.substr(lastSlash + 1) : filePath;
 
     std::unique_ptr<Model> model = std::make_unique<Model>();
-    model->Initialize(modelCommon, directory, filename);  // 传递目录和文件名
+    model->Initialize(modelCommon.get(), directory, filename);  // 传递目录和文件名
     models.insert({filePath, std::move(model)});
 }
 

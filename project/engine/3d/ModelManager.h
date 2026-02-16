@@ -6,17 +6,12 @@
 #include "../base/DirectXCommon.h"
 class ModelManager
 {
-
-	static ModelManager* instance;
-	ModelManager() = default;
-	~ModelManager() = default;
-	ModelManager(ModelManager&) = default;
-	ModelManager& operator=(ModelManager&) = delete;
-
 public:
 
 	// シングルトンインスタンスの取得
-	static ModelManager* GetInstants();
+	static ModelManager& Instance();
+	// 既存コード互換（ポインタが欲しい場合）
+	static ModelManager* GetInstants() { return &Instance(); }
 	// 終了
 	void Finalize();
 
@@ -29,9 +24,14 @@ public:
 	// モデル検索
 	Model* FindModel(const std::string& filePath);
 private:
-
+	ModelManager() = default;
+	~ModelManager() = default;
+	ModelManager(const ModelManager&) = delete;
+ 	ModelManager& operator=(const ModelManager&) = delete;
+ 	ModelManager(ModelManager&&) = delete;
+ 	ModelManager& operator=(ModelManager&&) = delete;
 	//モデルデータ
 	std::map<std::string, std::unique_ptr < Model>> models;
-	ModelCommon* modelCommon = nullptr;
+	std::unique_ptr<ModelCommon> modelCommon;
 
 };
