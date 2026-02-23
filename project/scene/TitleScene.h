@@ -6,16 +6,16 @@
 #include "SrvManager.h"
 #include "SpriteCommon.h"
 #include "Sprite.h"
-#include "Object3dCommon.h"
-#include "Object3d.h"
-#include "ModelManager.h"
 #include "MyMath.h"
 #include "ImGuiManager.h"
 #include "SoundManager.h"
 #include "Camera.h"
+
 #include <vector>
 #include <memory>
+
 #include "BaseScene.h"
+#include "../particle/ParticleManager.h"
 
 class TitleScene : public BaseScene {
 public:
@@ -30,38 +30,64 @@ private:
         FadingOut,
     };
 
-    // 非拥有者：单例或外部管理的对象，保持裸指针即可
-    WinApp*        winApp_     = nullptr;
-    DirectXCommon* dxCommon_   = nullptr;
-    Input*         input_      = nullptr;
-    SrvManager*    srvManager_ = nullptr;
-    SpriteCommon* spriteCommon_ = nullptr;
-    // 拥有关系：用 unique_ptr 管理
-    std::unique_ptr<Sprite>       fadeSprite_;
-    std::unique_ptr<Sprite>       titleSprite_;
-    std::unique_ptr<Sprite>       startSprite_;
-    std::unique_ptr<Sprite>       backgroundSprite_;
+    // Title portal motes (custom 2D particles for the title screen)
+    struct PortalMote {
+        std::unique_ptr<Sprite> sprite;
+        float angle = 0.0f;         // rad
+        float radius = 0.0f;        // px
+        float angularSpeed = 0.0f;  // rad/s
+        float radialSpeed = 0.0f;   // px/s
+        float ySpeed = 0.0f;        // px/s (negative = up)
+        float yOffset = 0.0f;       // px
+        float life = 0.0f;          // s
+        float maxLife = 0.0f;       // s
+        float baseSize = 16.0f;     // px
+        Vector4 color = { 1,1,1,1 };
+    };
 
-    Vector2 rotation_{};
+    // Non-owning pointers
+    WinApp*        winApp_       = nullptr;
+    DirectXCommon* dxCommon_     = nullptr;
+    Input*         input_        = nullptr;
+    SrvManager*    srvManager_   = nullptr;
+    SpriteCommon*  spriteCommon_ = nullptr;
 
-    bool  isFadingOut_ = false;   // 是否正在淡出
-    float fadeAlpha_   = 0.0f;    // 当前淡出透明度 (0=透明,1=全黑)
+    // Sprites (owned)
+    std::unique_ptr<Sprite> backgroundSprite_;
+    std::unique_ptr<Sprite> portalRingSprite_;
+    std::unique_ptr<Sprite> titlePanelSprite_;
+    std::unique_ptr<Sprite> titleLogoSprite_;
+    std::unique_ptr<Sprite> startSprite_;
+    std::unique_ptr<Sprite> fadeSprite_;
 
+    // Title screen particles
+    std::vector<PortalMote> portalMotes_;
+    float moteSpawnTimer_   = 0.0f;
+    float uiFloatTimer_     = 0.0f;
+
+    // Optional: use existing particle system for small sparkle trails
+    std::unique_ptr<ParticleManager> particleMgr_;
+    ParticleEmitter* sparkleEmitter_ = nullptr;
+    float sparkleSpawnTimer_ = 0.0f;
+
+    // Ring rotation
+    float ringRotation_ = 0.0f;
+
+    // Fade out
+    float fadeAlpha_ = 0.0f;
     State state_ = State::Idle;
+    bool overlayPushed_ = false;
+    bool reachedBlack_ = false;
+    int  blackHoldFrames_ = 0;
 
-    // --- Title drop & bounce (tuned) ---
-    float titleY_        = -260.0f; // 起始更高一点，入场更明显
-    float titleTargetY_  = 0.0f;    // 着陆位置
+    // Title drop & bounce
+    float titleY_        = -260.0f;
+    float titleTargetY_  = 160.0f;
     float titleVy_       = 0.0f;
-    float titleGravity_  = 3.6f;    // 重力稍小，弹跳节奏更柔
-    float titleBounce_   = 0.72f;   // 弹性更大 → 弹跳次数更多
-    float titleStopEps_  = 0.35f;   // 终止阈值更小 → 不会太早停
+    float titleGravity_  = 3.6f;
+    float titleBounce_   = 0.72f;
+    float titleStopEps_  = 0.35f;
     bool  titleSettled_  = false;
 
-    float frameCount_    = 0.0f;
-
-    bool overlayPushed_  = false;
-
-    bool reachedBlack_   = false;
-    int  blackHoldFrames_ = 0;
+    float frameCount_ = 0.0f;
 };
