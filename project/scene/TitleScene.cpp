@@ -121,6 +121,16 @@ void TitleScene::Initialize()
     fadeSprite_->SetColor({ 1.0f, 1.0f, 1.0f, 0.0f });
     fadeSprite_->SetVisible(false);
 
+    // --- Transition portal ring (center screen) ---
+    transitionRingSprite_ = std::make_unique<Sprite>();
+    transitionRingSprite_->Initialize(spriteCommon_, "Resources/portal_ring.png");
+    transitionRingSprite_->SetAnchorPoint({ 0.5f, 0.5f });
+    transitionRingSprite_->SetPosition({ w * 0.5f, h * 0.5f });
+    transitionRingSprite_->SetSize({ 560.0f, 560.0f });
+    transitionRingSprite_->SetColor({ 1.0f, 1.0f, 1.0f, 0.0f });
+    transitionRingSprite_->SetVisible(false);
+    transitionRingSprite_->Update();
+
     // --- Particle system (sparkles) ---
     particleMgr_ = std::make_unique<ParticleManager>();
     particleMgr_->Initialize(nullptr, spriteCommon_);
@@ -139,6 +149,8 @@ void TitleScene::Initialize()
     sparkleSpawnTimer_ = 0.0f;
 
     ringRotation_ = 0.0f;
+    transitionRingRotation_ = 0.0f;
+    transitionRingPulseTime_ = 0.0f;
 
     titleSettled_ = false;
     overlayPushed_ = false;
@@ -362,6 +374,26 @@ void TitleScene::Update()
     if (titleLogoSprite_)  titleLogoSprite_->Update();
     if (startSprite_)      startSprite_->Update();
 
+    if (transitionRingSprite_) {
+        if (fadeAlpha_ > 0.001f) {
+            transitionRingPulseTime_ += dt;
+            transitionRingRotation_ += 1.05f * dt;
+            if (transitionRingRotation_ > 2.0f * kPi) { transitionRingRotation_ -= 2.0f * kPi; }
+            const float pulse = 1.0f + 0.04f * std::sin(transitionRingPulseTime_ * 6.0f);
+            const float size = (520.0f + 150.0f * fadeAlpha_) * pulse;
+            const float a = 0.20f + 0.72f * fadeAlpha_;
+            transitionRingSprite_->SetVisible(true);
+            transitionRingSprite_->SetPosition({ (float)WinApp::kClientWidth * 0.5f, (float)WinApp::kClientHeight * 0.5f });
+            transitionRingSprite_->SetSize({ size, size });
+            transitionRingSprite_->SetRotation(transitionRingRotation_);
+            transitionRingSprite_->SetColor({ 1.0f, 1.0f, 1.0f, a });
+        } else {
+            transitionRingSprite_->SetVisible(false);
+            transitionRingSprite_->SetColor({ 1.0f, 1.0f, 1.0f, 0.0f });
+        }
+        transitionRingSprite_->Update();
+    }
+
     if (fadeSprite_) {
         fadeSprite_->SetColor({ 1.0f, 1.0f, 1.0f, fadeAlpha_ });
         fadeSprite_->Update();
@@ -408,6 +440,9 @@ void TitleScene::Draw()
     if (fadeSprite_) {
         fadeSprite_->Draw();
     }
+    if (transitionRingSprite_) {
+        transitionRingSprite_->Draw();
+    }
 
     dxCommon_->End();
 }
@@ -428,6 +463,7 @@ void TitleScene::Finalize()
     titleLogoSprite_.reset();
     startSprite_.reset();
     fadeSprite_.reset();
+    transitionRingSprite_.reset();
 
     TextureManager::GetInstance()->Finalize();
 }

@@ -26,10 +26,7 @@ public:
         alpha_ = a;
         if (alpha_ < 0.0f) alpha_ = 0.0f;
         if (alpha_ > 1.0f) alpha_ = 1.0f;
-        if (sprite_) {
-            sprite_->SetColor({ 0.0f, 0.0f, 0.0f, alpha_ });
-            sprite_->Update();
-        }
+        SyncVisual_();
     }
 
     float GetSpeed() const { return speed_; }
@@ -54,8 +51,14 @@ public:
     void  SetOverlayPushed(bool v) { overlayPushed_ = v; }
 
 private:
+    void SyncVisual_();
+
     SpriteCommon* spriteCommon_ = nullptr;
     std::unique_ptr<Sprite> sprite_;
+    std::unique_ptr<Sprite> portalRingSprite_;
+
+    float ringRotation_  = 0.0f;
+    float ringPulseTime_ = 0.0f;
 
     FadePhase phase_   = FadePhase::None;
     float     alpha_   = 0.0f;

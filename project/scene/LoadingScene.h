@@ -38,6 +38,8 @@ private:
     std::unique_ptr<Sprite> progressBackground_;
 
     std::unique_ptr<Sprite> blackSprite_;
+    std::unique_ptr<Sprite> portalRingSprite_;
+    float portalRingRotation_ = 0.0f;
 
     // ===== Spinner (白点转圈) =====
     std::vector<std::unique_ptr<Sprite>> spinnerDots_;

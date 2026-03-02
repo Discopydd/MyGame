@@ -59,6 +59,7 @@ private:
     std::unique_ptr<Sprite> titleLogoSprite_;
     std::unique_ptr<Sprite> startSprite_;
     std::unique_ptr<Sprite> fadeSprite_;
+    std::unique_ptr<Sprite> transitionRingSprite_;
 
     // Title screen particles
     std::vector<PortalMote> portalMotes_;
@@ -74,6 +75,8 @@ private:
     float ringRotation_ = 0.0f;
 
     // Fade out
+    float transitionRingRotation_ = 0.0f;
+    float transitionRingPulseTime_ = 0.0f;
     float fadeAlpha_ = 0.0f;
     State state_ = State::Idle;
     bool overlayPushed_ = false;
