@@ -2265,7 +2265,7 @@ void GameScene::HandlePlayerOnMovingPlatforms()
 
                 // 把玩家跟着平台一起移动（这一帧平台的位移）
                 Vector3 delta = platform->GetPosition() - platform->GetPrevPosition();
-                pos.x += delta.x;
+                pos = pos + delta;
             }
         }
     }
