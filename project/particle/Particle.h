@@ -15,10 +15,10 @@ struct Particle
     float rotation = 0.0f;
     float rotationSpeed = 0.0f;
 
-    float life = 1.0f;      // 剩余生命
-    float maxLife = 1.0f;   // 初始生命
+    float life = 1.0f;      // 残り寿命
+    float maxLife = 1.0f;   // 初期寿命
 
-    // sprite 粒子需要的颜色
+    // Sprite 粒子で使用する色
     Vector4 color = {1,1,1,1};
 
     bool IsAlive() const { return life > 0; }

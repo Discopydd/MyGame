@@ -35,12 +35,12 @@ void ModelManager::LoadModel(const std::string& filePath)
     std::string directory = (lastSlash != std::string::npos) ? 
         "Resources/" + filePath.substr(0, lastSlash) : "Resources";
     
-    // 获取文件名（如 "cube.obj"）
+    // 取得ファイル名（ "cube.obj"）
     std::string filename = (lastSlash != std::string::npos) ? 
         filePath.substr(lastSlash + 1) : filePath;
 
     std::unique_ptr<Model> model = std::make_unique<Model>();
-    model->Initialize(modelCommon.get(), directory, filename);  // 传递目录和文件名
+    model->Initialize(modelCommon.get(), directory, filename);  // 伝递目録和文件名
     models.insert({filePath, std::move(model)});
 }
 

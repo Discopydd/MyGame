@@ -15,7 +15,7 @@ void DashUIManager::Initialize(SpriteCommon* spriteCommon, Player* player)
     overlay_ = std::make_unique<Sprite>();
     overlay_->Initialize(spriteCommon_, textureFilePath[1]);
 
-    // 保存 overlay 原贴图尺寸（Initialize 内会把 textureSize_ 设为“贴图原尺寸”）
+    // overlay の元テクスチャサイズを保存する（Initialize 内で textureSize_ は「元画像サイズ」になる）
     overlayFullTexSize_ = overlay_->GetTextureSize();
 
     overlay_->SetPosition({ 30.0f, 80.0f });
@@ -46,23 +46,23 @@ void DashUIManager::Update(float dt)
 
     if (overlay_) {
         if (ratio > 0.0f) {
-            // 图标的屏幕尺寸/位置（用于对齐）
+            // アイコンの画面サイズ／位置（位置合わせ用）
             const Vector2 iconSize = icon_ ? icon_->GetSize() : Vector2{ 32.0f, 32.0f };
             const Vector2 iconPos  = icon_ ? icon_->GetPosition() : Vector2{ 40.0f, 80.0f };
 
             const float fullSpriteH    = iconSize.y;
             const float visibleSpriteH = fullSpriteH * ratio;
 
-            // 贴图裁剪必须按“原贴图高度”计算（例如 52 * ratio），否则会裁错
+            // テクスチャの切り抜きは必ず「元テクスチャの高さ」で計算する（例: 52 * ratio）。そうしないと切り抜き位置がずれる
             const float texW        = overlayFullTexSize_.x;
             const float texH        = overlayFullTexSize_.y;
             const float visibleTexH = texH * ratio;
 
-            // 从底部开始显示（底部对齐）
+            // 下から表示を開始（下揃え）
             overlay_->SetTextureLeftTop({ 0.0f, texH - visibleTexH });
             overlay_->SetTextureSize({ texW, visibleTexH });
 
-            // 屏幕上仍然是 32 宽，按 ratio 缩高度，并把位置往下挪保持底部对齐
+            // 画面上では幅をそのままにし、高さだけ ratio に応じて縮め、位置を下げて下揃えを維持する
             overlay_->SetSize({ iconSize.x, visibleSpriteH });
             overlay_->SetPosition({ iconPos.x, iconPos.y + (fullSpriteH - visibleSpriteH) });
 

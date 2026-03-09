@@ -21,13 +21,13 @@ void Enemy::InitializeCommon(Object3dCommon* common, Camera* camera, const Vecto
     hp_ = 1;
     enrageHp_ = 0;
 
-    // 受击闪烁
+    // 被弾点滅
     isHitReacting_ = false;
     hitReactTimer_ = 0.0f;
     damageBlinkTimer_ = 0.0f;
     damageBlinkVisible_ = true;
 
-    // 默认体积（派生侧可能会改）
+    // デフォルトのサイズ（派生側で変更する場合がある）
     width_ = 1.5f;
     height_ = 1.5f;
 
@@ -35,7 +35,7 @@ void Enemy::InitializeCommon(Object3dCommon* common, Camera* camera, const Vecto
     obj_->Initialize(common);
     obj_->SetCamera(camera);
     obj_->SetTranslate(position_);
-    // 初始朝向：右=0，左=PI（和 Player 逻辑一致）
+    // 初期向き: 右=0、左=PI（Player のロジックと一致）
     obj_->SetRotate({ 0.0f, 0.0f, 0.0f });
 }
 
@@ -45,7 +45,7 @@ bool Enemy::UpdateCommon(float dt)
         return false;
     }
 
-    // ===== 受击闪烁 =====
+    // ===== 被弾点滅 =====
     if (isHitReacting_) {
         hitReactTimer_ -= dt;
         if (hitReactTimer_ <= 0.0f) {
@@ -61,7 +61,7 @@ bool Enemy::UpdateCommon(float dt)
         }
     }
 
-    // 踩头无敌时间（Boss 用；普通敌人也保留原逻辑）
+    // 踏みつけ無敵時間（Boss 用；通常敵も元ロジックを維持）
     stompInvuln_ = (std::max)(0.0f, stompInvuln_ - dt);
     return true;
 }
@@ -85,10 +85,10 @@ void Enemy::StartHitReaction(float duration)
 void Enemy::OnStomp()
 {
     if (isDead_) { return; }
-    // 防止同一帧/同一次重叠反复触发
+    // 防止同一フレーム / 同じ重なりで反復トリガーしないようにする
     if (stompInvuln_ > 0.0f) { return; }
 
-    // 普通敌人：先保留原行为（只闪一下）
+    // 通常敵: 先に保留原挙動（1回だけ点滅）
     StartHitReaction(0.40f);
     stompInvuln_ = 0.20f;
 }
@@ -123,7 +123,7 @@ Enemy::PlayerContact Enemy::CheckPlayerContact(const Player& player, float stomp
     out.overlap = overlapX && overlapY;
     if (!out.overlap) { return out; }
 
-    // “踩头”：玩家向下运动，且玩家底部在敌人顶部附近（允许一个 margin）
+    // 「踏みつけ」: プレイヤーが下向きに移動しており、かつプレイヤーの下端が敵の上端付近にある（margin を許容）
     const bool falling = (pVel.y < -0.05f);
     const bool fromAbove = (pBottom >= (eTop - stompMargin));
     out.stomp = falling && fromAbove;

@@ -19,9 +19,9 @@ enum class EnemyType : uint8_t {
 };
 
 // ============================================================
-// Enemy 基类（接口不变）：GameScene 仍然只依赖 Enemy*
-//  - 普通敌人：NormalEnemy
-//  - Boss：BossEnemy
+// Enemy 基底クラス（インターフェースはそのまま）: GameScene 引き続き依存するのは Enemy*
+// - 通常敵: NormalEnemy
+// - Boss: BossEnemy
 // ============================================================
 class Enemy {
 public:
@@ -35,7 +35,7 @@ public:
         EnemyType type
     ) = 0;
 
-    // Boss 会用到 map/player；普通敌人也走同一个接口（保持原逻辑）
+    // Boss では map/player を使う。通常敵も同じインターフェースで処理し、元ロジックを維持する
     virtual void Update(float deltaTime, const MapChipField& map, const Player& player) = 0;
 
     virtual void Draw() = 0;
@@ -49,8 +49,8 @@ public:
     void StartHitReaction(float duration);
     bool IsHitReacting() const { return isHitReacting_; }
 
-    // ====== 踩头伤害 / 死亡判定 ======
-    // 普通敌人：保持原行为（只闪一下）；Boss：扣血/硬直/死亡
+    // ====== 踏みつけダメージ / 死亡判定 ======
+    // 通常敵: 元の挙動を維持（1回だけ点滅）。Boss: ダメージ / 硬直 / 死亡を処理
     virtual void OnStomp();
     bool IsDead() const { return isDead_; }
     int  GetHp()  const { return hp_; }
@@ -58,31 +58,31 @@ public:
     int  GetMaxHp() const { return maxHp_; }
     float GetHpRatio() const { return (maxHp_ > 0) ? (static_cast<float>(hp_) / static_cast<float>(maxHp_)) : 0.0f; }
 
-    // Boss：踩头无敌时间是否结束（用于 GameScene 避免重复扣血）
+    // Boss: 踏みつけ無敵時間が終了したかどうか（GameScene 側で重複ダメージを避けるために使用）
     virtual bool CanTakeStompDamage() const { return stompInvuln_ <= 0.0f; }
 
-    // ====== Boss 远程弹幕命中检测（GameScene 调用）======
-    // 命中则会“消耗”弹丸（inactive），返回 true
+    // ====== Boss 远程弾幕命中判定（GameScene 呼び出す）======
+    // 命中すると弾丸を消費し（inactive）、true を返す
     virtual bool CheckBossProjectileHit(const Player& /*player*/) { return false; }
 
-    // ====== 与玩家的碰撞/踩头判定（普通敌人/关卡逻辑可复用） ======
+    // ====== プレイヤーとの衝突/踏みつけ判定（通常敵／ステージロジックで再度利用可能） ======
     struct PlayerContact {
         bool overlap = false; // AABB 重叠
-        bool stomp   = false; // “踩头”判定成立（从上方下落命中）
+        bool stomp   = false; // 「踏みつけ」判定成立（上から落下して命中）
     };
 
-    // 不改变现有 GameScene 结构：需要时可直接调用。
-    // 说明：
-    //  - overlap：双方 AABB 是否重叠
-    //  - stomp：在 overlap 的基础上，玩家处于下落且玩家底部高于敌人顶部（带 margin）
+    // 既存の GameScene 構造は変えず、必要なら直接呼び出せる。
+    // 説明:
+    // - overlap: 両者 AABB かどうか重なり
+    // - stomp: overlap のうえで、プレイヤーが落下中かつプレイヤー下端が敵上端より高い位置にある（margin あり）
     PlayerContact CheckPlayerContact(const Player& player, float stompMargin = 0.10f) const;
 
 protected:
-    // --- 共享初始化 / 更新 / 绘制 ---
+    // --- 共有初期化 / より新 / 绘制 ---
     void InitializeCommon(Object3dCommon* common, Camera* camera, const Vector3& spawnPos, EnemyType type);
-    // 返回 false 表示已死亡（原逻辑：死亡后直接 return）
+    // false を返した場合は死亡済みを示す（元ロジック: 死亡後は即 return）
     bool UpdateCommon(float dt);
-    // 只画本体（带受击闪烁逻辑）
+    // 本体のみを描画する（被弾点滅ロジック付き）
     void DrawCommonBody();
 
 protected:
@@ -91,11 +91,11 @@ protected:
     Vector3   position_{};
     EnemyType type_{ EnemyType::Type0 };
 
-    // 碰撞体积
+    // 当たり判定サイズ
     float width_  = 1.5f;
     float height_ = 1.5f;
 
-    // --- 受击闪烁 ---
+    // --- 被弾点滅 ---
     bool  isHitReacting_       = false;
     float hitReactTimer_       = 0.0f;
     float damageBlinkTimer_    = 0.0f;
@@ -106,6 +106,6 @@ protected:
     bool  isDead_  = false;
     int   maxHp_   = 1;
     int   hp_      = 1;          // Boss: 30
-    int   enrageHp_ = 0;         // Boss 残血阈值（用于加强攻击）
-    float stompInvuln_ = 0.0f;  // 防止同一帧/连续重叠多次扣血
+    int   enrageHp_ = 0;         // Boss 低HP閾値（攻撃強化用）
+    float stompInvuln_ = 0.0f;  // 同一フレーム / 連続重なりで何度もダメージしないようにする
 };

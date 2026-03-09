@@ -15,7 +15,7 @@ public:
     virtual void Finalize();
 
 
-    void Run();  // 主循环
+    void Run();  // メインループ
 
 protected:
     bool endRequest_ = false;

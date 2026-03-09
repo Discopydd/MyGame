@@ -12,13 +12,13 @@ void GameClearManager::Initialize(SpriteCommon* spriteCommon,
     camera_         = camera;
     hpNdcZ_         = hpNdcZ;
 
-    // 标题 Sprite
+    // タイトル Sprite
     titleSprite_ = std::make_unique<Sprite>();
     titleSprite_->Initialize(spriteCommon_, "Resources/GameClear.png");
     titleSprite_->SetSize(titleSize_);
     titleSprite_->SetVisible(false);
 
-    // GameClear 玩家模型（先创建，Start 时再设位置）
+    // GameClear 用プレイヤーモデル（先に生成し、Start 時に位置を設定）
     clearPlayerObj_ = std::make_unique<Object3d>();
     clearPlayerObj_->Initialize(object3dCommon_);
     clearPlayerObj_->SetModel("player/player.obj");
@@ -48,7 +48,7 @@ void GameClearManager::Start() {
     const float W = (float)WinApp::kClientWidth;
     const float H = (float)WinApp::kClientHeight;
 
-    // 标题从屏幕外上方滑到中间（基本照搬你原来的逻辑）
+    // タイトルが画面外の上側から中央へ滑り込む（基本的に元のロジックを踏襲）
     titleEndPos_   = { (W - titleSize_.x) * 0.5f, (H - titleSize_.y) * 0.5f };
     titleStartPos_ = { titleEndPos_.x, -titleSize_.y - 40.0f };
     titlePos_      = titleStartPos_;
@@ -59,7 +59,7 @@ void GameClearManager::Start() {
         titleSprite_->Update();
     }
 
-    // 用屏幕坐标算「目标位置：画面中央偏下」
+    // 画面座標から「目標位置: 画面中央やや下」を計算する
     Vector3 centerWorld = ScreenToWorld(
         W * 0.5f,
         H * 0.6f,
@@ -67,7 +67,7 @@ void GameClearManager::Start() {
         camera_);
     clearPlayerBasePos_ = centerWorld;
 
-    // 起点：屏幕左侧内（用你当前的 0.2f，你可以之后再改成屏幕外）
+    // 開始位置: 画面左側の内側（現在の 0.2f を使用。後で画面外に変更してもよい）
     Vector3 fromLeftWorld = ScreenToWorld(
         W * -0.2f,
         H * 0.6f,
@@ -90,7 +90,7 @@ void GameClearManager::Update(float dt) {
 
     switch (state_) {
     case State::SlideTitle: {
-        // 标题从上滑入（沿用你原来 GameOver 的 easeOutBack）
+        // タイトルを上から滑り込ませる（元の GameOver の easeOutBack を流用）
         float d = (std::min)(1.0f, t_ / titleSlideTime_);
         float s = 1.70158f;
         float p = d - 1.0f;
@@ -116,13 +116,13 @@ void GameClearManager::Update(float dt) {
 
         clearPlayerSpinT_ += dt;
 
-        const float moveDuration   = 1.0f; // 从左滑到中间
-        const float rotateDuration = 1.0f; // 原地转头所用时间
+        const float moveDuration   = 1.0f; // 左から中央まで滑らせる
+        const float rotateDuration = 1.0f; // その場で向きを変える時間
 
         const float W = (float)WinApp::kClientWidth;
         const float H = (float)WinApp::kClientHeight;
 
-        // 起点/终点（屏幕左侧 -> 屏幕中央）
+        // 開始位置／終点（画面左側 -> 画面中央）
         Vector3 startPos = ScreenToWorld(
             W * -0.2f,
             H * 0.6f,
@@ -138,23 +138,23 @@ void GameClearManager::Update(float dt) {
         float   yaw = 0.0f;
 
         if (clearPlayerSpinT_ < moveDuration) {
-            // 阶段1：从左边滑到屏幕中央
+            // 段階1: 左側から画面中央へ滑らせる
             float u = clearPlayerSpinT_ / moveDuration;
             float e = EaseOutCubic_(u);
             pos.x = startPos.x + (endPos.x - startPos.x) * e;
             pos.y = startPos.y + (endPos.y - startPos.y) * e;
             pos.z = startPos.z + (endPos.z - startPos.z) * e;
-            // 这里你可以保持默认朝向
+            // ここではデフォルトの向きを維持してよい
             yaw = 0.0f;
         } else {
-            // 阶段2：已经在中央，慢慢转头
+            // 段階2: すでに中央に到達しているので、ゆっくり向きを変える
             pos = endPos;
             float rTime = clearPlayerSpinT_ - moveDuration;
             if (rTime > rotateDuration) { rTime = rotateDuration; }
             float v  = rotateDuration > 0.0f ? (rTime / rotateDuration) : 1.0f;
             float e  = EaseOutCubic_(v);
             float startYaw = 0.0f;
-            float endYaw   = std::numbers::pi_v<float> * 0.5f; // 向右看一点
+            float endYaw   = std::numbers::pi_v<float> * 0.5f; // 少し右を見る
             yaw = startYaw + (endYaw - startYaw) * e;
         }
 

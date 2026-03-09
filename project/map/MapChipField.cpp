@@ -5,11 +5,11 @@
 namespace {
 
 enum MapChipCharIndex {
-    kChipType = 0,  // 先頭1文字：種別
-    kChipSubID = 1, // 2文字目：サブID
+    kChipType = 0,  // 先頭1文字: 種別
+    kChipSubID = 1, // 2文字目: サブID
 };
 
-// 新フォーマット：先頭1文字で種別判定
+// 新フォーマット: 先頭1文字で種別を判定
 const std::map<char, MapChipType> kTypeTable = {
     // 数値も一応対応させておく
     { '0', MapChipType::kBlank },
@@ -34,7 +34,7 @@ const std::map<char, MapChipType> kTypeTable = {
     { 'E', MapChipType::kEnemy },
 };
 
-// 旧フォーマット（"0","1","10"...）用：互換性のため残す
+// 旧フォーマット（"0","1","10"...）用: 互換性のため残す
 const std::map<std::string, MapChipType> kLegacyTable = {
     { "0",  MapChipType::kBlank },
     { "1",  MapChipType::kBlock },

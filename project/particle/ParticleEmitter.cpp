@@ -33,7 +33,7 @@ void ParticleEmitter::Emit(int count,
 {
     for (int i = 0; i < count; i++)
     {
-        // 1) 找一个可以复用的粒子槽位（life <= 0）
+        // 1) 再利用できる粒子スロットを探す（life <= 0）
         int freeIndex = -1;
         for (size_t idx = 0; idx < particles_.size(); ++idx) {
             if (!particles_[idx].IsAlive()) {
@@ -44,18 +44,18 @@ void ParticleEmitter::Emit(int count,
 
         bool needNewVisual = false;
 
-        // 2) 没有可复用的，就看看能否开一个新槽位
+        // 2) 再利用可能なスロットがなければ、新しいスロットを確保できるか確認する
         if (freeIndex == -1) {
             if (particles_.size() >= maxParticles_) {
-                // 已经满了，不再生成新的，直接跳出
+                // すでに上限に達しているため、これ以上は新規生成せず終了する
                 break;
             }
-            particles_.emplace_back();                // 新增一个空粒子
+            particles_.emplace_back();                // 空の粒子を 1 つ追加する
             freeIndex = static_cast<int>(particles_.size() - 1);
-            needNewVisual = true;                     // 第一次用这个槽位，需要创建对应的 Sprite/Object3d
+            needNewVisual = true;                     // このスロットを初めて使うので、対応する Sprite/Object3d を生成する
         }
 
-        // 现在有了一个可用的粒子槽位
+        // 使用可能な粒子スロットを確保できた
         Particle& p = particles_[freeIndex];
         p = Particle();
         p.type = type;
@@ -64,10 +64,10 @@ void ParticleEmitter::Emit(int count,
         float speed = RandRange(minSpeed, maxSpeed);
 
         if (windMode_ && type == ParticleType::Sprite2D) {
-            // 屏幕坐标：x 向右为正, y 向下为正
-            // 想要从右上飞到左下：dx < 0, dy > 0
-            float dirX = RandRange(-1.0f, -0.6f);   // 向左一点点随机
-            float dirY = RandRange(0.3f, 0.9f);    // 向下，略有变化
+            // 画面座標: x は右が正、y は下が正
+            // 右上から左下へ飛ばす: dx < 0, dy > 0
+            float dirX = RandRange(-1.0f, -0.6f);   // 左方向に少しランダムを持たせる
+            float dirY = RandRange(0.3f, 0.9f);    // 下方向にややばらつきを持たせる
 
             float len = std::sqrt(dirX * dirX + dirY * dirY);
             if (len > 0.0f) {
@@ -76,23 +76,23 @@ void ParticleEmitter::Emit(int count,
             }
             p.velocity = { dirX * speed, dirY * speed, 0.0f };
 
-            // 旋转朝速度方向
+            // 回転を速度方向に合わせる
             p.rotation = std::atan2(dirY, dirX);
 
-            // 用 rotationSpeed 作为“摆动相位”的随机种子（后面 Update 用）
+            // rotationSpeed を「揺れ位相」のランダム種として使う（後で Update で使用）
             p.rotationSpeed = RandRange(-3.14159f, 3.14159f);
 
-            // 风的缩放：接近原图大小（如果你没用原尺寸，这个可以略调一点点）
+            // 風パーティクルの拡大率: 元画像に近い大きさ（原寸を使わない場合は少し調整可能）
             p.scale = RandRange(0.8f, 1.2f);
 
-            // 一开始完全透明，后面在 Update 里做淡入
+            // 開始時は完全に透明にし、後で Update 内でフェードインさせる
             p.color = { 1.0f, 1.0f, 1.0f, 0.0f };
         }
-        // ===== 雪模式：3D snow.obj，从上往下飘，略微偏斜 =====
+        // ===== 雪モード: 3D の snow.obj を上から下へ、やや斜めに漂わせる =====
         else if (snowMode_ && type == ParticleType::Model3D) {
-            // 先按风的规则随机一个屏幕方向（右上 -> 左下）
-            float dirScreenX = RandRange(-1.0f, -0.6f); // 屏幕向左
-            float dirScreenY = RandRange(0.3f, 0.9f);   // 屏幕向下
+            // まず風モードと同様に、画面上の方向をランダムに決める（右上 -> 左下）
+            float dirScreenX = RandRange(-1.0f, -0.6f); // 画面上で左方向
+            float dirScreenY = RandRange(0.3f, 0.9f);   // 画面上で下方向
 
             float len2D = std::sqrt(dirScreenX * dirScreenX + dirScreenY * dirScreenY);
             if (len2D > 0.0f) {
@@ -100,12 +100,12 @@ void ParticleEmitter::Emit(int count,
                 dirScreenY /= len2D;
             }
 
-            // 转成世界方向：
-            //   屏幕 X → 世界 X（左右）
-            //   屏幕 Y 向下 → 世界 -Y（向下）
+            // ワールド座標系の方向に変換する: 
+            //  画面 X → ワールド X（左右）
+            //  画面 Y の下方向 → ワールド -Y（下方向）
             float dirX = dirScreenX;
-            float dirY = -dirScreenY; // 注意取负号，世界里向下是 -Y
-            float dirZ = RandRange(-0.1f, 0.1f); // 前后给一点小扰动即可
+            float dirY = -dirScreenY; // 負符号に注意。ワールドでは下方向が -Y
+            float dirZ = RandRange(-0.1f, 0.1f); // 前後方向に少しだけ揺らぎを与える
 
             float len3D = std::sqrt(dirX * dirX + dirY * dirY + dirZ * dirZ);
             if (len3D > 0.0f) {
@@ -116,7 +116,7 @@ void ParticleEmitter::Emit(int count,
 
             p.velocity = { dirX * speed, dirY * speed, dirZ * speed };
 
-            // 给一点横向“风加速度”和轻微摆动
+            // 少し横方向の「風の加速度」と軽い揺れを与える
             p.accel = {
                 RandRange(-0.15f, 0.15f),
                 0.0f,
@@ -127,30 +127,30 @@ void ParticleEmitter::Emit(int count,
             p.rotationSpeed = RandRange(-0.5f, 0.5f);
         }
         else {
-            // ===== 普通粒子：保持你原来的随机方向逻辑 =====
+            // ===== 通常粒子: 元のランダム方向ロジックを維持する =====
             float sideSign = 0.0f;
             if (horizontalBias > 0.1f)      sideSign = 1.0f;
             else if (horizontalBias < -0.1f) sideSign = -1.0f;
 
             float dirX;
             if (sideSign == 0.0f) {
-                // 没有偏向：左右随机一点点
+                // 横方向指定がない場合: 左右に少しだけランダムを与える
                 dirX = RandRange(-0.12f, 0.12f);
             }
             else {
-                // 有偏向：给一个比较强的侧向分量
+                // 横方向指定がある場合: 比較的強い横成分を与える
                 dirX = RandRange(0.5f, 0.9f) * sideSign;
             }
             float dirY;
             float dirZ;
 
             if (randomColor && type == ParticleType::Model3D) {
-                // ⭐ dash 彩色星星：上下散开多一点
-                dirY = RandRange(-1.1f, -0.3f);    // 有的更朝下，有的几乎水平
-                dirZ = RandRange(-0.25f, 0.25f);   // 前后也稍微散开一点
+                // ⭐ dash 用のカラフルな星: 上下方向に少し散らす
+                dirY = RandRange(-1.1f, -0.3f);    // 下向きが強いものから、ほぼ水平なものまで混ぜる
+                dirZ = RandRange(-0.25f, 0.25f);   // 前後方向にも少し散らす
             }
             else {
-                // 其它 3D 粒子 / 2D 粒子：保持原来的比较窄的范围
+                // その他の 3D / 2D 粒子: 元のやや狭い範囲を維持する
                 dirY = RandRange(-1.0f, -0.85f);
                 dirZ = RandRange(-0.12f, 0.12f);
             }
@@ -164,7 +164,7 @@ void ParticleEmitter::Emit(int count,
 
             p.velocity = { dirX * speed, dirY * speed, dirZ * speed };
 
-            // 尾气块一般比较小
+            // 尾のパーティクルはやや小さめにする
             p.scale = RandRange(0.18f, 0.30f);
             p.rotationSpeed = RandRange(-1.2f, 1.2f);
 
@@ -172,23 +172,23 @@ void ParticleEmitter::Emit(int count,
                 p.color = { 1.0f, 1.0f, 1.0f, 0.7f };
             }
 
-            // 让这种普通 3D 粒子默认有一点重力（可选）
+            // この通常 3D 粒子にはデフォルトで少し重力を与える（任意）
             if (p.type == ParticleType::Model3D) {
-                p.accel = { 0.0f, -9.8f * 1.2f, 0.0f }; // 往下加速，尾巴拉长一点
+                p.accel = { 0.0f, -9.8f * 1.2f, 0.0f }; // 下向きに加速させ、尾を少し長く見せる
             }
             if (randomColor && p.type == ParticleType::Model3D) {
                 int c = rand() % 6;
                 switch (c) {
-                case 0: p.color = { 1.0f, 0.4f, 0.4f, 1.0f }; break; // 红
+                case 0: p.color = { 1.0f, 0.4f, 0.4f, 1.0f }; break; // 赤
                 case 1: p.color = { 1.0f, 0.8f, 0.3f, 1.0f }; break; // 黄
-                case 2: p.color = { 0.4f, 1.0f, 0.4f, 1.0f }; break; // 绿
-                case 3: p.color = { 0.4f, 0.8f, 1.0f, 1.0f }; break; // 蓝
+                case 2: p.color = { 0.4f, 1.0f, 0.4f, 1.0f }; break; // 緑
+                case 3: p.color = { 0.4f, 0.8f, 1.0f, 1.0f }; break; // 青
                 case 4: p.color = { 0.9f, 0.4f, 1.0f, 1.0f }; break; // 紫
-                case 5: p.color = { 1.0f, 0.6f, 0.9f, 1.0f }; break; // 粉
+                case 5: p.color = { 1.0f, 0.6f, 0.9f, 1.0f }; break; // ピンク
                 }
             }
             else {
-                // 默认：不随机，就用白色
+                // デフォルト: ランダムにしない場合はそのまま白色を使う
                 p.color = { 1.0f, 1.0f, 1.0f, 1.0f };
             }
         }
@@ -196,8 +196,8 @@ void ParticleEmitter::Emit(int count,
         p.life = RandRange(minLife, maxLife);
         p.maxLife = p.life;
 
-        // 3) 只在“第一次使用这个槽位”的时候创建视觉对象，
-        //    以后复用同一个槽位就不再 new 新对象
+        // 3) 「このスロットを初めて使うとき」だけ見た目用オブジェクトを生成し、
+        //    以後は同じスロットを再利用し、新しいオブジェクトは生成しない
         if (type == ParticleType::Model3D) {
             if (needNewVisual) {
                 auto o = std::make_unique<Object3d>();
@@ -232,65 +232,65 @@ void ParticleEmitter::Update(float dt)
         p.life -= dt;
         if (p.life <= 0) continue;
 
-         float lifeRatio = p.life / p.maxLife;   // 从 1 -> 0
-        float age       = p.maxLife - p.life;   // 已经活了多久
+         float lifeRatio = p.life / p.maxLife;   // 1 -> 0
+        float age       = p.maxLife - p.life;   // 経過した生存時間
         float age01     = age / p.maxLife;      // 0 -> 1
 
-        // ===== Sprite 粒子：更自然的 淡入/保持/淡出 =====
+        // ===== Sprite 粒子: より自然なフェードイン / 維持 / フェードアウト =====
         if (p.type == ParticleType::Sprite2D) {
             float alpha = 0.0f;
 
-            // 前 20% 时间：从 0 -> 1 淡入
+            // 最初の 20% の時間: 0 -> 1 にフェードイン
             if (age01 < 0.2f) {
                 alpha = age01 / 0.2f;
             }
-            // 中间 60%：维持全亮
+            // 中間の 60%: 最大輝度を維持
             else if (age01 < 0.8f) {
                 alpha = 1.0f;
             }
-            // 最后 20%：从 1 -> 0 淡出
+            // 最後の 20%: 1 -> 0 にフェードアウト
             else {
                 alpha = (1.0f - age01) / 0.2f;
             }
 
-            p.color.w = alpha * 0.7f;   // 最大亮度 0.7，可按需要调整
+            p.color.w = alpha * 0.7f;   // 最大明るさは 0.7。必要に応じて調整可能
         }
 
-        // ===== 基础直线运动 =====
+        // ===== 基礎直線移動 =====
         p.velocity += p.accel * dt;
         p.position += p.velocity * dt;
 
-        // ===== 风模式：在直线基础上加一点“左右摆动” + 旋转对齐速度 =====
+        // ===== 風モード: 直線移動に少し「左右の揺れ」を加え、回転を速度に合わせる =====
         if (windMode_ && p.type == ParticleType::Sprite2D) {
-            // 用 rotationSpeed 当随机相位，让不同粒子不同步
+            // rotationSpeed をランダム位相として使い、粒子ごとの動きをずらす
             float phase = p.rotationSpeed;
-            float sway  = std::sin(age * 8.0f + phase) * 25.0f; // 8 = 频率, 25 = 摆动幅度(像素)
+            float sway  = std::sin(age * 8.0f + phase) * 25.0f; // 8 = 周波数、25 = 揺れ幅（ピクセル）
 
-            // 根据当前速度计算“侧向”方向（与速度垂直）
+            // 現在の速度から「横方向」（速度に垂直）を計算する
             Vector3 v = p.velocity;
             float len = std::sqrt(v.x * v.x + v.y * v.y);
             if (len > 0.001f) {
-                Vector3 side = { -v.y / len, v.x / len, 0.0f }; // 垂直于速度
+                Vector3 side = { -v.y / len, v.x / len, 0.0f }; // 速度に垂直
                 p.position.x += side.x * sway * dt;
                 p.position.y += side.y * sway * dt;
 
-                // 让纹理朝向运动方向
+                // テクスチャの向きを移動方向に合わせる
                 p.rotation = std::atan2(v.y, v.x);
             }
         }
         else {
-            // 非风的情况就保持原来的旋转逻辑
+            // 風モードでない場合は、元の回転ロジックをそのまま使う
             p.rotation += p.rotationSpeed * dt;
         }
         if (snowMode_ && p.type == ParticleType::Model3D) {
-            float phase = p.rotationSpeed;       // 让每片雪不同步
-            float swayX = std::sin(age * 1.8f + phase) * 0.15f; // 幅度/频率都很小
+            float phase = p.rotationSpeed;       // 雪片ごとに動きをずらす
+            float swayX = std::sin(age * 1.8f + phase) * 0.15f; // 振幅も周波数も小さめ
             float swayZ = std::cos(age * 1.3f + phase) * 0.12f;
 
             p.position.x += swayX * dt;
             p.position.z += swayZ * dt;
 
-            // 让旋转更像“轻轻翻滚”
+            // 回転は「ふわっと翻る」ように見せる
             p.rotation += p.rotationSpeed * dt * 0.6f;
         }
         if (p.type == ParticleType::Model3D)
@@ -310,7 +310,7 @@ void ParticleEmitter::Update(float dt)
             s->SetRotation(p.rotation);
             s->SetColor(p.color);
 
-            // 只有在没有“用原图尺寸”时才重设 Size
+            // 「元画像サイズを使わない」場合のみ、Size を再設定する
             if (!useOriginalSpriteSize_) {
                 s->SetSize({ 32 * p.scale, 32 * p.scale });
             }
@@ -346,7 +346,7 @@ void ParticleEmitter::ApplyCameraMove(const Vector3& delta)
         return;
     }
 
-    // 没有移动就不必遍历
+    // 移動量がなければ走査する必要はない
     if (delta.x == 0.0f && delta.y == 0.0f && delta.z == 0.0f) {
         return;
     }
@@ -356,7 +356,7 @@ void ParticleEmitter::ApplyCameraMove(const Vector3& delta)
             continue;
         }
 
-        // 这里只处理“雪花”的 3D 粒子
+        // ここでは「雪」の 3D 粒子のみを処理する
         if (snowMode_ && p.type == ParticleType::Model3D) {
             p.position.x += delta.x;
             p.position.y += delta.y;

@@ -50,13 +50,13 @@ namespace Math {
 	// 角度(度) -> 弧度(rad)
 	float ToRadian(float degrees);
 
-	// 由轴角(弧度)构造四元数；返回值为 Vector4(quat.x, quat.y, quat.z, quat.w)
+	// 軸角から(弧度)构造クォータニオン；返す值为 Vector4(quat.x, quat.y, quat.z, quat.w)
 	Quaternion MakeAxisAngleQuaternion(const Vector3& axis, float angleRad);
 
-	// 线性插值（Nlerp）：默认走最短弧，并做单位化
+	// 線性插值（Nlerp）: デフォルト走最短弧、かつ做正規化
 	Quaternion Lerp(const Quaternion& a, const Quaternion& b, float t, bool shortestPath = true);
 
-	// 球面线性插值（Slerp）：默认走最短弧，t∈[0,1]
+	// 球面線形補間（Slerp）: デフォルト走最短弧、t∈[0,1]
 	Quaternion Slerp(const Quaternion& a, const Quaternion& b, float t, float eps = 1e-6f);
 
 	Vector3 QuaternionToEuler(const Quaternion& q);

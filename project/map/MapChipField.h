@@ -19,7 +19,7 @@ enum class MapChipType {
     kMoveHorizontal, // 左右往復
     kMoveVertical,   // 上下往復
 
-    // 以后在地图上放玩家 / 敌人时用
+    // 以降、マップ上にプレイヤー / 敵を配置する際に使用
     kPlayer,
     kEnemy,
 };
@@ -50,7 +50,7 @@ public:
     void LoadMapChipCsv(const std::string& filePath);
 
     MapChipType GetMapChipTypeByIndex(uint32_t xIndex, uint32_t yIndex) const;
-    // ★ 新增：取得サブID
+    // ★ 追加: サブIDを取得
     uint8_t     GetMapChipSubIDByIndex(uint32_t xIndex, uint32_t yIndex) const;
 
     Vector3 GetMapChipPositionByIndex(uint32_t xIndex, uint32_t yIndex) const;

@@ -55,7 +55,7 @@ void PortalManager::UpdateHint(const MapChipField::IndexSet& playerIndex,
 
     const PortalInfo* p = GetPortalAt(playerIndex);
     if (p && canControl) {
-        // 提示位置：玩家头上稍微偏一下，和你原来代码一致
+        // ヒント表示位置: プレイヤーの少し上。元のコードと同じ
         Vector3 pos = playerWorldPos;
         pos.x -= 0.25f;
         pos.y += 2.0f;

@@ -76,7 +76,7 @@ void HintUIManager::Update(float dt)
     }
 
 
-    // Up 一组
+    // Up ヒント一式
     if (upHints_) {
         for (auto& h : *upHints_) {
             if (!h.sprite) continue;
@@ -103,7 +103,7 @@ void HintUIManager::Update(float dt)
 
 void HintUIManager::Draw()
 {
-    // 这里默认 GameScene 已经调用过 spriteCommon_->CommonDraw()
+    // ここではデフォルト GameScene すでに呼び出している spriteCommon_->CommonDraw()
 
     if (spaceHint_ && spaceHint_->sprite) {
         // Move hint icons placed left of Space hint

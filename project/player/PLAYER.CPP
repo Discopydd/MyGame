@@ -22,14 +22,14 @@ void Player::Initialize(Object3dCommon* object3dCommon, Camera* camera) {
     position_ = { -10, 0, 0 };
     velocity_ = { 0, 0, 0 };
 
-    // Dash 初始状态
+    // Dash の初期状態
     isDashing_ = false;
     dashTimer_ = 0.0f;
     dashCooldownTimer_ = 0.0f;
     canDash_ = true;
     dashDirection_ = { 1, 0, 0 };
 
-    // 让“旧的 originalGravity_”与当前新参数对齐
+    // 旧来の originalGravity_ を現在のパラメータに合わせる
     originalGravity_ = gravityBase_;
     dashGravity_ = 0.0f;
 
@@ -41,29 +41,29 @@ void Player::Initialize(Object3dCommon* object3dCommon, Camera* camera) {
 }
 
 void Player::Update(Input* input, const MapChipField& mapChipField) {
-    const float deltaTime = 1.0f / 60.0f; // 先按 60FPS 固定，后续可外部传参
+    const float deltaTime = 1.0f / 60.0f; // とりあえず 60FPS 固定。必要なら後で外部から渡せる
     didDoubleJumpThisFrame_ = false;
 
-   // 记录上一帧的水状态，用于判断“刚刚进入水中”
+   // 1フレーム前の水状態を記録し、ちょうど水に入った瞬間を判定する
     bool wasInWater        = inWater_;
     bool wasOnWaterSurface = onWaterSurface_;
 
-    // 每帧默认认为不在水中，后面再基于地图重算
+    // 毎フレームいったん非水中状態にし、後でマップに基づいて再計算する
     inWater_ = false;
     onWaterSurface_ = false;
-         // === 无敌计时（受伤/冲刺/踩头） & 闪烁（仅受伤无敌） ===
-    // ① 受伤无敌：带闪烁
+         // === 無敵時間（被ダメージ / ダッシュ / 踏みつけ）と点滅（被ダメージ無敵のみ） ===
+    // ① 被ダメージ無敵: 点滅あり
     if (damageInvincibleTimer_ > 0.0f) {
         damageInvincibleTimer_ -= deltaTime;
 
         damageBlinkTimer_ += deltaTime;
-        // 每隔 damageBlinkInterval_ 翻转一次可见性
+        // damageBlinkInterval_ ごとに表示状態を反転する
         if (damageBlinkTimer_ >= damageBlinkInterval_) {
             damageBlinkTimer_ = 0.0f;
             damageBlinkVisible_ = !damageBlinkVisible_;
         }
 
-        // 无敌时间结束
+        // 無敵時間終了
         if (damageInvincibleTimer_ <= 0.0f) {
             damageInvincibleTimer_ = 0.0f;
             damageBlinkTimer_ = 0.0f;
@@ -71,26 +71,26 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
         }
     }
 
-    // ② 冲刺无敌：不闪烁
+    // ② ダッシュ無敵: 点滅なし
     if (dashInvincibleTimer_ > 0.0f) {
         dashInvincibleTimer_ -= deltaTime;
         if (dashInvincibleTimer_ < 0.0f) dashInvincibleTimer_ = 0.0f;
     }
 
-    // ③ 踩头无敌：不闪烁
+    // ③ 踏みつけ無敵: 点滅なし
     if (stompInvincibleTimer_ > 0.0f) {
         stompInvincibleTimer_ -= deltaTime;
         if (stompInvincibleTimer_ < 0.0f) stompInvincibleTimer_ = 0.0f;
     }
 
 
-    // ④ 踩头冷却：防止在 Boss 头顶原地无限连踩
+    // ④ 踏みつけクールダウン: Boss の頭上での無限連続踏みを防ぐ
     if (stompCooldownTimer_ > 0.0f) {
         stompCooldownTimer_ -= deltaTime;
         if (stompCooldownTimer_ < 0.0f) stompCooldownTimer_ = 0.0f;
     }
 
-    // ⑤ 踩头击退计时：仅踩头后短时间生效（避免影响日常空中手感）
+    // ⑤ 踏みつけノックバック時間: 踏みつけ後の短時間だけ有効にする（日常の空中操作感に影響させない）
     if (stompKickTimer_ > 0.0f) {
         stompKickTimer_ -= deltaTime;
         if (stompKickTimer_ < 0.0f) stompKickTimer_ = 0.0f;
@@ -99,7 +99,7 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
                     (dashInvincibleTimer_ > 0.0f) ||
                     (stompInvincibleTimer_ > 0.0f);
 
-    // --- HP 每秒递减 ---
+    // --- HP を毎秒減少させる ---
     if (hpDrainPerSec_ > 0.0f && hp_ > 0.0f) {
         //hp_ -= hpDrainPerSec_ * deltaTime;
         if (hp_ < 0.0f) hp_ = 0.0f;
@@ -107,35 +107,35 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
     if (hp_ <= 0.0f && !deathStarted_) {
         StartDeathFall();
     }
-    // 顶头短暂锁
+    // 頭上衝突後の短いロック
     headBonkTimer_ = (std::max)(0.0f, headBonkTimer_ - deltaTime);
     if (isDead_) {
         const float dt = 1.0f / 60.0f;
 
-        // 旋转到倒立（绕Z轴）0→π
+        // 倒立するまで回転させる（Z 軸 0→π）
         deathTimer_ += dt;
         float t = (std::min)(1.0f, deathTimer_ / deathRotateTime_);
         deathSpinZ_ = DirectX::XM_PI * (t * t * (3.0f - 2.0f * t)); // smoothstep
 
-        // 强化重力，下坠；跳起后的第一帧已经给了正向初速度
+        // 重力を強めて落下させる。跳ね上がり後の最初のフレームではすでに上向き初速を与えている
         float g = gravityBase_ * deathExtraGravScale_;
         velocity_.y += g * dt;
 
-        // 逐帧位移，**跳过碰撞**，直接坠出画面
+        // フレームごとに移動し、**衝突を無視して** そのまま画面外へ落とす
         position_.x += velocity_.x;
         position_.y += velocity_.y;
         isOnGround_ = false;
 
-        // 应用旋转：保持左右朝向Y旋转不变，只把Z转到180°
+        // 回転を適用する。左右向きの Y 回転は維持し、Z のみ 180° にする
         Vector3 rot = { 0.0f, currentRotationY_, deathSpinZ_ };
         model_->SetRotate(rot);
         model_->SetTranslate(position_);
         model_->Update();
-        return; // 死亡态独立更新完毕
+        return; // 死亡状態は独立処理なのでここで終了
     }
-    // ========== 无输入（如 Intro）时：只做物理 ==========
+    // ========== 入力なし（Intro など）のときは物理のみ更新 ==========
     if (input == nullptr) {
-        // 仅根据“可变重力”推进
+        // 可変重力のみに基づいて更新する
         float g = gravityBase_;
         if (!isOnGround_ && velocity_.y <= 0.0f) {
             g *= fallGravityScale_;
@@ -150,7 +150,7 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
         return;
     }
 
-    // ========= Dash 状态刷新 =========
+    // ========= Dash 状態更新 =========
     if (isDashing_) {
         dashTimer_ += deltaTime;
         if (dashTimer_ >= dashDuration_) {
@@ -159,7 +159,7 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
             dashCooldownTimer_ = dashCooldown_;
             canDash_ = false;
 
-            // 结束空中冲刺，恢复正常重力控制
+            // 空中ダッシュを終了し、通常の重力制御に戻す
             if (isDashJumping_) {
                 isDashJumping_ = false;
             }
@@ -172,7 +172,7 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
             canDash_ = true;
         }
     }
-            // ========= 水方块判定 =========
+            // ========= 水ブロック判定 =========
     {
         const float halfW = width_ * 0.5f;
         const float halfH = height_ * 0.5f;
@@ -202,21 +202,21 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
             }
         }
 
-        // 默认认为不在水中 / 不在水面，下面按检测结果再改
+        // いったん水中でも水面でもない状態にし、以下の判定結果で更新する
         inWater_ = false;
         onWaterSurface_ = false;
 
         if (hasWater) {
             float depth = waterSurfaceY - bottom;
             const float kSurfaceSnapThreshold = height_ * 0.5f;
-            // 下落速度多大以内，仍然算“慢慢接触水面”，可以漂浮
-            const float kFloatMaxFallSpeed = 0.15f;   // 可以自己再调大/调小
+            // この落下速度以下なら「ゆっくり水面に接触した」とみなし、浮遊させる
+            const float kFloatMaxFallSpeed = 0.15f;   // 必要に応じて調整可能
 
             const bool diveInput =
                 input->PushKey(DIK_S) || input->PushKey(DIK_DOWN);
 
             if (depth > 0.0f) {
-                // 垂直速度绝对值比较小（无论向上还是向下），认为是“轻轻接触水面”
+                // 垂直速度の絶対値が小さい（上昇でも下降でも）場合は「そっと水面に触れた」とみなす
                 bool canFloatOnSurface =
                     (std::fabs(velocity_.y) <= kFloatMaxFallSpeed);
 
@@ -224,74 +224,74 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
                     depth <= kSurfaceSnapThreshold &&
                     canFloatOnSurface) {
 
-                    // ★ 在水面上漂浮：保持一半身体在水中
+                    // ★ 水面に浮かせる: 体の半分が水中に入る位置を保つ
                     SnapOnGround(waterSurfaceY - halfH);
                     onWaterSurface_ = true;
                     inWater_ = false;
                 }
                 else {
-                    // ★ 速度较快（从高处跳落）或者按了 S：视为真正进入水内
+                    // ★ 速度が速い（高所から落下）または S を押している場合は、本当に水中へ入ったとみなす
                     inWater_ = true;
                     onWaterSurface_ = false;
                 }
             }
-            // depth <= 0：脚在水面以上，当成空气
+            // depth <= 0: 足が水面より上なので空中扱い
         }
     }
 
 
-       // === 刚从空气 / 水面进入水中的一帧：给一个固定“入水速度” ===
+       // === 空中 / 水面からちょうど水中へ入ったフレームでは、固定の入水速度を与える ===
     bool justEnteredWater = (!wasInWater && !wasOnWaterSurface && inWater_);
     if (justEnteredWater) {
 
-        // 判断这次跳到空中的时候，使用了几段跳
-        // 0：只是掉下去    1：普通跳    2：二段跳
+        // 今回空中に出た際に何段ジャンプを使ったかを判定する
+        // 0: 落下のみ  1: 通常ジャンプ  2: 2段ジャンプ
         int usedJumps = jumpCount_;
         if (usedJumps < 0) usedJumps = 0;
         if (usedJumps > 2) usedJumps = 2;
 
-        // 基础入水速度（从空中掉进水里时往下轻轻一滑）
-        const float kBaseEnterSinkSpeed = -0.10f; // 单位：世界单位/帧左右的感觉
+        // 基本の入水速度（空中から水中へ入る際に少し下へ沈む）
+        const float kBaseEnterSinkSpeed = -0.10f; // 単位: ワールド単位 / フレーム程度の感覚
 
-        // 二段跳额外加深一点（越多段跳，入水那一下越深）
-        const float kExtraSinkPerExtraJump = -0.05f; // 每比“一段跳”多一段，多沉这么多
+        // 2段ジャンプ時は少し深く沈める（段数が多いほどわずかに深く入水）
+        const float kExtraSinkPerExtraJump = -0.05f; // 1段多いごとにこの分だけ深く沈む
 
-        // 计算目标入水速度：
-        //  - 掉落/一段跳：   -0.10
-        //  - 二段跳入水：    -0.15
+        // 目標の入水速度を計算する:
+        // - 落下 / 1段ジャンプ:  -0.10
+        // - 2段ジャンプで入水: -0.15
         float targetVy = kBaseEnterSinkSpeed
                        + (float)(usedJumps - 1) * kExtraSinkPerExtraJump;
 
-        // 不允许是向上的速度，确保一定是往下轻轻沉
+        // 上向きの速度は許可せず、必ず少し下へ沈むようにする
         if (targetVy >= 0.0f) {
             targetVy = -0.05f;
         }
 
         velocity_.y = targetVy;
     }
-    // 触发冲刺（左 Shift）
+    // トリガーダッシュ（左 Shift）
     if (input->TriggerKey(DIK_LSHIFT) && canDash_ && !isDashing_) {
         isDashing_ = true;
         dashTimer_ = 0.0f;
         dashCooldownTimer_ = dashCooldown_;
 
 
-        // 冲刺期间无敌（不闪烁）
+        // ダッシュ中は無敵（点滅なし）
         StartDashInvincible(dashDuration_);
-        // 确定冲刺方向
+        // ダッシュ方向を決定する
         if (lrDirection_ == LRDirection::kRight)  dashDirection_ = { 1, 0, 0 };
         else                                      dashDirection_ = { -1, 0, 0 };
 
-        // 空中冲刺：无重力漂移
+        // 空中ダッシュ: 無重力で移動する
         if (!isOnGround_) {
             isDashJumping_ = true;
-            velocity_.y = 0.0f;   // 立即切断上升
-            isJumping_ = false;   // 结束可控上升
-            jumpPressDuration_ = currentMaxJumpHoldTime_; // 关闭长按窗口
+            velocity_.y = 0.0f;   // 上昇を即座に打ち切る
+            isJumping_ = false;   // 制御可能な上昇を終了する
+            jumpPressDuration_ = currentMaxJumpHoldTime_; // 長押し可能な時間窓を閉じる
         }
     }
 
-    // ========= 水平移动 =========
+    // ========= 水平移動 =========
     Vector3 moveInput = { 0, 0, 0 };
     if (input->PushKey(DIK_D) || input->PushKey(DIK_RIGHT)) {
         moveInput.x = 1.0f;
@@ -311,11 +311,11 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
         }
     } 
 
-    // ---- 水中物理倍率（可以按手感调整）----
-    const float kWaterMoveSpeedScale  = 0.4f;  // 水里移动速度 40%
-    const float kWaterDashSpeedScale  = 0.5f;  // 水里冲刺速度 50%
-    const float kWaterJumpVelScale    = 0.2f;  // 水里起跳初速度 20%
-    const float kWaterGravityScale    = 0.18f; // 水里重力 35%
+    // ---- 水中物理の倍率（操作感に応じて調整可能）----
+    const float kWaterMoveSpeedScale  = 0.4f;  // 水中移動速度 40%
+    const float kWaterDashSpeedScale  = 0.5f;  // 水中ダッシュ速度 50%
+    const float kWaterJumpVelScale    = 0.2f;  // 水中ジャンプ初速 20%
+    const float kWaterGravityScale    = 0.18f; // 水中重力 18%
 
     float currentMoveSpeed = moveSpeed_;
     if (inWater_) {
@@ -324,7 +324,7 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
     Vector3 moveVelocity = moveInput * currentMoveSpeed;
 
     if (isDashing_) {
-        // 冲刺期间固定速度，忽略输入
+        // ダッシュ中は固定速度で移動し、入力はほぼ無視する
         float dashSpeed = moveSpeed_ * dashSpeedMultiplier_;
         if (inWater_) {
             dashSpeed *= kWaterDashSpeedScale;
@@ -337,12 +337,12 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
 
     float finalVx = moveVelocity.x;
 
-    // 踩头击退：短时间内稳定生效，用 ease-out 让弹开更自然
+    // 踏みつけノックバック: 短時間だけ安定して効かせ、ease-out で自然に弾く
     if (stompKickTimer_ > 0.0f) {
         float denom = (stompKickTotal_ > 0.0f) ? stompKickTotal_ : 1.0f;
         float r = stompKickTimer_ / denom; // 1 -> 0
         float ease = r * r;                // ease-out
-        finalVx = stompKickVx_ * ease + moveVelocity.x * 0.25f; // 允许少量空中修正
+        finalVx = stompKickVx_ * ease + moveVelocity.x * 0.25f; // 少量の空中補正を許可
     }
 
     velocity_.x = finalVx;
@@ -350,10 +350,10 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
   const bool isSpacePressed   = input->PushKey(DIK_SPACE);
     const bool justPressedJump  = input->TriggerKey(DIK_SPACE);
 
-    // 起跳 & 二段跳 / 水中无限跳
+    // ジャンプ開始 & 2段ジャンプ / 水中無限ジャンプ
     if (justPressedJump) {
 
-        // ① 地面起跳（重置跳跃次数）
+        // ① 地上からジャンプ（ジャンプ回数をリセット）
         if (isOnGround_) {
             isOnGround_ = false;
 
@@ -362,26 +362,26 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
             currentMaxJumpHoldTime_ = maxJumpHoldTimeFirst_;
 
             velocity_.y = jumpVelInit_;
-            // 水面上起跳也可以更“沉”一点（按需要可以去掉这句）
+            // 水面からのジャンプも少し重めにできる（不要ならこの行は外せる）
             if (inWater_) {
                 velocity_.y *= kWaterJumpVelScale;
             }
-            jumpCount_ = 1; // 已经用掉第一段
+            jumpCount_ = 1; // すでに 1 段目を使用済み
 
             if (isDashing_) {
                 velocity_.x = dashDirection_.x * (moveSpeed_ * dashSpeedMultiplier_);
             }
         }
-        // ② 空中跳跃：
-        //    - 普通情况：最多 maxJumpCount_ 次（二段跳）
-        //    - inWater_ == true 时：不限制次数 → 无限跳
+        // ② 空中ジャンプ:
+        //  - 通常時: 最大 maxJumpCount_ 回まで（2段ジャンプ）
+        //  - inWater_ == true のとき: 回数制限なし → 無限ジャンプ
         else if (!isOnGround_ && (jumpCount_ < maxJumpCount_ || inWater_)) {
 
             isJumping_ = true;
             jumpPressDuration_ = 0.0f;
             currentMaxJumpHoldTime_ = maxJumpHoldTimeSecond_;
 
-            // 打断冲刺，避免乱飞
+            // ダッシュを中断して挙動の暴走を防ぐ
             isDashing_ = false;
             isDashJumping_ = false;
 
@@ -390,16 +390,16 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
                 velocity_.y *= kWaterJumpVelScale;
             }
 
-            // 为了不让 jumpCount_ 无限制变大，只在未达到上限时 +1
+            // jumpCount_ が無制限に増えないよう、上限未満のときだけ +1 する
             if (jumpCount_ < maxJumpCount_) {
                 jumpCount_++;
             }
 
-            didDoubleJumpThisFrame_ = true; // 水中额外跳也当成“二段跳事件”，方便播特效
+            didDoubleJumpThisFrame_ = true; // 水中の追加ジャンプも「2段ジャンプ発生」として扱い、演出を出しやすくする
         }
     }
 
-    // 长按小加速度：在“可控上升”窗口内且仍在上升
+    // 長押し時の追加加速: 「制御可能な上昇」ウィンドウ内かつ上昇中のみ有効
     if (isJumping_) {
         if (isSpacePressed && jumpPressDuration_ < currentMaxJumpHoldTime_) {
             jumpPressDuration_ += deltaTime;
@@ -411,51 +411,51 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
                 }
             }
         } else {
-            isJumping_ = false; // 窗口结束或已松手
+            isJumping_ = false; // ウィンドウ終了またはボタンを離した
         }
     }
 
-      // 可变重力
+      // 可変重力
     float g = gravityBase_;
 
     if (inWater_) {
-        // ★ 在水中：只用基础重力 * 水倍率，不叠加额外下落/早松手重力
+        // ★ 水中では基礎重力 × 水中倍率のみを使い、追加の落下重力 / 早離し重力は重ねない
         g *= kWaterGravityScale;
     } else {
-        // ★ 在空气中才使用“早松手/下落更重”的逻辑
-        // 早松手（结束可控上升但还在上升）→ 更大重力，短跳更利落
+        // ★ 空中ではじめて「早離し / 落下を重くする」ロジックを使う
+        // 早離し（制御上昇終了後もまだ上昇中）→ 重力を強めて短いジャンプにする
         if (!isOnGround_ && velocity_.y > 0.0f && !isJumping_) {
             g *= lowJumpGravityScale_;
         }
-        // 下落期 → 更重
+        // 落下中 → より重くする
         if (!isOnGround_ && velocity_.y <= 0.0f) {
             g *= fallGravityScale_;
         }
     }
 
-    // 在水面上漂浮 → 不受重力影响
+    // 水面に浮いている間 → 重力の影響を受けない
     if (onWaterSurface_) {
         g = 0.0f;
     }
 
-    // 空中冲刺 → 无重力（优先级最高）
+    // 空中ダッシュ中 → 無重力（最優先）
     if (isDashing_) {
         g = 0.0f;
     }
 
-    // 应用重力
+    // 重力を適用
     velocity_.y += g * deltaTime;
-    // ★ 水中：限制最大下沉速度，避免越掉越快
+    // ★ 水中: 最大沈下速度を制限し、どんどん速く落ちないようにする
     if (inWater_ && !onWaterSurface_) {
-        const float kMaxSinkSpeed = -0.20f; // 每帧最多这么快往下掉（可调）
+        const float kMaxSinkSpeed = -0.20f; // 1 フレームあたりの最大沈下速度（調整可）
         if (velocity_.y < kMaxSinkSpeed) {
             velocity_.y = kMaxSinkSpeed;
         }
     }
-    // ========= 碰撞修正 =========
+    // ========= 衝突補正 =========
     HandleMapCollision(mapChipField);
 
-    // ========= 转身插值 =========
+    // ========= 旋回補間 =========
     if (turnCurrentFrame_ < turnTotalFrames_) {
         turnCurrentFrame_++;
         float t = static_cast<float>(turnCurrentFrame_) / turnTotalFrames_;
@@ -464,7 +464,7 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
         model_->SetRotate({ 0.0f, currentRotationY_, 0.0f });
     }
 
-    // ========= 更新模型 =========
+    // ========= モデル更新 =========
     model_->SetTranslate(position_);
     model_->Update();
 }
@@ -472,7 +472,7 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
 void Player::Draw() {
     if (!model_) { return; }
 
-    // 无敌期间：通过“某些帧不画”来实现闪烁
+    // 無敵中は「特定フレームを描画しない」ことで点滅を表現する
     if (isInvincible_ && !damageBlinkVisible_) {
         return;
     }
@@ -486,7 +486,7 @@ void Player::HandleMapCollision(const MapChipField& mapChipField) {
 
     bool onGround = false;
 
-    // ---- 先处理 X ----
+    // ---- 先に X を処理 ----
     {
         float nextX = position_.x + velocity_.x;
 
@@ -520,7 +520,7 @@ void Player::HandleMapCollision(const MapChipField& mapChipField) {
         if (hitX) velocity_.x = 0.0f;
     }
 
-    // ---- 再处理 Y ----
+    // ---- 次に Y を処理 ----
     {
         float nextY = position_.y + velocity_.y;
 
@@ -545,12 +545,12 @@ void Player::HandleMapCollision(const MapChipField& mapChipField) {
                 bool overlapY = !(top   <= r.bottom || bottom >= r.top);
                 if (overlapX && overlapY) {
                     hitY = true;
-                    if (velocity_.y > 0) { // 顶头
+                    if (velocity_.y > 0) { // 頭上衝突
                         fixY = r.bottom - kHalfH;
                         velocity_.y = 0.0f;
                         isJumping_ = false;
                         headBonkTimer_ = kHeadBonkLock_;
-                    } else if (velocity_.y < 0) { // 落地
+                    } else if (velocity_.y < 0) { // 着地
                         fixY = r.top + kHalfH;
                         velocity_.y = 0.0f;
                         onGround = true;
@@ -564,7 +564,7 @@ void Player::HandleMapCollision(const MapChipField& mapChipField) {
 
     isOnGround_ = onGround;
     if (isOnGround_) {
-        // 落地后重置跳跃状态
+        // 着地後にジャンプ状態をリセット
         jumpCount_ = 0;
         isJumping_ = false;
         jumpPressDuration_ = 0.0f;
@@ -590,15 +590,15 @@ void Player::SnapOnGround(float groundTopY)
 {
     const float kHalfH = height_ * 0.5f;
 
-    // 把“脚”放到 groundTopY 上面
+    // 「足」が groundTopY の上に来るように配置する
     position_.y = groundTopY + kHalfH;
 
-    // 如果正在往下掉，就把垂直速度清零
+    // 下降中なら、そのまま垂直速度を 0 にする
     if (velocity_.y < 0.0f) {
         velocity_.y = 0.0f;
     }
 
-    // 视为落地，重置跳跃状态
+    // 着地したものとして扱い、ジャンプ状態をリセットする
     isOnGround_ = true;
     jumpCount_ = 0;
     isJumping_ = false;
@@ -617,7 +617,7 @@ void Player::ApplyExternalDisplacement(const Vector3& delta)
 }
 
 void Player::ResetForMapTransition(bool keepFacing) {
-    // 清零速度 & 动作
+    // 速度と動作状態をリセット
     velocity_ = { 0, 0, 0 };
     isJumping_ = false;
     jumpPressDuration_ = 0.0f;
@@ -626,11 +626,11 @@ void Player::ResetForMapTransition(bool keepFacing) {
     headBonkTimer_ = 0.0f;
     currentMaxJumpHoldTime_ = 0.0f;
 
-    // 冲刺状态复位
+    // ダッシュ状態をリセット
     isDashing_ = false;
     isDashJumping_ = false;
     dashTimer_ = 0.0f;
-    dashCooldownTimer_ = 0.0f;  // 若想保留冷却可移除此行
+    dashCooldownTimer_ = 0.0f;  // クールダウンを維持したい場合はこの行を削除
     canDash_ = true;
 
     isInvincible_          = false;
@@ -639,9 +639,9 @@ void Player::ResetForMapTransition(bool keepFacing) {
     stompInvincibleTimer_    = 0.0f;
     damageBlinkTimer_        = 0.0f;
     damageBlinkVisible_      = true;
-    // 重力“基准”恢复（与新参数体系对齐）
+    // 重力の基準値を復帰する（新しいパラメータ体系に合わせる）
     originalGravity_ = gravityBase_;
-    // 离开当前地图/传送时，不保留水中状态
+    // 現在のマップを離れる / 転送時は水中状態を保持しない
     inWater_ = false;
     onWaterSurface_ = false;
 }
@@ -649,10 +649,10 @@ void Player::StartDeathFall() {
     if (deathStarted_) { return; }
     deathStarted_ = true;
     isDead_ = true;
-    // 死亡时不再判定水
+    // 死亡後は水判定を行わない
     inWater_ = false;
     onWaterSurface_ = false;
-    // 立即打断一切动作
+    // ただちにすべての動作を中断する
     isDashing_ = false; canDash_ = false;
     isDashJumping_ = false; dashTimer_ = 0.0f;
     isJumping_ = false; jumpPressDuration_ = currentMaxJumpHoldTime_;
@@ -660,11 +660,11 @@ void Player::StartDeathFall() {
     isOnGround_ = false;
     currentMaxJumpHoldTime_ = 0.0f;
 
-    velocity_.x = 0.0f;          // ← 清零水平速度
-    velocity_.z = 0.0f;          // ← 并清掉Z方向
+    velocity_.x = 0.0f;          // ← ゼロクリア水平速度
+    velocity_.z = 0.0f;          // ← かつクリアするZ方向
 
-    // 微跳启动 + 倒立旋转准备
-    velocity_.y = deathJumpVel_; // 给一个初速度向上跳一下
+    // 小さく跳ね上げて倒立回転の準備をする
+    velocity_.y = deathJumpVel_; // 少し上向きの初速度を与える
     deathTimer_ = 0.0f;
     deathSpinZ_ = 0.0f;
     jumpCount_ = 0;
@@ -672,7 +672,7 @@ void Player::StartDeathFall() {
 
 void Player::StartInvincible(float duration)
 {
-    // 受伤无敌（带闪烁）
+    // 被ダメージ無敵（点滅あり）
     if (duration <= 0.0f) {
         damageInvincibleTimer_ = 0.0f;
         damageBlinkTimer_ = 0.0f;
@@ -681,12 +681,12 @@ void Player::StartInvincible(float duration)
         return;
     }
 
-    // 不要把已有无敌“缩短”
+    // 既存の無敵時間を短くしない
     damageInvincibleTimer_ = (std::max)(damageInvincibleTimer_, duration);
 
-    // 重新开始闪烁
+    // 点滅を再開始する
     damageBlinkTimer_ = 0.0f;
-    // 开始时就闪一下：先设为不可见
+    // 開始時にすぐ点滅させるため、先に不可視にする
     damageBlinkVisible_ = false;
 
     isInvincible_ = true;
@@ -708,7 +708,7 @@ void Player::StartStompInvincible(float duration)
 
 void Player::StartStompCooldown(float duration)
 {
-    // duration <= 0 也允许作为清零
+    // duration <= 0 の場合はクリアとして扱ってもよい
     if (duration <= 0.0f) {
         stompCooldownTimer_ = 0.0f;
         return;
@@ -721,7 +721,7 @@ void Player::StartStompKick(float vx, float duration)
 {
     if (duration <= 0.0f) { return; }
 
-    // 不要把已有击退“缩短”
+    // 既存のノックバック時間を短くしない
     stompKickTimer_ = (std::max)(stompKickTimer_, duration);
     stompKickTotal_ = (std::max)(stompKickTotal_, duration);
     stompKickVx_ = vx;

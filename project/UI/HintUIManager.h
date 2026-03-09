@@ -6,13 +6,13 @@
 #include <vector>
 #include <memory>
 
-// GameScene 里已经有的结构体，可以直接搬到这里也用这个定义
+// GameScene 内にすでにある構造体。ここでも同じ定義を使う
 struct HintSprite {
     std::unique_ptr<Sprite> sprite;
     Vector3 worldPos{};
 };
 
-// GameScene 里实现的 WorldToScreen，我们这里只声明一下
+// GameScene 内で実装されている WorldToScreen。ここでは宣言のみ行う
 Vector3 WorldToScreen(const Vector3& worldPos, Camera* camera);
 
 class HintUIManager {
@@ -23,16 +23,16 @@ public:
     void Initialize(SpriteCommon* spriteCommon, Camera* camera);
     void Finalize();
 
-    // 让管理器知道 GameScene 里那几个 HintSprite / 容器
+    // このマネージャに GameScene 内の HintSprite / コンテナを渡す
     void SetSpaceHint(HintSprite* spaceHint)   { spaceHint_ = spaceHint; }
     void SetShiftHint(HintSprite* shiftHint)   { shiftHint_ = shiftHint; }
     void SetSprintHint(HintSprite* sprintHint) { sprintHint_ = sprintHint; }
     void SetUpHints(std::vector<HintSprite>* upHints) { upHints_ = upHints; }
 
-    // 每帧更新：计算上下浮动 + 用世界坐标算屏幕坐标
+    // 毎フレーム更新：上下の揺れを計算し、ワールド座標から画面座標へ変換する
     void Update(float dt);
 
-    // 在 GameScene::Draw() 的“中间层 Sprite”里调用
+    // GameScene::Draw() の「中間レイヤー Sprite」内で呼び出す
     void Draw();
 
 private:
@@ -44,10 +44,10 @@ private:
     HintSprite* sprintHint_ = nullptr;
     std::vector<HintSprite>* upHints_ = nullptr;
 
-    // 上下浮动用参数（原来 GameScene 里的那三个）
+    // 上下に揺らすためのパラメータ（元の GameScene にあった 3 つ）
     float bobTime_      = 0.0f;
-    float bobAmplitude_ = 6.0f;   // 位移像素（上下±6）
-    float bobSpeed_     = 3.0f;   // 频率（越大晃得越快）
+    float bobAmplitude_ = 6.0f;   // 移動ピクセル（上下±6）
+    float bobSpeed_     = 3.0f;   // 周波数（大きいほど速く揺れる）
 
     // Move hint icons (key_A / arrow_left / key_D / arrow_right)
     std::unique_ptr<Sprite> moveKeyA_;

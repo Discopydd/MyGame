@@ -120,7 +120,7 @@ void SpriteCommon::GraphicsPipelineInitialize()
 	//すべての色素要素を書き込む
 	blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
 
-	// ★ 开启 Alpha 混合（前景=SrcAlpha，背景=InvSrcAlpha）
+	// ★ 開启 Alpha 混合（前景=SrcAlpha、背景=InvSrcAlpha）
 	rt.BlendEnable = TRUE;
 	rt.SrcBlend = D3D12_BLEND_SRC_ALPHA;
 	rt.DestBlend = D3D12_BLEND_INV_SRC_ALPHA;

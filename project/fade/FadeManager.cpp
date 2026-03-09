@@ -22,7 +22,7 @@ void FadeManager::Initialize(SpriteCommon* spriteCommon)
     sprite_->SetColor({ 0.0f, 0.0f, 0.0f, 0.0f });
     sprite_->Update();
 
-    // 标题页同款 portal_ring，用于所有转场
+    // タイトル画面と同じ portal_ring を使用し、すべての遷移演出に使う
     portalRingSprite_ = std::make_unique<Sprite>();
     portalRingSprite_->Initialize(spriteCommon_, "Resources/portal_ring.png");
     portalRingSprite_->SetAnchorPoint({ 0.5f, 0.5f });
@@ -112,7 +112,7 @@ void FadeManager::Update(float dt)
 {
     if (!sprite_) { return; }
 
-    // 让 portal_ring 在转场时轻微旋转/脉动（和标题页同素材）
+    // 遷移中は portal_ring を軽く回転・脈動させる（タイトル画面と同じ素材）
     if (alpha_ > 0.001f) {
         ringRotation_ += 0.95f * dt;
         if (ringRotation_ > 2.0f * kPi) {
@@ -157,7 +157,7 @@ void FadeManager::SyncVisual_()
     const float cx = (float)WinApp::kClientWidth * 0.5f;
     const float cy = (float)WinApp::kClientHeight * 0.5f;
 
-    // alpha 越高，ring 越明显；淡出时略微放大，淡入时略微收回
+    // alpha が高いほど ring を目立たせる。フェードアウト時は少し拡大し、フェードイン時はやや元に戻す
     const float pulse = 1.0f + 0.035f * std::sin(ringPulseTime_ * 6.0f);
     const float size = (520.0f + 140.0f * alpha_) * pulse;
     const float ringAlpha = std::clamp(0.18f + alpha_ * 0.72f, 0.0f, 0.92f);

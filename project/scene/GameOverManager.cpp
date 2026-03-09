@@ -21,7 +21,7 @@ void GameOverManager::Finalize()
 void GameOverManager::Start()
 {
     if (state_ != State::None && state_ != State::Done) {
-        return; // 已经在 GameOver 里了
+        return; // すでに GameOver 中
     }
 
     state_ = State::SlideTitle;
@@ -30,9 +30,9 @@ void GameOverManager::Start()
     float W = (float)WinApp::kClientWidth;
     float H = (float)WinApp::kClientHeight;
 
-    // 标题最终位置：屏幕中央（根据大小居中）
+    // タイトル最終位置: 画面中央（サイズに応じて中央寄せ）
     titleEndPos_   = { (W - titleSize_.x) * 0.5f, (H - titleSize_.y) * 0.5f };
-    // 起点：从屏幕上方移入
+    // 開始位置: 画面上側から入る
     titleStartPos_ = { titleEndPos_.x, -titleSize_.y - 40.0f };
     titlePos_      = titleStartPos_;
 
@@ -55,7 +55,7 @@ void GameOverManager::Update(float dt)
         float d = t_ / titleSlideTime_;
         if (d > 1.0f) d = 1.0f;
 
-        // 你原来 GameOver 用的 easeOutBack 效果
+        // 元の GameOver で使っていた easeOutBack の効果
         float e = EaseOutBack_(d);
 
         titlePos_.x = titleStartPos_.x + (titleEndPos_.x - titleStartPos_.x) * e;
@@ -67,13 +67,13 @@ void GameOverManager::Update(float dt)
         }
 
         if (d >= 1.0f) {
-            state_ = State::Wait; // 进入等待状态（按 Space 回标题）
+            state_ = State::Wait; // 待機状態へ移行（Space でタイトルへ戻る）
             t_ = 0.0f;
         }
     }
     else if (state_ == State::Wait) {
-        // 目前什么都不做，只是标题停在中间
-        // 真正回标题由 GameScene 里检测 Space + 淡出处理
+        // 現状では何もしない。タイトルを中央に止めておくだけ
+        // 実際のタイトル復帰は GameScene 側で Space 入力検出 + フェードアウト処理を行う
     }
 }
 

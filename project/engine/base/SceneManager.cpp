@@ -1,7 +1,7 @@
 #include "SceneManager.h"
 
 SceneManager::~SceneManager() {
-    // 最后一个场景的终止和释放
+    // 最後一个场景的終止和放つ
     if (scene_) {
         scene_->Finalize();
     }
@@ -36,9 +36,9 @@ void SceneManager::ClearOverlayScene() {
 }
 
 void SceneManager::Update() {
-    // 切换场景（如果有预约）
+    // シーン切替（予約がある場合）
     if (nextScene_) {
-        // 当前场景の终止
+        // 現在のシーンの終止
         if (scene_) {
             scene_->Finalize();
         }
@@ -51,7 +51,7 @@ void SceneManager::Update() {
         }
     }
 
-    // 更新当前场景
+    // 現在のシーンをより新
     if (scene_) {
         scene_->Update();
     }
@@ -61,11 +61,11 @@ void SceneManager::Update() {
 }
 
 void SceneManager::Draw() {
-    // 调用当前场景的绘制
+    // 現在のシーンの描画を呼ぶ
     if (overlayScene_) {
         overlayScene_->Draw();
     } else if (scene_) {
-        // 没有覆盖场景时，才绘制当前场景
+        // オーバーレイシーンがない時だけ現在のシーンを描画
         scene_->Draw();
     }
 }

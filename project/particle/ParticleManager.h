@@ -4,29 +4,29 @@
 #include "SpriteCommon.h"
 #include "ParticleEmitter.h"
 #include <memory>
-// 统一管理所有粒子发射器
+// すべての粒子エミッタを一括管理する
 class ParticleManager
 {
 public:
     ParticleManager() = default;
-    ~ParticleManager();   // 析构里自动释放
+    ~ParticleManager();   // デストラクタで自動解放する
 
-    // 初始化：把 3D / 2D 的共通对象传进来
+    // 初期化: 3D / 2D の共通オブジェクトを受け取る
     void Initialize(Object3dCommon* objectCommon, SpriteCommon* spriteCommon);
 
-    // 创建一个新的发射器，由管理器托管生命周期
+    // 新しいエミッタを生成し、マネージャがライフサイクルを管理する
     ParticleEmitter* CreateEmitter();
 
-    // 每帧更新所有发射器
+    // 毎フレームすべてのエミッタを更新する
     void Update(float dt);
 
-    // 3D 粒子（模型粒子）绘制
+    // 3D 粒子（モデル粒子）を描画する
     void Draw3D();
 
-    // 2D 粒子（Sprite 粒子）绘制
+    // 2D 粒子（Sprite 粒子）を描画する
     void Draw2D();
 
-    // 手动清空所有发射器（可选，在切场景时也可以显式调用）
+    // すべてのエミッタを手動でクリアする（任意。シーン切り替え時にも明示的に呼び出せる）
     void Finalize();
 
 private:

@@ -18,16 +18,16 @@ public:
 
     void Finalize();
 
-    // 设置当前总金币数（0~999），会自动刷新 UI
+    // 現在の総コイン数を設定する（0～999）。UI は自動で更新される
     void SetTotalCoin(int total);
     int  GetTotalCoin() const { return totalCoin_; }
 
-    // 每帧更新（灯光闪烁计时）
+    // 毎フレーム更新（ライト点滅用のタイマー）
     void Update(float dt);
 
-    // 在 GameScene::Draw() 里调用
-    void Draw3D();  // 3D coin 模型
-    void Draw2D();  // 冒号 + 数字
+    // GameScene::Draw() 内で呼び出す
+    void Draw3D();  // 3D coin モデル
+    void Draw2D();  // コロン + 数字
 
 private:
     SpriteCommon*   spriteCommon_   = nullptr;
@@ -35,7 +35,7 @@ private:
     Camera*         camera_         = nullptr;
     float           hpNdcZ_         = 0.08f;
 
-    // 3D coin 模型
+    // 3D coin モデル
     std::unique_ptr<Object3d> coinObj_;
     std::unique_ptr<Sprite>   colonSprite_;
     std::unique_ptr<Sprite>   digitSprites_[3] = {
@@ -46,6 +46,6 @@ private:
     int   lastCoin_  = -1;
     float lightTime_ = 0.0f;
 
-    // 刷新右上角数字 UI（原来的 UpdateCoinCountUI_）
+    // 右上の数字 UI を更新する（旧 UpdateCoinCountUI_）
     void UpdateDigits_();
 };

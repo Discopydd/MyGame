@@ -57,7 +57,7 @@ private:
     SpriteCommon*   spriteCommon_   = nullptr;
     SrvManager*     srvManager_     = nullptr;
 
-    // ===== GameScene 自己拥有的对象们：用 unique_ptr 管理 =====
+    // ===== GameScene 所有するオブジェクト群: unique_ptr で管理 =====
     std::unique_ptr<Sprite>       backgroundSprite_;
     std::unique_ptr<ImGuiManager> imguiManager_;
     std::unique_ptr<Object3dCommon> object3dCommon_;
@@ -68,9 +68,9 @@ private:
     Vector2 rotation_{};
 
     // --- Map ---
-    MapChipField mapChipField_;  // 地图数据本体（值语义）
+    MapChipField mapChipField_;  // 地図データ本体（値セマンティクス）
 
-    // 地图方块 / 水块 3D 模型：GameScene 拥有
+    // マップブロック / 水ブロックの 3D モデル: GameScene が所有
     std::vector<std::unique_ptr<Object3d>> mapBlocks_;
     std::vector<std::unique_ptr<Object3d>> waterBlocks_;
 
@@ -78,7 +78,7 @@ private:
     void LoadMap(const std::string& mapPath, const Vector3& startPos);
     void HandlePlayerOnMovingPlatforms();
 
-    // UI / 管理器
+    // UI / マネージャ
     std::unique_ptr<DashUIManager>   dashUI_;
     std::unique_ptr<PortalManager>   portalMgr_;
     std::unique_ptr<HPBar3DManager>  hpBar_;
@@ -90,74 +90,74 @@ private:
     std::unique_ptr<IntroManager>     intro_;
     std::unique_ptr<FadeManager>      fade_;
 
-    // ================== 加载相关 ==================
-    bool shouldStartLoading_ = true;   // 延迟初始化加载
-    bool isMapLoading_       = false;  // 初始化加载标志
-    bool isPortalLoading_    = false;  // 传送门加载标志
+    // ================== ロード関連 ==================
+    bool shouldStartLoading_ = true;   // 遅延初期化ロード
+    bool isMapLoading_       = false;  // 初期ロードフラグ
+    bool isPortalLoading_    = false;  // 転送門ロードフラグ
 
-    std::string portalMapPath_;        // 传送门目标地图
-    Vector3     portalStartPos_;       // 传送门起点
-    float       portalLoadingTimer_ = 0.0f;  // 传送门计时
-    float       loadingTimer_       = 0.0f;  // 初始化加载计时
+    std::string portalMapPath_;        // 転送門目標マップ
+    Vector3     portalStartPos_;       // 転送門開始位置
+    float       portalLoadingTimer_ = 0.0f;  // 転送門タイマー
+    float       loadingTimer_       = 0.0f;  // 初期ロードタイマー
 
     static constexpr float LOADING_DURATION = 0.5f; // 0.5秒
 
-    // 传送门触发：等待到黑后再开始加载
+    // 転送門トリガー: 黒くなってからロードを開始するのを待つ
     bool        pendingPortalLoad_ = false;
     std::string pendingPortalMapPath_;
     Vector3     pendingPortalStartPos_;
 
-    // === GameClear / 回标题用的标志 ===
-    bool pendingGameClear_ = false;  // 按 E 触发通关时，用来等黑幕到纯黑再进入胜利演出
-    bool returnToTitle_    = false;  // 在胜利画面按 Space 后，黑幕淡出回 Title
+    // === GameClear / 回タイトル用フラグ ===
+    bool pendingGameClear_ = false;  // E でクリアをトリガーした時、黒幕が完全な黒になるのを待ってから勝利演出へ入るために使う
+    bool returnToTitle_    = false;  // 勝利画面で Space を押した後、黒幕フェードアウトで Title へ戻る
 
     // === Victory condition ===
-    bool bossDefeated_   = false;  // Boss 被击败后只触发一次通关
+    bool bossDefeated_   = false;  // Boss 撃破後にクリアを1回だけトリガーする
 
-    // ===== HP 3D 条 =====
-    float hpNdcZ_ = 0.08f;  // 贴近相机，避免被遮挡
+    // ===== HP 3D バー =====
+    float hpNdcZ_ = 0.08f;  // カメラに近づけ、遮蔽されるのを防ぐ
 
-    // ===== 提示图标（HintSprite 自身只是“视图”，真正 Sprite 的所有权在 GameScene 里）=====
+    // ===== ヒントアイコン（HintSprite 自身は「ビュー」だけであり、Sprite の所有権はすべて GameScene 側にある）=====
     HintSprite spaceHint_;
     HintSprite shiftHint_;
     HintSprite sprintHint_;
     std::vector<HintSprite> upHints_;
 
-    // Hub 指引进度：0=去 map3, 1=去 map4, 2=去 map5, 3=去 map6, 4=全部完成
+    // Hub の誘導進捗: 0=map3 へ、1=map4 へ、2=map5 へ、3=map6 へ、4=すべて完了
     int hubGuideStage_ = 0;
 
-    // ==== 当前地图路径（用于做 key / Hub 逻辑）====
+    // ==== 現在のマップパス（key / Hub ロジック用）====
     std::string currentMapPath_;
 
-    // === Coin 统计 ===
+    // === Coin 集計 ===
     int totalCoinCollected_ = 0;
 
-    // ==== Hub（map2）解锁进度 ====
-    // 0: 只解锁第1关入口
-    // 1: 解锁到第2关
-    // 2: 解锁到第3关
-    // 3: 解锁到最终关入口
-    // 4: 全部关卡通关
+    // ==== Hub（map2）解放進捗 ====
+    // 0: 第1関入口だけ解放
+    // 1: 第2関まで解放
+    // 2: 第3関まで解放
+    // 3: 最終関入口まで解放
+    // 4: 全ステージクリア
     int  hubProgress_      = 0;
     bool allStagesCleared_ = false;
 
-    // 每张子地图对应哪一关（0~3）
+    // 各サブマップがどの関に対応するか（0〜3）
     std::unordered_map<std::string, int> hubStageByMap_;
 
-    // ===== 粒子系统 =====
-    // GameScene 拥有 ParticleManager，用 unique_ptr 管理生命周期
+    // ===== パーティクル関連 =====
+    // GameScene は ParticleManager を所有し、ライフサイクルは unique_ptr で管理する
     std::unique_ptr<ParticleManager> particleMgr_;
 
-    // 发射器由 ParticleManager 创建并持有，这里只是“借用”裸指针，不 delete
-    ParticleEmitter* emitter2D_        = nullptr;   // 2D（Sprite）粒子发射器
-    ParticleEmitter* emitter3D_        = nullptr;   // 3D（Model）粒子发射器
+    // エミッタは ParticleManager が生成・所有し、ここでは「借用」した生ポインタを保持するだけで delete しない
+    ParticleEmitter* emitter2D_        = nullptr;   // 2D（Sprite）粒子エミッタ
+    ParticleEmitter* emitter3D_        = nullptr;   // 3D（Model）粒子エミッタ
     ParticleEmitter* dashStarEmitter_  = nullptr;
-    ParticleEmitter* windEmitter_      = nullptr;   // 风特效的粒子发射器
+    ParticleEmitter* windEmitter_      = nullptr;   // 風エフェクト用のパーティクルエミッタ
     float            windSpawnTimer_   = 0.0f;
     ParticleEmitter* snowEmitter_      = nullptr;
     float            snowSpawnTimer_   = 0.0f;
 
-    // 玩家位置历史（用于地刺回退到 1 秒前所在格子）
+    // プレイヤー位置履歴（〜用トゲまで戻す 1 秒前所在格子）
     static inline const int kPlayerIndexHistoryFrameCount_ = 30;
     MapChipField::IndexSet playerIndexHistory_[kPlayerIndexHistoryFrameCount_]{};
     int  playerIndexHistoryCursor_         = 0;
@@ -166,68 +166,68 @@ private:
 
     Vector3 prevCameraPos_{};
 
-    // 移动平台
+    // 移動床
     std::vector<std::unique_ptr<MovingPlatform>> movingPlatforms_;
     float movingPlatformSpeed_ = 10.0f;
 
     bool crushedByPlatformThisFrame_ = false;
     bool damagedByEnemyThisFrame_    = false;
 
-    // 本帧造成玩家受伤的敌人（用于受伤时做轻微“分离”，避免玩家被顶飞/反复卡在敌人里）
+    // このフレームプレイヤーにダメージを与えた敵（被ダメージ時に軽く「分離」し、敵の中で吹き飛び / 再度埋まるのを防ぐために使う）
     Enemy* damageSourceEnemy_ = nullptr;
 
-    // 踩头锁：同一个敌人，在玩家还没离开它的碰撞盒之前不重复判定（防止站桩无限踩）
+    // 踏みつけロック: 同じ敵に対しては、プレイヤーがその当たり判定から離れるまで再判定しない（頭上での棒立ち無限踏みを防ぐ）
     Enemy* stompLockEnemy_ = nullptr;
 
     
     // ================== Boss HP（2D） ==================
-    std::unique_ptr<Sprite> bossHpDamageSprite_; // 红色：延迟扣血条
-    std::unique_ptr<Sprite> bossHpSprite_;       // 绿色：即时血条
+    std::unique_ptr<Sprite> bossHpDamageSprite_; // 赤: 遅れて減る HP バー
+    std::unique_ptr<Sprite> bossHpSprite_;       // 緑: 即時 HP バー
 
-    Vector2 bossHpBarPos_{};   // 左上角坐标（屏幕像素）
-    Vector2 bossHpBarSize_{};  // 满血时的尺寸（屏幕像素）
+    Vector2 bossHpBarPos_{};   // 左上座標（画面ピクセル）
+    Vector2 bossHpBarSize_{};  // 満タン時のサイズ（画面ピクセル）
 
-    float bossHpRatio_      = 1.0f; // 绿色条比例
-    float bossDamageRatio_  = 1.0f; // 红色条比例（缓慢追上绿色）
-    float bossDamageDropSpeed_ = 0.45f; // 每秒下降速度（0~1）
+    float bossHpRatio_      = 1.0f; // 緑バーの割合
+    float bossDamageRatio_  = 1.0f; // 赤バーの割合（ゆっくり緑へ追従）
+    float bossDamageDropSpeed_ = 0.45f; // 毎秒の低下速度（0~1）
     bool  bossHpVisible_    = false;
 
 
-    // ================== Boss 触发演出（镜头推 Boss + 名字 + 回玩家） ==================
+    // ================== Boss トリガー演出（カメラ推 Boss + 名字 + 回プレイヤー） ==================
     enum class BossIntroPhase {
         None,
-        ToBoss,      // 镜头从玩家推到 Boss（拉近）
-        ShowName,    // 顶部显示 Boss 名字
-        BackToPlayer // 镜头回到玩家
+        ToBoss,      // カメラをプレイヤーから Boss へ寄せる
+        ShowName,    // 画面上端に Boss 名を表示
+        BackToPlayer // カメラ戻るプレイヤー
     };
 
     BossIntroPhase bossIntroPhase_ = BossIntroPhase::None;
     float   bossIntroTimer_ = 0.0f;
 
-    // 触发瞬间：记录玩家跟随镜头的起点
+    // トリガー瞬間: プレイヤー追従カメラの開始位置を記録
     Vector3 bossIntroStartCamPos_{};
     float   bossIntroStartFovY_ = 0.45f;
 
-    // 回玩家阶段：记录回拉起点
+    // プレイヤーへ戻る段階: 戻り開始位置を記録
     Vector3 bossIntroBackStartCamPos_{};
     float   bossIntroBackStartFovY_ = 0.45f;
 
-    // 目标 Boss（借用指针，生命周期由 enemies_ 管理）
+    // 対象 Boss（借用ポインタ。ライフサイクルは enemies_ 側で管理）
     BossEnemy* introBoss_ = nullptr;
 
-    // —— 可调参数（想要“更电影感”就改这里）——
-    float bossIntroBossFovY_   = 0.28f;            // 推到 Boss 时的 FOV（更小=更近）
-    float bossIntroBossZ_      = -25.0f;           // 推到 Boss 时相机 Z（更接近 0=更近）
-    // ★ 推镜头/展示名时：整体镜头向下挪一点
-    // 注意：你这个项目的世界坐标 Y 轴更像是“向下为正”，所以“向下”用 +Y。
-    // 若你的场景是 Y 向上为正，把这个值改成负数即可。
+    // —— 調整可能なパラメータ（より映画的にしたい場合はここをそのまま調整）——
+    float bossIntroBossFovY_   = 0.28f;            // Boss へ寄せた時の FOV（小さいほど近い）
+    float bossIntroBossZ_      = -25.0f;           // Boss へ寄せた時のカメラ Z（0 に近いほど近い）
+    // ★ 推カメラ/展示名時: カメラ全体を少し下へずらす
+    // 注意: このプロジェクトのワールド座標 Y 軸は「下が正」のようなので、「下へ」は +Y を使う。
+    // もしシーンが「上が正」の場合は、この値を負数へ変更すればよい。
     Vector3 bossIntroBossCamOffset_ = {0.0f, 0.0f, 0.0f};
 
-    float bossIntroToBossDur_  = 0.85f;            // 推镜头时长
-    float bossIntroShowDur_    = 1.10f;            // 显示名字停留时长
-    float bossIntroBackDur_    = 0.85f;            // 回玩家时长
+    float bossIntroToBossDur_  = 0.85f;            // カメラ寄せ時間
+    float bossIntroShowDur_    = 1.10f;            // 名前表示の停止時間
+    float bossIntroBackDur_    = 0.85f;            // プレイヤーへ戻る時間
 
-    // Boss 名字（Sprite 贴图）
+    // Boss 名称（Sprite テクスチャ）
     std::unique_ptr<Sprite> bossNameSprite_;
     bool bossNameVisible_ = false;
 
@@ -236,20 +236,20 @@ private:
 
     BossEnemy* FindBossEnemy();
 
-    // 把相机目标点限制在地图边界（★ 先约束目标，再插值，沿边界滑动更顺）
+    // カメラ目標点をマップ境界内に制限する（★ 先に目標を制約してから補間することで、境界沿いの滑りが滑らかになる）
     Vector3 ConstrainCameraToMap(const Vector3& desiredPos, float fovY, float cameraZ) const;
 
     // ================== Pause Menu（ESC） ==================
     bool isPaused_ = false;
     int  pauseCursor_ = 0; // 0: Continue, 1: Back to Title
-    // 继续/回标题按钮（普通/选中）
+    // 継続 / タイトルへ戻るボタン（通常 / 選択中）
     std::unique_ptr<Sprite> pauseContinueNormal_;
     std::unique_ptr<Sprite> pauseContinueSelected_;
     std::unique_ptr<Sprite> pauseBackNormal_;
     std::unique_ptr<Sprite> pauseBackSelected_;
-    // 暂停时的暗色覆盖层（不借用 FadeManager，避免状态互相影响）
+    // 一時停止時の暗色オーバーレイ（FadeManager を流用せず、状態干渉を避ける）
     std::unique_ptr<Sprite> pauseDimSprite_;
 
-    // 敌人
+    // 敵
     std::vector<std::unique_ptr<Enemy>> enemies_;
 };

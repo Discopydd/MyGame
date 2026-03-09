@@ -13,7 +13,7 @@ void CoinUIManager::Initialize(SpriteCommon* spriteCommon,
     camera_         = camera;
     hpNdcZ_         = hpNdcZ;
 
-    // ==== 右上角 Coin UI（3D 模型） ====
+    // ==== 右上 Coin UI（3D モデル） ====
     coinObj_ = std::make_unique<Object3d>();
     coinObj_->Initialize(object3dCommon_);
     coinObj_->SetModel("coin_ui/coin_ui.obj");
@@ -26,7 +26,7 @@ void CoinUIManager::Initialize(SpriteCommon* spriteCommon,
     colonSprite_->Initialize(spriteCommon_, "Resources/numbers/colon.png");
     colonSprite_->SetSize({ 24.0f, 24.0f });
 
-    // 先全部初始化成 0.png，之后在 UpdateDigits_ 里切换贴图
+    // 最初はすべて 0.png で初期化し、その後 UpdateDigits_ 内でテクスチャを切り替える
     for (int i = 0; i < 3; ++i) {
         digitSprites_[i] = std::make_unique<Sprite>();
         digitSprites_[i]->Initialize(spriteCommon_, "Resources/numbers/0.png");
@@ -70,18 +70,18 @@ void CoinUIManager::Draw3D()
     const float digitW   = 24.0f;
     const float digitGap = 2.0f;
 
-    // 与 UpdateDigits_ 使用同一套公式：预留 3 位数字空间
+    // UpdateDigits_ と同じ計算式を使い、3 桁分の数字スペースを確保する
     float colonX = (float)WinApp::kClientWidth - uiPad - 3.0f * (digitW + digitGap);
     float colonY = uiPad + 10.0f;
 
-    // coin 放在冒号左边一点
+    // coin はコロンの少し左側に配置する
     float coinScreenX = colonX - 20.0f;
     float coinScreenY = colonY + 12.0f;
 
     Vector3 coinWorld = ScreenToWorld(coinScreenX, coinScreenY, hpNdcZ_, camera_);
     coinObj_->SetTranslate(coinWorld);
 
-    // 灯光闪烁
+    // ライトを点滅させる
     const float baseI  = 0.6f;
     const float ampI   = 1.4f;
     const float speedI = 6.0f;
@@ -117,16 +117,16 @@ void CoinUIManager::UpdateDigits_()
     const float digitH   = 24.0f;
     const float digitGap = 2.0f;
 
-    // 预留三位数字的空间，靠近右上角
+    // 3 桁分の数字スペースを確保し、右上寄りに配置する
     float colonX = (float)WinApp::kClientWidth  - uiPad - 3.0f * (digitW + digitGap);
     float colonY = uiPad + 10.0f;
 
-    // 冒号位置
+    // コロン位置
     colonSprite_->SetPosition({ colonX, colonY });
     colonSprite_->SetVisible(true);
     colonSprite_->Update();
 
-    // 数字（整型限制在 0~999）
+    // 数字（整数値は 0～999 に制限）
     int c = totalCoin_;
     if (c < 0)   c = 0;
     if (c > 999) c = 999;
@@ -138,14 +138,14 @@ void CoinUIManager::UpdateDigits_()
     int digits[3] = { d0, d1, d2 };
     int numDigits = (c >= 100) ? 3 : (c >= 10 ? 2 : 1);
 
-    // 先全部隐藏
+    // いったんすべて非表示にする
     for (int i = 0; i < 3; ++i) {
         if (digitSprites_[i]) {
             digitSprites_[i]->SetVisible(false);
         }
     }
 
-    // 数字贴图路径
+    // 数字テクスチャのパス
     const char* digitTex[10] = {
         "Resources/numbers/0.png","Resources/numbers/1.png","Resources/numbers/2.png",
         "Resources/numbers/3.png","Resources/numbers/4.png","Resources/numbers/5.png",
@@ -153,7 +153,7 @@ void CoinUIManager::UpdateDigits_()
         "Resources/numbers/9.png",
     };
 
-    // 让数字靠右（最低位靠近右侧）
+    // 数字は右寄せで表示する（1 の位を右側に配置）
     float x = colonX + digitW + digitGap;
     float y = colonY;
 
