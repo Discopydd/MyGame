@@ -128,6 +128,9 @@ preAttackJitterTime_ = 0.0f;
     case EnemyType::Type1:
         obj_->SetModel("enemy2/enemy2.obj");
         break;
+    case EnemyType::Type2:
+        obj_->SetModel("enemy3/enemy3.obj");
+        break;
     case EnemyType::Boss: {
         obj_->SetModel("enemy1/enemy1.obj"); // 無ければ既存のモデルパスに差し替える
 

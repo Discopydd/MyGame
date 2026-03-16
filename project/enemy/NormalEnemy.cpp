@@ -25,15 +25,16 @@ namespace {
         if (s > 3.0f) s = 3.0f;
         return s;
     }
+
     inline bool HitSpikeUnderFoot(const Vector3& pos, float width, float height, const MapChipField& map)
     {
         const float halfW = width * 0.5f;
         const float halfH = height * 0.5f;
 
-        // 少し下に伸ばして、確実に「ちょうど接地（bottom==tileTop）」も能判到トゲ
+        // 少し下に伸ばして、確実に「ちょうど接地（bottom==tileTop）」も検出できるようにする
         const float probeY = pos.y - halfH - 0.08f;
 
-        // 3 点采样: 中/左脚/右脚（中心だけを見ると足先にが端のトゲに触れても見逃すため）
+        // 3 点サンプリング: 中/左脚/右脚（中心だけを見ると足先が端のトゲに触れても見逃すため）
         const float xs[3] = {
             pos.x,
             pos.x - halfW * 0.65f,
@@ -49,7 +50,16 @@ namespace {
         return false;
     }
 
-    // Type1（E1）: 目の前のタイルが障害物（Block/Spike/MovingBlock 等）ならジャンプしたい
+    // 前方の足元が抜けているかどうか
+    inline bool IsMissingGroundAhead(const Vector3& pos, int facing, float width, float height, const MapChipField& map)
+    {
+        const float checkX = pos.x + static_cast<float>(facing) * (width * 0.5f + 0.20f);
+        const float checkY = pos.y - height * 0.5f - 0.15f;
+        auto idx = map.GetMapChipIndexByPosition({ checkX, checkY, 0.0f });
+        return !IsSolid(map.GetMapChipTypeByIndex(idx.xIndex, idx.yIndex));
+    }
+
+    // Type1 / Type2: 目の前のタイルが障害物（Block/Spike/MovingBlock 等）ならジャンプしたい
     enum class JumpKind { None, Small, High };
 
     inline JumpKind NeedJumpAheadKind(const Vector3& pos, int facing, float width, float height, const MapChipField& map)
@@ -57,11 +67,11 @@ namespace {
         const float halfW = width * 0.5f;
         const float halfH = height * 0.5f;
 
-        // ✅探知距離: 遠すぎると早めに跳んでしまうので、長くしすぎない
+        // 遠すぎると早めに跳んでしまうので、長くしすぎない
         const float probeX = pos.x + static_cast<float>(facing) * (halfW + 0.12f);
 
         const float yFoot = pos.y - halfH + 0.12f; // 脚辺
-        const float yMid = pos.y;                 // 身体中部
+        const float yMid = pos.y;                  // 身体中部
 
         auto idxF = map.GetMapChipIndexByPosition({ probeX, yFoot, 0.0f });
         MapChipType tF = map.GetMapChipTypeByIndex(idxF.xIndex, idxF.yIndex);
@@ -77,6 +87,7 @@ namespace {
 
         return JumpKind::None;
     }
+
     // BossEnemy::ResolveMapCollision の「簡易再利用版」
     inline void ResolveMapCollision(
         Vector3& pos,
@@ -153,7 +164,7 @@ namespace {
                     bool overlapY = !(top <= r.bottom || bottom >= r.top);
                     if (overlapX && overlapY) {
                         hitY = true;
-                        if (vel.y > 0.0f) {          // 頂头
+                        if (vel.y > 0.0f) {          // 頭突き
                             fixY = r.bottom - halfH;
                             vel.y = 0.0f;
                         }
@@ -185,7 +196,7 @@ void NormalEnemy::Initialize(Object3dCommon* common, Camera* camera, const Vecto
     enrageHp_ = 0;
     hp_ = 1;
 
-    // 敵タイプに応じてモデルを切り替える（パスはプロジェクトのリソースに合わせて変より）
+    // 敵タイプに応じてモデルを切り替える
     switch (type_) {
     case EnemyType::Type0:
         obj_->SetModel("enemy0/enemy0.obj");
@@ -193,9 +204,12 @@ void NormalEnemy::Initialize(Object3dCommon* common, Camera* camera, const Vecto
     case EnemyType::Type1:
         obj_->SetModel("enemy2/enemy2.obj");
         break;
+    case EnemyType::Type2:
+        obj_->SetModel("enemy3/enemy3.obj");
+        break;
     case EnemyType::Boss:
         // 防御的な書き方: 誤って Boss が渡された場合は、ここでは Type1 として処理
-        obj_->SetModel("enemy1/enemy1.obj");
+        obj_->SetModel("enemy2/enemy2.obj");
         type_ = EnemyType::Type1;
         break;
     }
@@ -216,9 +230,36 @@ void NormalEnemy::Initialize(Object3dCommon* common, Camera* camera, const Vecto
     aliveWidth_ = width_;
     aliveHeight_ = height_;
 
-    // Type1（E1）エリア制限: スポーン地点（家）を記録して状態を初期化
+    // 各種状態
     homePos_ = spawnPos;
     type1State_ = Type1State::Patrol;
+    type2State_ = Type2State::Patrol;
+    jumpCooldown_ = 0.0f;
+    type0JumpCooldown_ = 0.0f;
+    pounceCooldown_ = 0.0f;
+    recoverTimer_ = 0.0f;
+    chaseMemoryTimer_ = 0.0f;
+
+    // タイプごとの初期チューニング
+    switch (type_) {
+    case EnemyType::Type0:
+        patrolHalfWidth_ = 0.0f;
+        break;
+    case EnemyType::Type1:
+        patrolHalfWidth_ = 2.5f;   // 最初から少し動かして待機を自然にする
+        aggroRange_ = 12.0f;
+        leashRange_ = 20.0f;
+        stopRange_ = 0.90f;
+        break;
+    case EnemyType::Type2:
+        patrolHalfWidth_ = 3.5f;
+        aggroRange_ = 14.0f;
+        leashRange_ = 22.0f;
+        stopRange_ = 1.10f;
+        break;
+    case EnemyType::Boss:
+        break;
+    }
 }
 
 void NormalEnemy::Update(float dt, const MapChipField& map, const Player& player)
@@ -226,7 +267,7 @@ void NormalEnemy::Update(float dt, const MapChipField& map, const Player& player
     // 完全に死亡済み（アニメ終了）
     if (isDead_) { return; }
 
-    // ===== 死亡アニメより新 =====
+    // ===== 死亡アニメ更新 =====
     if (isDying_) {
         deathTimer_ = (std::max)(0.0f, deathTimer_ - dt);
 
@@ -253,117 +294,229 @@ void NormalEnemy::Update(float dt, const MapChipField& map, const Player& player
     // ===== 生存状態 =====
     if (!UpdateCommon(dt)) { return; }
 
-    // Type1 cooldown
-    if (type_ == EnemyType::Type1) {
-        jumpCooldown_ = (std::max)(0.0f, jumpCooldown_ - dt);
-    }
+    // cooldown / memory
+    jumpCooldown_ = (std::max)(0.0f, jumpCooldown_ - dt);
+    type0JumpCooldown_ = (std::max)(0.0f, type0JumpCooldown_ - dt);
+    pounceCooldown_ = (std::max)(0.0f, pounceCooldown_ - dt);
+    recoverTimer_ = (std::max)(0.0f, recoverTimer_ - dt);
+    chaseMemoryTimer_ = (std::max)(0.0f, chaseMemoryTimer_ - dt);
 
     // 重力
     velocity_.y += gravity_ * dt;
     if (velocity_.y < -2.5f) { velocity_.y = -2.5f; }
 
+    const Vector3 playerPos = player.GetPosition();
+    const float playerX = playerPos.x;
+    const float playerY = playerPos.y;
+    const float distPlayerHome = std::fabs(playerX - homePos_.x);
+    const float distEnemyHome  = std::fabs(position_.x - homePos_.x);
+
+    auto MoveToX = [&](float targetX, float speed, float stopRange) {
+        const float dx = targetX - position_.x;
+        constexpr float kDeadZone = 0.10f;
+
+        if (dx > kDeadZone) { facing_ = 1; }
+        else if (dx < -kDeadZone) { facing_ = -1; }
+
+        const bool nearTarget = (std::fabs(dx) < stopRange);
+        if (nearTarget) {
+            velocity_.x = 0.0f;
+            return false;
+        }
+
+        velocity_.x = static_cast<float>(facing_) * speed;
+        return true;
+    };
+
+    auto TryJumpAhead = [&](float lowVel, float highVel, float& cooldownTimer, float cooldownTime) {
+        if (!isOnGround_ || cooldownTimer > 0.0f) { return; }
+        JumpKind k = NeedJumpAheadKind(position_, facing_, width_, height_, map);
+        if (k == JumpKind::None) { return; }
+        velocity_.y = (k == JumpKind::High) ? highVel : lowVel;
+        isOnGround_ = false;
+        cooldownTimer = cooldownTime;
+    };
+
+    auto PatrolAroundHome = [&](float halfWidth, float speed) {
+        if (halfWidth <= 0.0f) {
+            velocity_.x = 0.0f;
+            return;
+        }
+
+        if (position_.x < homePos_.x - halfWidth) { facing_ = 1; }
+        if (position_.x > homePos_.x + halfWidth) { facing_ = -1; }
+
+        if (isOnGround_ && IsMissingGroundAhead(position_, facing_, width_, height_, map)) {
+            facing_ *= -1;
+        }
+        velocity_.x = static_cast<float>(facing_) * speed;
+    };
+
     // =====================================================
-    // 挙動: Type1 追プレイヤー；Type0 巡回
+    // 挙動: Type0 警戒巡回 / Type1 追跡強化 / Type2 飛びかかり
     // =====================================================
     if (type_ == EnemyType::Type1) {
-        const float playerX = player.GetPosition().x;
+        const bool playerInAggroRange = (distPlayerHome <= aggroRange_);
+        if (playerInAggroRange) {
+            chaseMemoryTimer_ = chaseMemoryTime_;
+        }
 
-        // 「スポーン地点 homePos_」を中心としたエリア制限: プレイヤーが警戒範囲に入ると追跡し、リーシュ範囲を超えたら離脱して帰還
-        const float distPlayerHome = std::fabs(playerX - homePos_.x);
-        const float distEnemyHome  = std::fabs(position_.x - homePos_.x);
-
-        const bool canAggro = (distPlayerHome <= aggroRange_);
-        // リーシュ判定: プレイヤーがリーシュ範囲を離れる、または敵が家から離れすぎたら追跡をやめる
+        const bool canAggro = playerInAggroRange || (chaseMemoryTimer_ > 0.0f);
         const bool inLeash  = (distPlayerHome <= leashRange_) && (distEnemyHome <= leashRange_ * 1.2f);
 
         const float homeLeft  = homePos_.x - leashRange_;
         const float homeRight = homePos_.x + leashRange_;
         const float chaseTargetX = std::clamp(playerX, homeLeft, homeRight);
 
-        auto MoveToX = [&](float targetX, float speed) {
-            const float dx = targetX - position_.x;
-            constexpr float kDeadZone = 0.10f;
-
-            if (dx > kDeadZone) { facing_ = 1; }
-            else if (dx < -kDeadZone) { facing_ = -1; }
-
-            const bool nearTarget = (std::fabs(dx) < stopRange_);
-            if (nearTarget) {
-                velocity_.x = 0.0f;
-            }
-            else {
-                velocity_.x = static_cast<float>(facing_) * speed;
-
-                // 障害物でジャンプ（2 段階）
-                if (isOnGround_ && jumpCooldown_ <= 0.0f) {
-                    JumpKind k = NeedJumpAheadKind(position_, facing_, width_, height_, map);
-                    if (k != JumpKind::None) {
-                        velocity_.y = (k == JumpKind::High) ? highJumpVelocity_ : smallJumpVelocity_;
-                        isOnGround_ = false;
-                        jumpCooldown_ = jumpCooldownTime_;
-                    }
-                }
-            }
-        };
-
-        // ---------- ステートマシン ----------
         switch (type1State_) {
         case Type1State::Patrol:
-            // プレイヤーが警戒範囲に入る -> 追跡
             if (canAggro) {
                 type1State_ = Type1State::Chase;
                 break;
             }
-
-            // デフォルト棒立ち（patrolHalfWidth_==0）、想巡回そのまま patrolHalfWidth_ 設成 >0
-            if (patrolHalfWidth_ <= 0.0f) {
-                velocity_.x = 0.0f;
-            }
-            else {
-                velocity_.x = static_cast<float>(facing_) * moveSpeed_;
-                if (position_.x < homePos_.x - patrolHalfWidth_) { facing_ = 1; }
-                if (position_.x > homePos_.x + patrolHalfWidth_) { facing_ = -1; }
-            }
+            PatrolAroundHome(patrolHalfWidth_, moveSpeed_);
             break;
 
         case Type1State::Chase:
-            // 離脱: プレイヤー／敵がリーシュ範囲を離れる
             if (!inLeash) {
                 type1State_ = Type1State::Return;
                 break;
             }
-            MoveToX(chaseTargetX, chaseSpeed_);
+            {
+                const float dx = std::fabs(chaseTargetX - position_.x);
+                const float chaseSpeedNow = (dx > 6.0f) ? chaseBoostSpeed_ : chaseSpeed_;
+                const bool moving = MoveToX(chaseTargetX, chaseSpeedNow, stopRange_);
+                if (moving) {
+                    TryJumpAhead(smallJumpVelocity_, highJumpVelocity_, jumpCooldown_, jumpCooldownTime_);
+                }
+            }
             break;
 
         case Type1State::Return:
-            // プレイヤーが再び警戒範囲に戻る -> 追跡を継続（必要なければ削除可）
             if (canAggro) {
                 type1State_ = Type1State::Chase;
                 break;
             }
-            // 戻る家付近 -> 巡回に戻る/棒立ち
             if (std::fabs(position_.x - homePos_.x) <= returnStopDist_) {
                 velocity_.x = 0.0f;
                 type1State_ = Type1State::Patrol;
                 break;
             }
-            MoveToX(homePos_.x, moveSpeed_);
+            MoveToX(homePos_.x, moveSpeed_, returnStopDist_);
+            TryJumpAhead(smallJumpVelocity_, highJumpVelocity_, jumpCooldown_, jumpCooldownTime_);
+            break;
+        }
+    }
+    else if (type_ == EnemyType::Type2) {
+        const float dx = playerX - position_.x;
+        const float adx = std::fabs(dx);
+        const float ady = std::fabs(playerY - position_.y);
+
+        const bool canAggro = (distPlayerHome <= aggroRange_);
+        const bool inLeash  = (distPlayerHome <= leashRange_) && (distEnemyHome <= leashRange_ * 1.15f);
+
+        auto MoveInDistanceBand = [&](float targetX, float minDist, float maxDist, float speed) {
+            const float localDx = targetX - position_.x;
+            const float localAbsDx = std::fabs(localDx);
+
+            if (localAbsDx > maxDist) {
+                MoveToX(targetX, speed, maxDist);
+                return true;
+            }
+            if (localAbsDx < minDist) {
+                const float retreatDir = (localDx >= 0.0f) ? -1.0f : 1.0f;
+                facing_ = (retreatDir >= 0.0f) ? 1 : -1;
+                velocity_.x = retreatDir * speed;
+                return true;
+            }
+
+            velocity_.x = 0.0f;
+            if (localDx > 0.1f) { facing_ = 1; }
+            else if (localDx < -0.1f) { facing_ = -1; }
+            return false;
+        };
+
+        switch (type2State_) {
+        case Type2State::Patrol:
+            if (canAggro) {
+                type2State_ = Type2State::Stalk;
+                break;
+            }
+            PatrolAroundHome(patrolHalfWidth_, moveSpeed_);
+            break;
+
+        case Type2State::Stalk:
+            if (!inLeash) {
+                type2State_ = Type2State::Return;
+                break;
+            }
+
+            if (dx > 0.1f) { facing_ = 1; }
+            else if (dx < -0.1f) { facing_ = -1; }
+
+            if (isOnGround_ && pounceCooldown_ <= 0.0f &&
+                adx >= pounceMinRange_ && adx <= pounceMaxRange_ && ady <= pounceVerticalRange_)
+            {
+                velocity_.x = static_cast<float>(facing_) * pounceSpeed_;
+                velocity_.y = pounceJumpVelocity_;
+                isOnGround_ = false;
+                pounceCooldown_ = pounceCooldownTime_;
+                type2State_ = Type2State::Pounce;
+                break;
+            }
+
+            if (MoveInDistanceBand(playerX, stalkPreferredMin_, stalkPreferredMax_, stalkSpeed_)) {
+                TryJumpAhead(smallJumpVelocity_, highJumpVelocity_, jumpCooldown_, jumpCooldownTime_);
+            }
+            break;
+
+        case Type2State::Pounce:
+            velocity_.x = static_cast<float>(facing_) * (isOnGround_ ? pounceSpeed_ : pounceAirControl_);
+            break;
+
+        case Type2State::Recover:
+            velocity_.x = 0.0f;
+            if (recoverTimer_ <= 0.0f) {
+                type2State_ = inLeash ? Type2State::Stalk : Type2State::Return;
+            }
+            break;
+
+        case Type2State::Return:
+            if (canAggro) {
+                type2State_ = Type2State::Stalk;
+                break;
+            }
+            if (std::fabs(position_.x - homePos_.x) <= returnStopDist_) {
+                velocity_.x = 0.0f;
+                type2State_ = Type2State::Patrol;
+                break;
+            }
+            MoveToX(homePos_.x, moveSpeed_, returnStopDist_);
+            TryJumpAhead(smallJumpVelocity_, highJumpVelocity_, jumpCooldown_, jumpCooldownTime_);
             break;
         }
     }
     else {
-        // Type0: 左右巡回
-        velocity_.x = static_cast<float>(facing_) * moveSpeed_;
+        // Type0: シンプルな巡回を維持しつつ、近くのプレイヤーにだけ反応を少し強くする
+        const float dx = playerX - position_.x;
+        const bool isAlert = (std::fabs(dx) <= type0AlertRange_) && (std::fabs(playerY - position_.y) <= 2.5f);
 
-        // 崖端で反転: 前方足元にブロックがなければ方向転換
-        if (isOnGround_) {
-            float checkX = position_.x + static_cast<float>(facing_) * (width_ * 0.5f + 0.20f);
-            float checkY = position_.y - height_ * 0.5f - 0.15f;
-            auto idx = map.GetMapChipIndexByPosition({ checkX, checkY, 0.0f });
-            if (!IsSolid(map.GetMapChipTypeByIndex(idx.xIndex, idx.yIndex))) {
-                facing_ *= -1;
-                velocity_.x = static_cast<float>(facing_) * moveSpeed_;
-            }
+        if (isAlert && std::fabs(dx) > 0.70f) {
+            facing_ = (dx >= 0.0f) ? 1 : -1;
+        }
+
+        const float speed = isAlert ? type0AlertSpeed_ : moveSpeed_;
+        velocity_.x = static_cast<float>(facing_) * speed;
+
+        // 崖端で反転
+        if (isOnGround_ && IsMissingGroundAhead(position_, facing_, width_, height_, map)) {
+            facing_ *= -1;
+            velocity_.x = static_cast<float>(facing_) * speed;
+        }
+
+        // 近距離警戒中だけ軽い段差ジャンプを許可し、従来より詰まりにくくする
+        if (isAlert) {
+            TryJumpAhead(type0JumpVelocity_, type0JumpVelocity_ + 0.08f, type0JumpCooldown_, type0JumpCooldownTime_);
         }
     }
 
@@ -371,34 +524,14 @@ void NormalEnemy::Update(float dt, const MapChipField& map, const Player& player
     // Map 衝突
     // =====================================================
     const float prevVX = velocity_.x;
+    const bool wasOnGround = isOnGround_;
     ResolveMapCollision(position_, velocity_, isOnGround_, width_, height_, map, dt);
 
     // =====================================================
-    // 衝突後処理: Type1 壁詰まり時に追加ジャンプ；Type0 壁に当たったら反転
+    // 衝突後処理
     // =====================================================
     if (type_ == EnemyType::Type1) {
-        const float playerX = player.GetPosition().x;
-        const float homeLeft  = homePos_.x - leashRange_;
-        const float homeRight = homePos_.x + leashRange_;
-
-        float targetX = 0.0f;
-        if (type1State_ == Type1State::Return) {
-            targetX = homePos_.x;
-        }
-        else if (type1State_ == Type1State::Patrol) {
-            // 棒立ち時は現在位置をそのまま目標にし、巡回時は境界方向を目標にする
-            targetX = (patrolHalfWidth_ <= 0.0f)
-                ? position_.x
-                : (homePos_.x + static_cast<float>(facing_) * patrolHalfWidth_);
-        }
-        else {
-            targetX = std::clamp(playerX, homeLeft, homeRight);
-        }
-
-        const bool nearTarget = (std::fabs(targetX - position_.x) < stopRange_);
-
-        if (!nearTarget &&
-            isOnGround_ && jumpCooldown_ <= 0.0f &&
+        if (isOnGround_ && jumpCooldown_ <= 0.0f &&
             std::fabs(prevVX) > 0.0001f && std::fabs(velocity_.x) < 0.0001f)
         {
             JumpKind k = NeedJumpAheadKind(position_, facing_, width_, height_, map);
@@ -407,10 +540,30 @@ void NormalEnemy::Update(float dt, const MapChipField& map, const Player& player
                 isOnGround_ = false;
                 jumpCooldown_ = jumpCooldownTime_;
             }
+            else {
+                facing_ *= -1;
+            }
+        }
+    }
+    else if (type_ == EnemyType::Type2) {
+        if (type2State_ == Type2State::Pounce) {
+            // 着地したら短い硬直を入れて「飛びかかった感」を出す
+            if (!wasOnGround && isOnGround_) {
+                type2State_ = Type2State::Recover;
+                recoverTimer_ = recoverDuration_;
+                velocity_.x = 0.0f;
+            }
+            else if (std::fabs(prevVX) > 0.0001f && std::fabs(velocity_.x) < 0.0001f && !isOnGround_) {
+                // 空中で壁に刺さったら、そのまま惰性で引っかかるのを避ける
+                facing_ *= -1;
+            }
+        }
+        else if (std::fabs(prevVX) > 0.0001f && std::fabs(velocity_.x) < 0.0001f && isOnGround_) {
+            TryJumpAhead(highJumpVelocity_, highJumpVelocity_, jumpCooldown_, jumpCooldownTime_);
         }
     }
     else {
-        // ✅Type0: 壁に当たったら反転（以前の実装で抜けていた）
+        // Type0: 壁に当たったら反転
         if (std::fabs(prevVX) > 0.0001f && std::fabs(velocity_.x) < 0.0001f) {
             facing_ *= -1;
         }
@@ -418,7 +571,6 @@ void NormalEnemy::Update(float dt, const MapChipField& map, const Player& player
 
     // =====================================================
     // トゲ: 踏むと死亡
-    // Type1 だけをトゲで死亡させたい場合は、外側に if(type_==EnemyType::Type1) を追加する
     // =====================================================
     if (!isDying_ && HitSpikeUnderFoot(position_, width_, height_, map)) {
         OnStomp();
@@ -437,7 +589,7 @@ void NormalEnemy::Update(float dt, const MapChipField& map, const Player& player
     }
 
     // =====================================================
-    // ✅描画更新: Type0 / Type1 の両方で必ず実行する（以前は Type1 にしか適用されていなかった）
+    // 描画更新
     // =====================================================
     if (obj_) {
         const float rotY = (facing_ >= 0) ? kPi : 0.0f;
@@ -447,14 +599,12 @@ void NormalEnemy::Update(float dt, const MapChipField& map, const Player& player
     }
 }
 
-
-
 void NormalEnemy::Draw()
 {
     if (isDead_) { return; }
     if (!obj_) { return; }
 
-    // 死亡アニメ期間不点滅隐藏（否なら看起来像「消失」）
+    // 死亡アニメ期間は点滅で隠さない（見た目が消えたように見えるため）
     if (!isDying_ && isHitReacting_ && !damageBlinkVisible_) {
         return;
     }
@@ -481,6 +631,6 @@ void NormalEnemy::OnStomp()
     width_ = 0.0f;
     height_ = 0.0f;
 
-    // 必要なら、被弾フィードバックとして少し点滅を残してもよい（コメントアウト可）
+    // 少しだけ被弾フィードバックを残す
     StartHitReaction(0.10f);
 }

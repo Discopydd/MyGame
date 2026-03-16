@@ -13,9 +13,10 @@ class Player;
 
 // Enemy の種類（既存ロジック保持）
 enum class EnemyType : uint8_t {
-    Type0 = 0,   // 普通敵（見た目0）
-    Type1 = 1,   // 普通敵（見た目1）
-    Boss  = 2,   // Boss
+    Type0 = 0,   // 普通敵（enemy0）
+    Type1 = 1,   // 普通敵（enemy2）
+    Type2 = 2,   // 普通敵（enemy3）
+    Boss  = 3,   // Boss
 };
 
 // ============================================================

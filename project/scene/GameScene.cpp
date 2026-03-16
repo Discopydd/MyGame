@@ -183,6 +183,9 @@ void GameScene::GenerateBlocks() {
                 else if (subID == 2) {
                     eType = EnemyType::Boss;
                 }
+                else if (subID == 3) {
+                    eType = EnemyType::Type2;
+                }
 
                 std::unique_ptr<Enemy> enemy;
                 if (eType == EnemyType::Boss) {
@@ -438,6 +441,7 @@ void GameScene::Initialize() {
     ModelManager::GetInstants()->LoadModel("enemy0/enemy0.obj");
     ModelManager::GetInstants()->LoadModel("enemy1/enemy1.obj");
     ModelManager::GetInstants()->LoadModel("enemy2/enemy2.obj");
+    ModelManager::GetInstants()->LoadModel("enemy3/enemy3.obj");
     ModelManager::GetInstants()->LoadModel("enemyBullet/enemyBullet.obj");
     // === プレイヤー ===
     player_ = std::make_unique<Player>();
