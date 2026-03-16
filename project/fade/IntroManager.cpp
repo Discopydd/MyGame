@@ -33,7 +33,7 @@ void IntroManager::Initialize(SpriteCommon* spriteCommon, Input* input)
     // タイトル
     introTitle_ = std::make_unique<Sprite>();
     introTitle_->Initialize(spriteCommon_, "Resources/PortalReady_LeapIn.png");
-    introTitle_->SetPosition({ 50.0f, H * 0.15f });
+    introTitle_->SetPosition({ 150.0f, H * 0.20f });
     introTitle_->SetColor({ 1,1,1,0 });
 
     // スキップ表示
