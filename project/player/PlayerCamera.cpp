@@ -33,6 +33,19 @@ void PlayerCamera::Update() {
     camera_->Update();
 }
 
+void PlayerCamera::SnapToTarget()
+{
+    if (!camera_ || !player_ || !map_) return;
+
+    Vector3 targetPos = CalculateTargetPosition();
+    if (constrainToMap_) {
+        targetPos = ConstrainPosition(targetPos);
+    }
+
+    camera_->SetTranslate(targetPos);
+    camera_->Update();
+}
+
 Vector3 PlayerCamera::CalculateTargetPosition() const {
     Vector3 playerPos = player_->GetPosition();
     return {

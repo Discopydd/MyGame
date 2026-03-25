@@ -51,9 +51,13 @@ void SceneManager::Update() {
         }
     }
 
-    // 現在のシーンをより新
+    // 初期化未完了のシーンは通常 Update ではなく、分割初期化を進める
     if (scene_) {
-        scene_->Update();
+        if (!scene_->IsInitializationComplete()) {
+            scene_->UpdateInitialization();
+        } else {
+            scene_->Update();
+        }
     }
     if (overlayScene_) {
         overlayScene_->Update();
@@ -64,7 +68,7 @@ void SceneManager::Draw() {
     // 現在のシーンの描画を呼ぶ
     if (overlayScene_) {
         overlayScene_->Draw();
-    } else if (scene_) {
+    } else if (scene_ && scene_->IsInitializationComplete()) {
         // オーバーレイシーンがない時だけ現在のシーンを描画
         scene_->Draw();
     }

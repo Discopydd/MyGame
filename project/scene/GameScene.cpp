@@ -85,214 +85,36 @@ Vector3 ScreenToWorld(float screenX, float screenY, float ndcZ, Camera* camera)
     return world;
 }
 
-void GameScene::GenerateBlocks() {
-    // 先に古いブロック / 水ブロック / 足場 / 敵をクリア
-    mapBlocks_.clear();
-    waterBlocks_.clear();
-    movingPlatforms_.clear();
-    enemies_.clear();
 
-    for (uint32_t y = 0; y < mapChipField_.numBlockVertical_; y++) {
-        for (uint32_t x = 0; x < mapChipField_.numBlockHorizontal_; x++) {
-            MapChipType type     = mapChipField_.GetMapChipTypeByIndex(x, y);
-            Vector3     position = mapChipField_.GetMapChipPositionByIndex(x, y);
-
-            // 通常ブロック
-            if (type == MapChipType::kBlock) {
-                auto block = std::make_unique<Object3d>();
-                block->Initialize(object3dCommon_.get());
-                block->SetModel("cube/cube.obj");
-                block->SetCamera(camera_.get());
-                block->SetTranslate(position);
-                mapBlocks_.push_back(std::move(block));
-            }
-            // 第2種ブロック
-            else if (type == MapChipType::kBlock2) {
-                auto block2 = std::make_unique<Object3d>();
-                block2->Initialize(object3dCommon_.get());
-                block2->SetModel("cube2/cube2.obj");
-                block2->SetCamera(camera_.get());
-                block2->SetTranslate(position);
-                mapBlocks_.push_back(std::move(block2));
-            }
-            // 転送門（可視ブロック）
-            else if (type == MapChipType::kPortal) {
-                auto portal = std::make_unique<Object3d>();
-                portal->Initialize(object3dCommon_.get());
-                portal->SetModel("door/Door.obj");
-                portal->SetCamera(camera_.get());
-                portal->SetTranslate(position);
-                mapBlocks_.push_back(std::move(portal));
-            }
-            // アイテムマス
-            else if (type == MapChipType::kItem) {
-                if (!itemMgr_) { continue; }
-
-                // このマップでそのマスのアイテムがすでに取得済みなら、以後は再生成しない
-                if (!itemMgr_->CanSpawnItem(currentMapPath_, x, y)) {
-                    continue;
-                }
-
-                auto item = std::make_unique<Object3d>();
-                item->Initialize(object3dCommon_.get());
-                item->SetModel("coin/coin.obj");
-                item->SetCamera(camera_.get());
-
-                Vector3 itemPos = position;
-                itemPos.y += 0.4f;
-                item->SetTranslate(itemPos);
-                item->SetEnableLighting(true);
-                item->SetDirectionalLightIntensity(2.0f);
-                item->SetPointLightIntensity(2.0f);
-
-                itemMgr_->RegisterItem(currentMapPath_, x, y, std::move(item));
-            }
-            // トゲ
-            else if (type == MapChipType::kSpike) {
-                auto spike = std::make_unique<Object3d>();
-                spike->Initialize(object3dCommon_.get());
-                spike->SetModel("strip/strip.obj");
-                spike->SetCamera(camera_.get());
-
-                Vector3 spikePos = position;
-                spikePos.y -= 0.1f;
-                spike->SetTranslate(spikePos);
-                spike->SetLightingMode(2);
-                mapBlocks_.push_back(std::move(spike));
-            }
-            // 水ブロック
-            else if (type == MapChipType::kWater) {
-                auto water = std::make_unique<Object3d>();
-                water->Initialize(object3dCommon_.get());
-                water->SetModel("water/water.obj");
-                water->SetCamera(camera_.get());
-                water->SetTranslate(position);
-                Vector4 color = water->GetColor();
-                color.w = 0.5f;
-                water->SetColor(color);
-                waterBlocks_.push_back(std::move(water));
-            }
-            // 敵
-            else if (type == MapChipType::kEnemy) {
-                uint8_t subID = mapChipField_.GetMapChipSubIDByIndex(x, y);
-
-                EnemyType eType = EnemyType::Type0;
-                if (subID == 1) {
-                    eType = EnemyType::Type1;
-                }
-                else if (subID == 2) {
-                    eType = EnemyType::Boss;
-                }
-                else if (subID == 3) {
-                    eType = EnemyType::Type2;
-                }
-
-                std::unique_ptr<Enemy> enemy;
-                if (eType == EnemyType::Boss) {
-                    enemy = std::make_unique<BossEnemy>();
-                }
-                else {
-                    enemy = std::make_unique<NormalEnemy>();
-                }
-                enemy->Initialize(object3dCommon_.get(), camera_.get(), position, eType);
-                enemies_.push_back(std::move(enemy));
-            }
-        }
-    }
-
-    // === 左右移動床を生成（連続した kMoveHorizontal を1本の MovingPlatform として扱う）===
-    for (uint32_t y = 0; y < mapChipField_.numBlockVertical_; ++y) {
-        uint32_t x = 0;
-        while (x < mapChipField_.numBlockHorizontal_) {
-            MapChipType t = mapChipField_.GetMapChipTypeByIndex(x, y);
-            if (t != MapChipType::kMoveHorizontal) {
-                ++x;
-                continue;
-            }
-
-            uint32_t startX = x;
-            uint32_t endX   = x;
-            while (endX + 1 < mapChipField_.numBlockHorizontal_ &&
-                   mapChipField_.GetMapChipTypeByIndex(endX + 1, y) == MapChipType::kMoveHorizontal) {
-                ++endX;
-            }
-
-            int length = static_cast<int>(endX - startX + 1);
-
-            Vector3 leftPos  = mapChipField_.GetMapChipPositionByIndex(startX, y);
-            Vector3 rightPos = mapChipField_.GetMapChipPositionByIndex(endX, y);
-            Vector3 center{};
-            center.x = (leftPos.x + rightPos.x) * 0.5f;
-            center.y = leftPos.y;
-            center.z = leftPos.z;
-
-            auto platform = std::make_unique<MovingPlatform>();
-            platform->Initialize(
-                object3dCommon_.get(),
-                camera_.get(),
-                center,
-                MovingPlatform::Axis::Horizontal,
-                movingPlatformSpeed_,
-                length
-            );
-            movingPlatforms_.push_back(std::move(platform));
-
-            x = endX + 1;
-        }
-    }
-
-    // === 上下移動床を生成（連続した kMoveVertical を1本の MovingPlatform として扱う）===
-    for (uint32_t y = 0; y < mapChipField_.numBlockVertical_; ++y) {
-        uint32_t x = 0;
-        while (x < mapChipField_.numBlockHorizontal_) {
-            MapChipType t = mapChipField_.GetMapChipTypeByIndex(x, y);
-            if (t != MapChipType::kMoveVertical) {
-                ++x;
-                continue;
-            }
-
-            uint32_t startX = x;
-            uint32_t endX   = x;
-            while (endX + 1 < mapChipField_.numBlockHorizontal_ &&
-                   mapChipField_.GetMapChipTypeByIndex(endX + 1, y) == MapChipType::kMoveVertical) {
-                ++endX;
-            }
-
-            int length = static_cast<int>(endX - startX + 1);
-
-            Vector3 leftPos  = mapChipField_.GetMapChipPositionByIndex(startX, y);
-            Vector3 rightPos = mapChipField_.GetMapChipPositionByIndex(endX, y);
-            Vector3 center{};
-            center.x = (leftPos.x + rightPos.x) * 0.5f;
-            center.y = leftPos.y;
-            center.z = leftPos.z;
-
-            auto platform = std::make_unique<MovingPlatform>();
-            platform->Initialize(
-                object3dCommon_.get(),
-                camera_.get(),
-                center,
-                MovingPlatform::Axis::Vertical,
-                movingPlatformSpeed_,
-                length
-            );
-            movingPlatforms_.push_back(std::move(platform));
-
-            x = endX + 1;
-        }
-    }
+namespace {
+    const char* kDeferredInitModelPaths[] = {
+        "cube/cube.obj",
+        "player/player.obj",
+        "door/Door.obj",
+        "strip/strip.obj",
+        "coin/coin.obj",
+        "coin_ui/coin_ui.obj",
+        "snow/snow.obj",
+        "jump/jump.obj",
+        "star/star.obj",
+        "hurd/hurd.obj",
+        "cube2/cube2.obj",
+        "water/water.obj",
+        "enemy0/enemy0.obj",
+        "enemy1/enemy1.obj",
+        "enemy2/enemy2.obj",
+        "enemy3/enemy3.obj",
+        "enemyBullet/enemyBullet.obj",
+    };
 }
 
-void GameScene::Initialize() {
-    winApp_      = WinApp::GetInstance();
-    dxCommon_    = DirectXCommon::GetInstance();
-    input_       = Input::GetInstance();
-    srvManager_  = SrvManager::GetInstance();
-    spriteCommon_= SpriteCommon::GetInstance();
+bool GameScene::IsInitializationComplete() const
+{
+    return initComplete_;
+}
 
-    // テクスチャマネージャ（シングルトン）の初期化
-    TextureManager::GetInstance()->Initialize(dxCommon_, srvManager_);
-
+void GameScene::InitializeUiSprites_()
+{
     // === 背景 Sprite ===
     const std::string kSkyTexPath = "Resources/sky_bg.png";
 
@@ -303,13 +125,9 @@ void GameScene::Initialize() {
         static_cast<float>(WinApp::kClientWidth),
         static_cast<float>(WinApp::kClientHeight)
     });
+    backgroundSprite_->Update();
 
     // ================== Pause Menu（ESC） ==================
-    // ※ 下記4枚の画像を Resources/ 配下に配置してください
-    //  - Resources/button_continue_game_q_2x.png
-    //  - Resources/button_back_to_title_q_2x.png
-    //  - Resources/selected_continue_game_2x.png
-    //  - Resources/selected_back_to_title_2x.png
     {
         const std::string kContinueNormalTex  = "Resources/button_continue_game_q_2x.png";
         const std::string kBackNormalTex      = "Resources/button_back_to_title_q_2x.png";
@@ -348,10 +166,8 @@ void GameScene::Initialize() {
         pauseCursor_ = 0;
     }
 
-
-    // —— Pause 用の暗幕（独立した Sprite。FadeManager は再利用しない）——
     {
-        const std::string kPauseDimTex = "Resources/black.png"; // 1x1 の黒画像でも可
+        const std::string kPauseDimTex = "Resources/black.png";
         pauseDimSprite_ = std::make_unique<Sprite>();
         pauseDimSprite_->Initialize(spriteCommon_, kPauseDimTex);
         pauseDimSprite_->SetPosition({ 0.0f, 0.0f });
@@ -359,15 +175,11 @@ void GameScene::Initialize() {
             static_cast<float>(WinApp::kClientWidth),
             static_cast<float>(WinApp::kClientHeight)
         });
-        pauseDimSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 0.6f }); // 0.5〜0.7 推奨
-        pauseDimSprite_->SetVisible(true); // 一時停止中のみ Draw() を呼ぶ
+        pauseDimSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 0.6f });
+        pauseDimSprite_->SetVisible(true);
         pauseDimSprite_->Update();
     }
 
-    // ================== Boss HP（2D） ==================
-    // 指定の2枚のテクスチャを Resources ディレクトリに置く必要がある: 
-    //  - Resources/Damagebar.png（赤の遅延バー）
-    //  - Resources/HPbar.png（緑の即時バー）
     const std::string kBossDamageBarTex = "Resources/Damagebar.png";
     const std::string kBossHpBarTex     = "Resources/HPbar.png";
 
@@ -377,7 +189,6 @@ void GameScene::Initialize() {
     bossHpSprite_ = std::make_unique<Sprite>();
     bossHpSprite_->Initialize(spriteCommon_, kBossHpBarTex);
 
-    // バーの位置 / サイズ（好みに応じて調整可）
     bossHpBarSize_ = { 420.0f, 24.0f };
     bossHpBarPos_  = { (WinApp::kClientWidth - bossHpBarSize_.x) * 0.5f, 24.0f };
 
@@ -393,25 +204,22 @@ void GameScene::Initialize() {
     bossDamageRatio_ = 1.0f;
     bossHpVisible_ = false;
 
-    // ================== Boss 名称（2D Sprite） ==================
-    // Boss 名称テクスチャを Resources/BossName.png に置く（必要なら自分のパスへ変更）
     const std::string kBossNameTex = "Resources/Boss_name.png";
     bossNameSprite_ = std::make_unique<Sprite>();
     bossNameSprite_->Initialize(spriteCommon_, kBossNameTex);
-    // 画面上端中央に表示（必要に応じて位置を微調整）
     const Vector2 bossNameSize = { 420.0f, 64.0f };
     const Vector2 bossNamePos  = { (WinApp::kClientWidth - bossNameSize.x) * 0.5f, 16.0f };
     bossNameSprite_->SetPosition(bossNamePos);
     bossNameSprite_->SetSize(bossNameSize);
     bossNameSprite_->SetVisible(false);
     bossNameVisible_ = false;
+}
 
-
-    // === ImGui マネージャ ===
+void GameScene::InitializeCoreSystems_()
+{
     imguiManager_ = std::make_unique<ImGuiManager>();
     imguiManager_->Initialize(winApp_, dxCommon_, srvManager_);
 
-    // === 3D 共通 & カメラ ===
     object3dCommon_ = std::make_unique<Object3dCommon>();
     object3dCommon_->Initialize(dxCommon_);
 
@@ -424,34 +232,16 @@ void GameScene::Initialize() {
     camera_ = std::make_unique<Camera>();
     camera_->SetRotate({ 0, 0, 0 });
     object3dCommon_->SetDefaultCamera(camera_.get());
+}
 
-    // 必要なモデルをあらかじめロード
-    ModelManager::GetInstants()->LoadModel("cube/cube.obj");
-    ModelManager::GetInstants()->LoadModel("player/player.obj");
-    ModelManager::GetInstants()->LoadModel("door/Door.obj");
-    ModelManager::GetInstants()->LoadModel("strip/strip.obj");
-    ModelManager::GetInstants()->LoadModel("coin/coin.obj");
-    ModelManager::GetInstants()->LoadModel("coin_ui/coin_ui.obj");
-    ModelManager::GetInstants()->LoadModel("snow/snow.obj");
-    ModelManager::GetInstants()->LoadModel("jump/jump.obj");
-    ModelManager::GetInstants()->LoadModel("star/star.obj");
-    ModelManager::GetInstants()->LoadModel("hurd/hurd.obj");
-    ModelManager::GetInstants()->LoadModel("cube2/cube2.obj");
-    ModelManager::GetInstants()->LoadModel("water/water.obj");
-    ModelManager::GetInstants()->LoadModel("enemy0/enemy0.obj");
-    ModelManager::GetInstants()->LoadModel("enemy1/enemy1.obj");
-    ModelManager::GetInstants()->LoadModel("enemy2/enemy2.obj");
-    ModelManager::GetInstants()->LoadModel("enemy3/enemy3.obj");
-    ModelManager::GetInstants()->LoadModel("enemyBullet/enemyBullet.obj");
-    // === プレイヤー ===
+void GameScene::InitializeGameplayManagers_()
+{
     player_ = std::make_unique<Player>();
     player_->Initialize(object3dCommon_.get(), camera_.get());
 
-    // === HP 3D 条マネージャ ===
     hpBar_ = std::make_unique<HPBar3DManager>();
     hpBar_->Initialize(object3dCommon_.get(), camera_.get(), player_.get(), hpNdcZ_);
 
-    // === 追従カメラ ===
     playerCamera_ = std::make_unique<PlayerCamera>();
     playerCamera_->Initialize(camera_.get(), player_.get(), &mapChipField_);
     playerCamera_->SetOffset({ 0, 0.0f, -40.0f });
@@ -460,53 +250,42 @@ void GameScene::Initialize() {
 
     prevCameraPos_ = camera_->GetTransform().translate;
 
-    // === ダッシュスキル UI マネージャ ===
     dashUI_ = std::make_unique<DashUIManager>();
     dashUI_->Initialize(spriteCommon_, player_.get());
 
-    // === Coin UI マネージャ ===
     coinUI_ = std::make_unique<CoinUIManager>();
     coinUI_->Initialize(spriteCommon_, object3dCommon_.get(), camera_.get(), hpNdcZ_);
     coinUI_->SetTotalCoin(totalCoinCollected_);
 
-    // === Hint UI マネージャ ===
     hintUI_ = std::make_unique<HintUIManager>();
     hintUI_->Initialize(spriteCommon_, camera_.get());
-
-    // GameScene 内の HintSprite ポインタをマネージャへ渡す（注意: ここでは借用ポインタ）
     hintUI_->SetSpaceHint(&spaceHint_);
     hintUI_->SetShiftHint(&shiftHint_);
     hintUI_->SetSprintHint(&sprintHint_);
     hintUI_->SetUpHints(&upHints_);
 
-    // === Item マネージャ ===
     itemMgr_ = std::make_unique<ItemManager>();
     itemMgr_->Initialize(object3dCommon_.get(), camera_.get());
 
-    // === Portal マネージャ ===
     portalMgr_ = std::make_unique<PortalManager>();
     portalMgr_->Initialize(spriteCommon_, camera_.get());
 
     isMapLoading_ = false;
     loadingTimer_ = 0.0f;
 
-    // === Fade マネージャ ===
     fade_ = std::make_unique<FadeManager>();
     fade_->Initialize(spriteCommon_);
+    fade_->SetAlpha(1.0f);
 
-    // === Intro マネージャ ===
     intro_ = std::make_unique<IntroManager>();
     intro_->Initialize(spriteCommon_, input_);
 
-    // === GameOver マネージャ ===
     gameOver_ = std::make_unique<GameOverManager>();
     gameOver_->Initialize(spriteCommon_);
 
-    // === GameClear マネージャ ===
     gameClear_ = std::make_unique<GameClearManager>();
     gameClear_->Initialize(spriteCommon_, object3dCommon_.get(), camera_.get(), hpNdcZ_);
 
-    // === パーティクル系 ===
     particleMgr_ = std::make_unique<ParticleManager>();
     particleMgr_->Initialize(object3dCommon_.get(), spriteCommon_);
 
@@ -535,20 +314,435 @@ void GameScene::Initialize() {
         dashStarEmitter_->SetFollowCamera(false);
     }
 
-    // === Hub（map2）のステージ配置 ===
     hubStageByMap_.clear();
-    hubStageByMap_["Resources/map/map3.csv"] = 0; // Stage 0
-    hubStageByMap_["Resources/map/map4.csv"] = 1; // Stage 1
-    hubStageByMap_["Resources/map/map5.csv"] = 2; // Stage 2
-    hubStageByMap_["Resources/map/map6.csv"] = 3; // Stage 3（最終関）
+    hubStageByMap_["Resources/map/map3.csv"] = 0;
+    hubStageByMap_["Resources/map/map4.csv"] = 1;
+    hubStageByMap_["Resources/map/map5.csv"] = 2;
+    hubStageByMap_["Resources/map/map6.csv"] = 3;
     hubProgress_      = 0;
     allStagesCleared_ = false;
-
 
     bossDefeated_ = false;
     playerIndexHistoryCursor_      = 0;
     playerIndexHistoryInitialized_ = false;
     playerIndexOneSecAgo_          = MapChipField::IndexSet{};
+}
+
+void GameScene::UpdateInitialization()
+{
+    switch (deferredInitPhase_) {
+    case DeferredInitPhase::UiSprites:
+        InitializeUiSprites_();
+        deferredInitPhase_ = DeferredInitPhase::CoreSystems;
+        break;
+
+    case DeferredInitPhase::CoreSystems:
+        InitializeCoreSystems_();
+        deferredInitPhase_ = DeferredInitPhase::ModelWarmup;
+        break;
+
+    case DeferredInitPhase::ModelWarmup:
+    {
+        size_t loadedThisFrame = 0;
+        const size_t kModelCount = sizeof(kDeferredInitModelPaths) / sizeof(kDeferredInitModelPaths[0]);
+        while (deferredModelLoadCursor_ < kModelCount && loadedThisFrame < kInitModelLoadsPerFrame) {
+            ModelManager::GetInstants()->LoadModel(kDeferredInitModelPaths[deferredModelLoadCursor_]);
+            ++deferredModelLoadCursor_;
+            ++loadedThisFrame;
+        }
+        if (deferredModelLoadCursor_ >= kModelCount) {
+            deferredInitPhase_ = DeferredInitPhase::GameplayManagers;
+        }
+        break;
+    }
+
+    case DeferredInitPhase::GameplayManagers:
+        InitializeGameplayManagers_();
+        deferredInitPhase_ = DeferredInitPhase::InitialMapPrepare;
+        break;
+
+    case DeferredInitPhase::InitialMapPrepare:
+        shouldStartLoading_ = false;
+        LoadMap("Resources/map/map.csv", { 3, 3, 0 });
+        isIncrementalMapLoading_ = true;
+        deferredInitPhase_ = DeferredInitPhase::InitialMapBuild;
+        break;
+
+    case DeferredInitPhase::InitialMapBuild:
+        ProcessPendingMapSpawns(kMapSpawnBudgetPerFrame);
+        if (IsMapBuildComplete()) {
+            FinishMapLoading(Vector3{ 3, 3, 0 });
+            if (player_) {
+                player_->ResetForMapTransition(true);
+            }
+            initComplete_ = true;
+            deferredInitPhase_ = DeferredInitPhase::Complete;
+        }
+        break;
+
+    case DeferredInitPhase::Complete:
+    case DeferredInitPhase::None:
+    default:
+        break;
+    }
+}
+
+void GameScene::SyncLoadedSceneForReveal()
+{
+    if (player_) {
+        player_->SetVelocity({ 0.0f, 0.0f, 0.0f });
+    }
+
+    if (playerCamera_) {
+        playerCamera_->SnapToTarget();
+    } else if (camera_) {
+        camera_->Update();
+    }
+
+    for (auto& block : mapBlocks_) {
+        if (block) {
+            block->Update();
+        }
+    }
+    for (auto& water : waterBlocks_) {
+        if (water) {
+            water->Update();
+        }
+    }
+
+    if (itemMgr_) {
+        itemMgr_->Update(0.0f);
+    }
+    if (hpBar_) {
+        hpBar_->Update(0.0f);
+    }
+    if (hintUI_) {
+        hintUI_->Update(0.0f);
+    }
+    if (dashUI_) {
+        dashUI_->Update(0.0f);
+    }
+    if (coinUI_) {
+        coinUI_->Update(0.0f);
+    }
+}
+
+void GameScene::GenerateBlocks() {
+    BuildPendingMapSpawns();
+    while (!pendingMapSpawns_.empty()) {
+        ProcessPendingMapSpawns(pendingMapSpawns_.size());
+    }
+}
+
+void GameScene::BuildPendingMapSpawns()
+{
+    pendingMapSpawns_.clear();
+
+    for (uint32_t y = 0; y < mapChipField_.numBlockVertical_; ++y) {
+        for (uint32_t x = 0; x < mapChipField_.numBlockHorizontal_; ++x) {
+            MapChipType type = mapChipField_.GetMapChipTypeByIndex(x, y);
+            Vector3 position = mapChipField_.GetMapChipPositionByIndex(x, y);
+
+            PendingSpawn spawn{};
+            spawn.position = position;
+            spawn.x = x;
+            spawn.y = y;
+            spawn.subID = mapChipField_.GetMapChipSubIDByIndex(x, y);
+
+            switch (type) {
+            case MapChipType::kBlock:
+                spawn.kind = PendingSpawnKind::Block;
+                pendingMapSpawns_.push_back(spawn);
+                break;
+            case MapChipType::kBlock2:
+                spawn.kind = PendingSpawnKind::Block2;
+                pendingMapSpawns_.push_back(spawn);
+                break;
+            case MapChipType::kPortal:
+                spawn.kind = PendingSpawnKind::Portal;
+                pendingMapSpawns_.push_back(spawn);
+                break;
+            case MapChipType::kItem:
+                if (itemMgr_ && itemMgr_->CanSpawnItem(currentMapPath_, x, y)) {
+                    spawn.kind = PendingSpawnKind::Item;
+                    pendingMapSpawns_.push_back(spawn);
+                }
+                break;
+            case MapChipType::kSpike:
+                spawn.kind = PendingSpawnKind::Spike;
+                pendingMapSpawns_.push_back(spawn);
+                break;
+            case MapChipType::kWater:
+                spawn.kind = PendingSpawnKind::Water;
+                pendingMapSpawns_.push_back(spawn);
+                break;
+            case MapChipType::kEnemy:
+                spawn.kind = PendingSpawnKind::Enemy;
+                pendingMapSpawns_.push_back(spawn);
+                break;
+            default:
+                break;
+            }
+        }
+    }
+
+    for (uint32_t y = 0; y < mapChipField_.numBlockVertical_; ++y) {
+        uint32_t x = 0;
+        while (x < mapChipField_.numBlockHorizontal_) {
+            if (mapChipField_.GetMapChipTypeByIndex(x, y) != MapChipType::kMoveHorizontal) {
+                ++x;
+                continue;
+            }
+
+            uint32_t startX = x;
+            uint32_t endX = x;
+            while (endX + 1 < mapChipField_.numBlockHorizontal_ &&
+                mapChipField_.GetMapChipTypeByIndex(endX + 1, y) == MapChipType::kMoveHorizontal) {
+                ++endX;
+            }
+
+            PendingSpawn spawn{};
+            spawn.kind = PendingSpawnKind::MoveHorizontal;
+            spawn.x = startX;
+            spawn.y = y;
+            spawn.length = endX - startX + 1;
+            Vector3 leftPos = mapChipField_.GetMapChipPositionByIndex(startX, y);
+            Vector3 rightPos = mapChipField_.GetMapChipPositionByIndex(endX, y);
+            spawn.position = {
+                (leftPos.x + rightPos.x) * 0.5f,
+                leftPos.y,
+                leftPos.z
+            };
+            pendingMapSpawns_.push_back(spawn);
+            x = endX + 1;
+        }
+    }
+
+    for (uint32_t y = 0; y < mapChipField_.numBlockVertical_; ++y) {
+        uint32_t x = 0;
+        while (x < mapChipField_.numBlockHorizontal_) {
+            if (mapChipField_.GetMapChipTypeByIndex(x, y) != MapChipType::kMoveVertical) {
+                ++x;
+                continue;
+            }
+
+            uint32_t startX = x;
+            uint32_t endX = x;
+            while (endX + 1 < mapChipField_.numBlockHorizontal_ &&
+                mapChipField_.GetMapChipTypeByIndex(endX + 1, y) == MapChipType::kMoveVertical) {
+                ++endX;
+            }
+
+            PendingSpawn spawn{};
+            spawn.kind = PendingSpawnKind::MoveVertical;
+            spawn.x = startX;
+            spawn.y = y;
+            spawn.length = endX - startX + 1;
+            Vector3 leftPos = mapChipField_.GetMapChipPositionByIndex(startX, y);
+            Vector3 rightPos = mapChipField_.GetMapChipPositionByIndex(endX, y);
+            spawn.position = {
+                (leftPos.x + rightPos.x) * 0.5f,
+                leftPos.y,
+                leftPos.z
+            };
+            pendingMapSpawns_.push_back(spawn);
+            x = endX + 1;
+        }
+    }
+}
+
+void GameScene::ProcessPendingMapSpawns(size_t spawnBudget)
+{
+    while (spawnBudget > 0 && !pendingMapSpawns_.empty()) {
+        PendingSpawn spawn = pendingMapSpawns_.front();
+        pendingMapSpawns_.pop_front();
+        --spawnBudget;
+
+        switch (spawn.kind) {
+        case PendingSpawnKind::Block:
+        {
+            auto block = std::make_unique<Object3d>();
+            block->Initialize(object3dCommon_.get());
+            block->SetModel("cube/cube.obj");
+            block->SetCamera(camera_.get());
+            block->SetTranslate(spawn.position);
+            block->Update();
+            mapBlocks_.push_back(std::move(block));
+            break;
+        }
+        case PendingSpawnKind::Block2:
+        {
+            auto block2 = std::make_unique<Object3d>();
+            block2->Initialize(object3dCommon_.get());
+            block2->SetModel("cube2/cube2.obj");
+            block2->SetCamera(camera_.get());
+            block2->SetTranslate(spawn.position);
+            block2->Update();
+            mapBlocks_.push_back(std::move(block2));
+            break;
+        }
+        case PendingSpawnKind::Portal:
+        {
+            auto portal = std::make_unique<Object3d>();
+            portal->Initialize(object3dCommon_.get());
+            portal->SetModel("door/Door.obj");
+            portal->SetCamera(camera_.get());
+            portal->SetTranslate(spawn.position);
+            portal->Update();
+            mapBlocks_.push_back(std::move(portal));
+            break;
+        }
+        case PendingSpawnKind::Item:
+        {
+            if (!itemMgr_) { break; }
+            auto item = std::make_unique<Object3d>();
+            item->Initialize(object3dCommon_.get());
+            item->SetModel("coin/coin.obj");
+            item->SetCamera(camera_.get());
+            Vector3 itemPos = spawn.position;
+            itemPos.y += 0.4f;
+            item->SetTranslate(itemPos);
+            item->SetEnableLighting(true);
+            item->SetDirectionalLightIntensity(2.0f);
+            item->SetPointLightIntensity(2.0f);
+            item->Update();
+            itemMgr_->RegisterItem(currentMapPath_, spawn.x, spawn.y, std::move(item));
+            break;
+        }
+        case PendingSpawnKind::Spike:
+        {
+            auto spike = std::make_unique<Object3d>();
+            spike->Initialize(object3dCommon_.get());
+            spike->SetModel("strip/strip.obj");
+            spike->SetCamera(camera_.get());
+            Vector3 spikePos = spawn.position;
+            spikePos.y -= 0.1f;
+            spike->SetTranslate(spikePos);
+            spike->SetLightingMode(2);
+            spike->Update();
+            mapBlocks_.push_back(std::move(spike));
+            break;
+        }
+        case PendingSpawnKind::Water:
+        {
+            auto water = std::make_unique<Object3d>();
+            water->Initialize(object3dCommon_.get());
+            water->SetModel("water/water.obj");
+            water->SetCamera(camera_.get());
+            water->SetTranslate(spawn.position);
+            Vector4 color = water->GetColor();
+            color.w = 0.5f;
+            water->SetColor(color);
+            water->Update();
+            waterBlocks_.push_back(std::move(water));
+            break;
+        }
+        case PendingSpawnKind::Enemy:
+        {
+            EnemyType eType = EnemyType::Type0;
+            if (spawn.subID == 1) {
+                eType = EnemyType::Type1;
+            }
+            else if (spawn.subID == 2) {
+                eType = EnemyType::Boss;
+            }
+            else if (spawn.subID == 3) {
+                eType = EnemyType::Type2;
+            }
+
+            std::unique_ptr<Enemy> enemy;
+            if (eType == EnemyType::Boss) {
+                enemy = std::make_unique<BossEnemy>();
+            }
+            else {
+                enemy = std::make_unique<NormalEnemy>();
+            }
+            enemy->Initialize(object3dCommon_.get(), camera_.get(), spawn.position, eType);
+            enemies_.push_back(std::move(enemy));
+            break;
+        }
+        case PendingSpawnKind::MoveHorizontal:
+        case PendingSpawnKind::MoveVertical:
+        {
+            auto platform = std::make_unique<MovingPlatform>();
+            platform->Initialize(
+                object3dCommon_.get(),
+                camera_.get(),
+                spawn.position,
+                spawn.kind == PendingSpawnKind::MoveHorizontal ? MovingPlatform::Axis::Horizontal : MovingPlatform::Axis::Vertical,
+                movingPlatformSpeed_,
+                static_cast<int>(spawn.length)
+            );
+            movingPlatforms_.push_back(std::move(platform));
+            break;
+        }
+        default:
+            break;
+        }
+    }
+}
+
+bool GameScene::IsMapBuildComplete() const
+{
+    return loadPrepared_ && pendingMapSpawns_.empty();
+}
+
+void GameScene::FinishMapLoading(const Vector3& startPos)
+{
+    isIncrementalMapLoading_ = false;
+    loadPrepared_ = false;
+    postLoadSettleFrames_ = 0;
+    pendingRevealAfterLoad_ = false;
+
+    if (player_) {
+        player_->SetPosition(startPos);
+        player_->ResetForMapTransition(true);
+    }
+
+    if (fade_) {
+        fade_->SetAlpha(1.0f);
+        fade_->SetPhase(FadePhase::LoadingHold);
+    }
+
+    SyncLoadedSceneForReveal();
+    postLoadSettleFrames_ = kPostLoadSettleFrames;
+    pendingRevealAfterLoad_ = true;
+
+    if (input_) {
+        input_->ResetAllKeys();
+    }
+}
+
+void GameScene::Initialize() {
+    winApp_       = WinApp::GetInstance();
+    dxCommon_     = DirectXCommon::GetInstance();
+    input_        = Input::GetInstance();
+    srvManager_   = SrvManager::GetInstance();
+    spriteCommon_ = SpriteCommon::GetInstance();
+
+    TextureManager::GetInstance()->Initialize(dxCommon_, srvManager_);
+
+    pendingMapSpawns_.clear();
+    isIncrementalMapLoading_ = false;
+    loadPrepared_ = false;
+    postLoadSettleFrames_ = 0;
+    pendingRevealAfterLoad_ = false;
+    shouldStartLoading_ = false;
+    isMapLoading_ = false;
+    isPortalLoading_ = false;
+    loadingTimer_ = 0.0f;
+    portalLoadingTimer_ = 0.0f;
+    bossNameVisible_ = false;
+    returnToTitle_ = false;
+    pendingGameClear_ = false;
+    pendingPortalLoad_ = false;
+    deferredModelLoadCursor_ = 0;
+    initComplete_ = false;
+    deferredInitPhase_ = DeferredInitPhase::UiSprites;
+
+    if (sceneManager_ && !sceneManager_->GetOverlayScene()) {
+        sceneManager_->SetOverlayScene(std::make_unique<LoadingScene>());
+    }
 }
 
 void GameScene::Update() {
@@ -729,18 +923,8 @@ void GameScene::Update() {
         loadingTimer_ += deltaTime;
         if (loadingTimer_ >= LOADING_DURATION) {
             isMapLoading_ = false;
-
-            // 実際にマップをロード
             LoadMap("Resources/map/map.csv", { 3,3,0 });
-            if (sceneManager_) sceneManager_->ClearOverlayScene();
-            if (fade_) fade_->SetPhase(FadePhase::FadingIn);
-
-            if (player_) {
-                player_->ResetForMapTransition(true);
-            }
-            if (input_) {
-                input_->ResetAllKeys();
-            }
+            isIncrementalMapLoading_ = true;
         }
         else {
             if (fade_) fade_->Update(deltaTime);
@@ -748,24 +932,13 @@ void GameScene::Update() {
         }
     }
 
-
     // 3️⃣ 転送門ロードのタイマー
     if (isPortalLoading_) {
         portalLoadingTimer_ += deltaTime;
         if (portalLoadingTimer_ >= LOADING_DURATION) {
             isPortalLoading_ = false;
-
-            // 実際にマップをロード
             LoadMap(portalMapPath_, portalStartPos_);
-            if (sceneManager_) sceneManager_->ClearOverlayScene();
-            if (fade_) fade_->SetPhase(FadePhase::FadingIn);
-
-            if (player_) {
-                player_->ResetForMapTransition(true);
-            }
-            if (input_) {
-                input_->ResetAllKeys();
-            }
+            isIncrementalMapLoading_ = true;
         }
         else {
             if (fade_) {
@@ -774,6 +947,34 @@ void GameScene::Update() {
             }
         }
     }
+
+    if (isIncrementalMapLoading_) {
+        ProcessPendingMapSpawns(kMapSpawnBudgetPerFrame);
+        if (IsMapBuildComplete()) {
+            FinishMapLoading(player_ ? player_->GetPosition() : Vector3{ 0, 0, 0 });
+        }
+        return;
+    }
+
+    if (pendingRevealAfterLoad_) {
+        SyncLoadedSceneForReveal();
+
+        if (postLoadSettleFrames_ > 0) {
+            --postLoadSettleFrames_;
+            return;
+        }
+
+        pendingRevealAfterLoad_ = false;
+        if (sceneManager_) {
+            sceneManager_->ClearOverlayScene();
+        }
+        if (fade_) {
+            fade_->SetAlpha(1.0f);
+            fade_->SetPhase(FadePhase::FadingIn);
+        }
+        return;
+    }
+
     imguiManager_->Begin();
 
     // ===== Boss トリガー演出: 演出中はプレイヤー追従カメラを動かさない =====
@@ -1355,11 +1556,6 @@ void GameScene::Update() {
         if (!returnToTitle_ && fade_) {
             returnToTitle_ = true;
 
-            if (gameOver_) {
-                gameOver_->SetTextVisible(false);
-                gameOver_->SetDrawEnabled(false);
-            }
-
             // 黒幕パラメータをリセットし、完全な黒までフェードアウトを開始
             fade_->SetAlpha(0.0f);
             fade_->SetReachedBlack(false);
@@ -1370,6 +1566,7 @@ void GameScene::Update() {
             if (Sprite* s = fade_->GetSprite()) {
                 s->SetVisible(true);
             }
+            gameOver_->SetDrawEnabled(false);
         }
     }
 
@@ -1848,11 +2045,6 @@ void GameScene::Draw() {
 
 
 void GameScene::Finalize() {
-    // ==== グローバル / シングルトンのリソース ====
-    SoundManager::GetInstance()->Finalize();
-    TextureManager::GetInstance()->Finalize();
-    ModelManager::GetInstants()->Finalize();
-
     // ==== ImGui ====
     if (imguiManager_) {
         imguiManager_->Finalize();
@@ -1957,13 +2149,24 @@ void GameScene::Finalize() {
     shiftHint_.sprite.reset();
     sprintHint_.sprite.reset();
     upHints_.clear();
+
+    deferredInitPhase_ = DeferredInitPhase::None;
+    initComplete_ = false;
+    deferredModelLoadCursor_ = 0;
+    postLoadSettleFrames_ = 0;
+    pendingRevealAfterLoad_ = false;
 }
 
 
-void GameScene::StartLoadingMap(const std::string& mapPath, const Vector3& startPos, bool isPortal = false) {
-    if (sceneManager_) {
+void GameScene::StartLoadingMap(const std::string& mapPath, const Vector3& startPos, bool isPortal) {
+    if (sceneManager_ && !sceneManager_->GetOverlayScene()) {
         sceneManager_->SetOverlayScene(std::make_unique<LoadingScene>());
     }
+    pendingMapSpawns_.clear();
+    isIncrementalMapLoading_ = false;
+    loadPrepared_ = false;
+    postLoadSettleFrames_ = 0;
+    pendingRevealAfterLoad_ = false;
     if (isPortal) {
         // 転送門ロード
         isPortalLoading_ = true;
@@ -2002,7 +2205,8 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
 
     // マップを再ロード
     mapChipField_.LoadMapChipCsv(mapPath);
-    GenerateBlocks();
+    BuildPendingMapSpawns();
+    loadPrepared_ = true;
 
     // ==== 右上 Coin UI を更新: 「合計で取得した coin 数」を表示 ====
     if (coinUI_) {
@@ -2104,7 +2308,6 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
     // ==== プレイヤー開始位置を設定 ====
     if (player_) {
         player_->SetPosition(startPos);
-        player_->ResetForMapTransition(true);
     }
 
     MapChipField::IndexSet startIndex = mapChipField_.GetMapChipIndexByPosition(startPos);

@@ -20,6 +20,7 @@
 #include <player/PlayerCamera.h>
 #include <unordered_map>
 #include <unordered_set>
+#include <deque>
 
 #include "TitleScene.h"
 #include "GameClearManager.h"
@@ -47,6 +48,8 @@ public:
     void Update() override;
     void Draw() override;
     void Finalize() override;
+    void UpdateInitialization() override;
+    bool IsInitializationComplete() const override;
 
     void StartLoadingMap(const std::string& mapPath, const Vector3& startPos, bool isPortal);
 
@@ -74,9 +77,35 @@ private:
     std::vector<std::unique_ptr<Object3d>> mapBlocks_;
     std::vector<std::unique_ptr<Object3d>> waterBlocks_;
 
+    enum class PendingSpawnKind {
+        Block,
+        Block2,
+        Portal,
+        Item,
+        Spike,
+        Water,
+        Enemy,
+        MoveHorizontal,
+        MoveVertical,
+    };
+
+    struct PendingSpawn {
+        PendingSpawnKind kind = PendingSpawnKind::Block;
+        Vector3 position{};
+        uint32_t x = 0;
+        uint32_t y = 0;
+        uint8_t subID = 0;
+        uint32_t length = 1;
+    };
+
     void GenerateBlocks();
+    void BuildPendingMapSpawns();
+    void ProcessPendingMapSpawns(size_t spawnBudget);
+    bool IsMapBuildComplete() const;
+    void FinishMapLoading(const Vector3& startPos);
     void LoadMap(const std::string& mapPath, const Vector3& startPos);
     void HandlePlayerOnMovingPlatforms();
+    void SyncLoadedSceneForReveal();
 
     // UI / マネージャ
     std::unique_ptr<DashUIManager>   dashUI_;
@@ -99,8 +128,15 @@ private:
     Vector3     portalStartPos_;       // 転送門開始位置
     float       portalLoadingTimer_ = 0.0f;  // 転送門タイマー
     float       loadingTimer_       = 0.0f;  // 初期ロードタイマー
+    std::deque<PendingSpawn> pendingMapSpawns_;
+    bool        isIncrementalMapLoading_ = false;
+    bool        loadPrepared_ = false;
+    int         postLoadSettleFrames_ = 0;
+    bool        pendingRevealAfterLoad_ = false;
 
     static constexpr float LOADING_DURATION = 0.5f; // 0.5秒
+    static constexpr size_t kMapSpawnBudgetPerFrame = 24;
+    static constexpr int kPostLoadSettleFrames = 3;
 
     // 転送門トリガー: 黒くなってからロードを開始するのを待つ
     bool        pendingPortalLoad_ = false;
@@ -249,6 +285,26 @@ private:
     std::unique_ptr<Sprite> pauseBackSelected_;
     // 一時停止時の暗色オーバーレイ（FadeManager を流用せず、状態干渉を避ける）
     std::unique_ptr<Sprite> pauseDimSprite_;
+
+    enum class DeferredInitPhase {
+        None,
+        UiSprites,
+        CoreSystems,
+        ModelWarmup,
+        GameplayManagers,
+        InitialMapPrepare,
+        InitialMapBuild,
+        Complete
+    };
+
+    void InitializeUiSprites_();
+    void InitializeCoreSystems_();
+    void InitializeGameplayManagers_();
+
+    DeferredInitPhase deferredInitPhase_ = DeferredInitPhase::None;
+    bool initComplete_ = false;
+    size_t deferredModelLoadCursor_ = 0;
+    static constexpr size_t kInitModelLoadsPerFrame = 3;
 
     // 敵
     std::vector<std::unique_ptr<Enemy>> enemies_;

@@ -11,6 +11,7 @@ public:
 
     void Initialize(Camera* camera, const Player* player, const MapChipField* map);
     void Update();
+    void SnapToTarget();
 
     void SetOffset(const Vector3& offset) { offset_ = offset; }
     void SetFollowSpeed(float speed) { followSpeed_ = speed; }

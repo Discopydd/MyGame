@@ -2,6 +2,7 @@
 #include "SceneManager.h"
 #include "scene/GameScene.h"
 #include "scene/LoadingScene.h"
+#include "engine/3d/ModelManager.h"
 
 #include <cmath>
 #include <cstdlib>
@@ -70,6 +71,60 @@ void TitleScene::Initialize()
     tm->LoadTexture("Resources/white_sphere.png");
     tm->LoadTexture("Resources/portal_mote.png");
     tm->LoadTexture("Resources/press_space_portal.png");
+
+    // GameScene 初回突入時のヒッチを少しでも前倒しするため、
+    // ここでゲーム側の主要リソースも温めておく。
+    tm->LoadTexture("Resources/sky_bg.png");
+    tm->LoadTexture("Resources/button_continue_game_q_2x.png");
+    tm->LoadTexture("Resources/button_back_to_title_q_2x.png");
+    tm->LoadTexture("Resources/selected_continue_game_2x.png");
+    tm->LoadTexture("Resources/selected_back_to_title_2x.png");
+    tm->LoadTexture("Resources/Damagebar.png");
+    tm->LoadTexture("Resources/HPbar.png");
+    tm->LoadTexture("Resources/Boss_name.png");
+    tm->LoadTexture("Resources/space2.png");
+    tm->LoadTexture("Resources/shift.png");
+    tm->LoadTexture("Resources/sprint.png");
+    tm->LoadTexture("Resources/up.dds");
+    tm->LoadTexture("Resources/up.png");
+    tm->LoadTexture("Resources/skill_icon.png");
+    tm->LoadTexture("Resources/gray.png");
+    tm->LoadTexture("Resources/key_A.png");
+    tm->LoadTexture("Resources/key_D.png");
+    tm->LoadTexture("Resources/arrow_left.png");
+    tm->LoadTexture("Resources/arrow_right.png");
+    tm->LoadTexture("Resources/letterE.png");
+    tm->LoadTexture("Resources/numbers/colon.png");
+    tm->LoadTexture("Resources/numbers/0.png");
+    tm->LoadTexture("Resources/numbers/1.png");
+    tm->LoadTexture("Resources/numbers/2.png");
+    tm->LoadTexture("Resources/numbers/3.png");
+    tm->LoadTexture("Resources/numbers/4.png");
+    tm->LoadTexture("Resources/numbers/5.png");
+    tm->LoadTexture("Resources/numbers/6.png");
+    tm->LoadTexture("Resources/numbers/7.png");
+    tm->LoadTexture("Resources/numbers/8.png");
+    tm->LoadTexture("Resources/numbers/9.png");
+    tm->LoadTexture("Resources/loading.png");
+
+    ModelManager::GetInstants()->Initialize(dxCommon_);
+    ModelManager::GetInstants()->LoadModel("cube/cube.obj");
+    ModelManager::GetInstants()->LoadModel("player/player.obj");
+    ModelManager::GetInstants()->LoadModel("door/Door.obj");
+    ModelManager::GetInstants()->LoadModel("strip/strip.obj");
+    ModelManager::GetInstants()->LoadModel("coin/coin.obj");
+    ModelManager::GetInstants()->LoadModel("coin_ui/coin_ui.obj");
+    ModelManager::GetInstants()->LoadModel("snow/snow.obj");
+    ModelManager::GetInstants()->LoadModel("jump/jump.obj");
+    ModelManager::GetInstants()->LoadModel("star/star.obj");
+    ModelManager::GetInstants()->LoadModel("hurd/hurd.obj");
+    ModelManager::GetInstants()->LoadModel("cube2/cube2.obj");
+    ModelManager::GetInstants()->LoadModel("water/water.obj");
+    ModelManager::GetInstants()->LoadModel("enemy0/enemy0.obj");
+    ModelManager::GetInstants()->LoadModel("enemy1/enemy1.obj");
+    ModelManager::GetInstants()->LoadModel("enemy2/enemy2.obj");
+    ModelManager::GetInstants()->LoadModel("enemy3/enemy3.obj");
+    ModelManager::GetInstants()->LoadModel("enemyBullet/enemyBullet.obj");
 
     const float w = static_cast<float>(WinApp::kClientWidth);
     const float h = static_cast<float>(WinApp::kClientHeight);
@@ -465,5 +520,6 @@ void TitleScene::Finalize()
     fadeSprite_.reset();
     transitionRingSprite_.reset();
 
-    TextureManager::GetInstance()->Finalize();
+    // ここでグローバル TextureManager を破棄すると、overlay が残っている
+    // フレームで参照切れを起こすため、シーン単位では Finalize しない。
 }

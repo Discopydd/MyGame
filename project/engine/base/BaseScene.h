@@ -10,6 +10,9 @@ public:
     virtual void Draw() = 0;
     virtual void Finalize() = 0;
 
+    virtual void UpdateInitialization() {}
+    virtual bool IsInitializationComplete() const { return true; }
+
     virtual void SetSceneManager(SceneManager* sceneManager) { sceneManager_ = sceneManager; }
     SceneManager* GetSceneManager() { return sceneManager_; }
 protected:
