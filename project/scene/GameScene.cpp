@@ -1355,6 +1355,11 @@ void GameScene::Update() {
         if (!returnToTitle_ && fade_) {
             returnToTitle_ = true;
 
+            if (gameOver_) {
+                gameOver_->SetTextVisible(false);
+                gameOver_->SetDrawEnabled(false);
+            }
+
             // 黒幕パラメータをリセットし、完全な黒までフェードアウトを開始
             fade_->SetAlpha(0.0f);
             fade_->SetReachedBlack(false);
