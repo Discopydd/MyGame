@@ -363,7 +363,7 @@ void GameScene::UpdateInitialization()
 
     case DeferredInitPhase::InitialMapPrepare:
         shouldStartLoading_ = false;
-        LoadMap("Resources/map/map.csv", { 3, 3, 0 });
+        LoadMap("Resources/map/map6.csv", { 2, 1, 0 });
         isIncrementalMapLoading_ = true;
         deferredInitPhase_ = DeferredInitPhase::InitialMapBuild;
         break;
@@ -915,7 +915,7 @@ void GameScene::Update() {
     // このフレーム後半で FadingIn を処理する（以下参照）
     if (shouldStartLoading_) {
         shouldStartLoading_ = false;
-        StartLoadingMap("Resources/map/map.csv", { 3,3,0 }, false);
+        StartLoadingMap("Resources/map/map6.csv", { 2,1,0 }, false);
         return; // このフレーム先に表示 LoadingScene
     }
     // 2️⃣ 初期ロードのタイマー
@@ -923,7 +923,7 @@ void GameScene::Update() {
         loadingTimer_ += deltaTime;
         if (loadingTimer_ >= LOADING_DURATION) {
             isMapLoading_ = false;
-            LoadMap("Resources/map/map.csv", { 3,3,0 });
+            LoadMap("Resources/map/map6.csv", { 2,1,0 });
             isIncrementalMapLoading_ = true;
         }
         else {
@@ -1945,11 +1945,8 @@ void GameScene::Draw() {
     srvManager_->PreDraw();
     object3dCommon_->CommonDraw();
 
-    // GameClear 再生中なら GameClear 用プレイヤーを描画し、そうでなければ通常プレイヤーを描画する
-    if (gameClear_ && gameClear_->IsPlaying()) {
-        gameClear_->DrawPlayer();
-    }
-    else {
+    // 勝利画面中は通常プレイヤー / 3D コイン / 3D 粒子 / 水ブロックを描画しない
+    if (!(gameClear_ && gameClear_->IsPlaying())) {
         if (player_) {
             player_->Draw();
         }

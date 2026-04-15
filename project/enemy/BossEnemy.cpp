@@ -49,7 +49,7 @@ preAttackJitterTime_ = 0.0f;
     isDead_ = false;
     stompInvuln_ = 0.0f;
     if (type == EnemyType::Boss) {
-        maxHp_ = 30;
+        maxHp_ = 3;
         // 低HP閾値: 20%（30 -> 6）
         enrageHp_ = (std::max)(1, maxHp_ / 5);
         hp_ = maxHp_;
