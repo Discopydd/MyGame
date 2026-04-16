@@ -24,7 +24,7 @@ struct Quaternion {
 
     static constexpr Quaternion Identity() { return Quaternion(1,0,0,0); }
 
-    // 由轴角构造（axis 需非零；内部会单位化），angle 单位：弧度
+    // 軸角から构造（axis 需非零；内部会正規化）、angle 单位: 弧度
 #if __cpp_concepts
     template <Vec3Like V>
 #else
@@ -42,8 +42,8 @@ struct Quaternion {
         return Quaternion(c, ax*inv*s, ay*inv*s, az*inv*s);
     }
 
-    // Yaw-Pitch-Roll（Yaw 绕 +Y，Pitch 绕 +X，Roll 绕 +Z），弧度
-    // 组合顺序：R = Rz(roll) * Rx(pitch) * Ry(yaw)  （常见游戏系：先 yaw，再 pitch，再 roll 的等价实现）
+    // Yaw-Pitch-Roll（Yaw 绕 +Y、Pitch 绕 +X、Roll 绕 +Z）、弧度
+    // 合成顺序: R = Rz(roll) * Rx(pitch) * Ry(yaw) （一般的游戏系: 先に yaw、再度 pitch、再度 roll 的等价実现）
     static Quaternion FromYawPitchRoll(float yawY, float pitchX, float rollZ) {
         float cy = std::cosf(yawY * 0.5f);
         float sy = std::sinf(yawY * 0.5f);
@@ -59,13 +59,13 @@ struct Quaternion {
         return (qz * qx * qy).Normalized();
     }
 
-    // 提取 Yaw-Pitch-Roll（与上面约定匹配），返回 (yawY, pitchX, rollZ)
+    // 抽出 Yaw-Pitch-Roll（与上面约定匹配）、返す (yawY, pitchX, rollZ)
     inline void ToYawPitchRoll(float& outYawY, float& outPitchX, float& outRollZ) const {
-        // 先得到旋转矩阵，再反推欧拉角（YXZ）
+        // 先に得到旋转矩阵、再度反推欧拉角（YXZ）
         float m[3][3];
         ToRotationMatrix3x3(m);
 
-        // 基于 YXZ 分解（常见方案，避免奇异时数值不稳）
+        // 基于 YXZ 分解（一般的方案、避ける奇异時数值不稳）
         // pitchX = asin(clamp(-m[2][1], -1, 1))
         float sy = -m[2][1];
         sy = std::clamp(sy, -1.0f, 1.0f);
@@ -78,7 +78,7 @@ struct Quaternion {
             // rollZ = atan2(m[0][1], m[1][1])
             rollZ = std::atan2f(m[0][1], m[1][1]);
         } else {
-            // 近奇异：将一个角设为 0，合并到另外一个
+            // 特異点近傍: 将一个角設为 0、合かつ到另外一个
             yawY  = 0.0f;
             rollZ = std::atan2f(-m[1][0], m[0][0]);
         }
@@ -104,7 +104,7 @@ struct Quaternion {
         return { w/s, x/s, y/s, z/s };
     }
 
-    // 四元数乘法（复合旋转，注意非交换）
+    // クォータニオン乘法（復合旋转、注意非交换）
     constexpr Quaternion operator*(const Quaternion& r) const {
         return {
             w*r.w - x*r.x - y*r.y - z*r.z,
@@ -143,7 +143,7 @@ struct Quaternion {
     }
 
     // 旋转插值
-    // Nlerp：线性后单位化（速度常量近似）
+    // Nlerp: 線性後正規化（速度常量近似）
     static Quaternion Nlerp(const Quaternion& a, const Quaternion& b, float t, bool shortestPath=true) {
         Quaternion bb = b;
         float d = Dot(a,b);
@@ -152,7 +152,7 @@ struct Quaternion {
         return q.Normalized();
     }
 
-    // Slerp：等角速度插值
+    // Slerp: 等角速度插值
     static Quaternion Slerp(const Quaternion& a, const Quaternion& b, float t, float eps=1e-6f) {
         float d = Dot(a,b);
         Quaternion bb = b;
@@ -160,7 +160,7 @@ struct Quaternion {
         if (d < 0.0f) { d = -d; bb = {-b.w, -b.x, -b.y, -b.z}; }
 
         if (1.0f - d < eps) {
-            // 非常接近：退化为 Nlerp
+            // 非常接近: 退化为 Nlerp
             return Nlerp(a, bb, t, /*shortestPath*/false);
         }
         float theta = std::acosf(std::clamp(d, -1.0f, 1.0f));
@@ -189,12 +189,12 @@ struct Quaternion {
         m[2][2] = 1.0f - (xx2 + yy2);
     }
 
-    // 填充 4x4 矩阵的旋转部分；其余为单位（列主 or 行主均可用，按照 columnMajor 组织）
+    // 填充 4x4 矩阵的旋转部分；其余为单位（列主 or 行主均可用、按照 columnMajor 组织）
     void ToRotationMatrix4x4(float m[16], bool columnMajor = true) const {
         float r[3][3];
         ToRotationMatrix3x3(r);
         if (columnMajor) {
-            // 列主序（如 DirectXMath 默认行主，但很多 API 接受列向量形式；这里提供两种）
+            // 列優先に（如 DirectXMath デフォルト行主、但很多 API 接受列向量形式；ここでは提供两种）
             m[0] = r[0][0]; m[4] = r[0][1]; m[8]  = r[0][2]; m[12] = 0.0f;
             m[1] = r[1][0]; m[5] = r[1][1]; m[9]  = r[1][2]; m[13] = 0.0f;
             m[2] = r[2][0]; m[6] = r[2][1]; m[10] = r[2][2]; m[14] = 0.0f;
@@ -256,7 +256,7 @@ struct Quaternion {
     template <class V>
 #endif
     V Rotate(const V& v) const {
-        // 更高效的向量旋转：v + 2*cross(q.xyz, cross(q.xyz, v) + q.w*v)
+        // より高效的ベクトル回転: v + 2*cross(q.xyz, cross(q.xyz, v) + q.w*v)
         V out{};
         float qx = x, qy = y, qz = z, qw = w;
         float uvx = qy * v.z - qz * v.y;
@@ -277,7 +277,7 @@ struct Quaternion {
         return out;
     }
 
-    // 将向量视作“增量旋转”的轴角（长度为角度，方向为轴）→ 四元数
+    // 将向量視作「增量旋转」的轴角（長度为角度、方向为轴）→ クォータニオン
 #if __cpp_concepts
     template <Vec3Like V>
 #else
@@ -290,9 +290,9 @@ struct Quaternion {
         return FromAxisAngle(v * inv, angle);
     }
 
-    // 近等判断（用于避免归一化抖动）
+    // 近等判断（用于避免归一化抖動）
     static bool AlmostEqual(const Quaternion& a, const Quaternion& b, float eps = 1e-5f) {
-        // 四元数 q 与 -q 表示相同旋转；因此比较时考虑两者
+        // クォータニオン q 与 -q 表示相同旋转；因此比较時考虑两者
         Quaternion d1 = a - b;
         Quaternion d2 = a + b;
         return (d1.LengthSq() <= eps*eps) || (d2.LengthSq() <= eps*eps);
@@ -301,6 +301,6 @@ struct Quaternion {
 
 // ===== 便捷函数 =====
 inline Quaternion Lerp(const Quaternion& a, const Quaternion& b, float t) {
-    // 普通 Lerp（不保证单位长度）；通常更推荐 Nlerp
+    // 普通 Lerp（不保证单位長度）；通常より推荐 Nlerp
     return a*(1.0f - t) + b*t;
 }

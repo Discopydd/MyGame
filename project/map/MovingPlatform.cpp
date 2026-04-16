@@ -36,8 +36,8 @@ void MovingPlatform::Initialize(Object3dCommon* common, Camera* camera,
     halfW_ = MapChipField::kBlockWidth  * 0.5f * static_cast<float>(lengthInTiles_);
     halfH_ = MapChipField::kBlockHeight * 0.5f;
 
-    // 生成这一排小方块
-    tiles_.clear();          // ★ unique_ptr 会自动释放旧的
+    // この列の小ブロックを生成
+    tiles_.clear();          // ★ unique_ptr が古いオブジェクトを自動で解放する
     tileOffsets_.clear();
 
     tiles_.reserve(lengthInTiles_);
@@ -76,7 +76,7 @@ MapChipField::Rect MovingPlatform::GetRect() const
 
 void MovingPlatform::HandleBlockCollision(const MapChipField& field)
 {
-    // 只沿当前轴运动
+    // 現在の軸方向にのみ移動
     if (axis_ == Axis::Horizontal) {
         float nextX = position_.x;
         float left   = nextX - halfW_;
@@ -110,7 +110,7 @@ void MovingPlatform::HandleBlockCollision(const MapChipField& field)
 
         if (hit) {
             position_.x = fixX;
-            dir_.x *= -1.0f;   // 反向
+            dir_.x *= -1.0f;   // 反転
         }
     } else { // Vertical
         float nextY = position_.y;
@@ -145,7 +145,7 @@ void MovingPlatform::HandleBlockCollision(const MapChipField& field)
 
         if (hit) {
             position_.y = fixY;
-            dir_.y *= -1.0f;   // 反向
+            dir_.y *= -1.0f;   // 反転
         }
     }
 }
@@ -160,7 +160,7 @@ void MovingPlatform::HandlePlatformCollision(const std::vector<MovingPlatform*>&
         bool overlapX = !(self.right <= r.left || self.left >= r.right);
         bool overlapY = !(self.top   <= r.bottom || self.bottom >= r.top);
         if (overlapX && overlapY) {
-            // 简单处理：回到上一帧位置并反向
+            // 簡易処理: 前フレーム位置に戻して反転
             position_ = prevPosition_;
             if (axis_ == Axis::Horizontal) {
                 dir_.x *= -1.0f;
@@ -181,9 +181,9 @@ void MovingPlatform::Update(float dt,
     Vector3 v = dir_ * speed_;
     position_ = position_ + v * dt;
 
-    // 和静态方块、地刺、门碰撞
+    // 静的ブロック／トゲ／扉と衝突
     HandleBlockCollision(field);
-    // 和其它移动平台碰撞
+    // 他の移動床と衝突
     HandlePlatformCollision(allPlatforms);
 
     for (size_t i = 0; i < tiles_.size(); ++i) {

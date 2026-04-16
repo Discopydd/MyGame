@@ -31,10 +31,10 @@ public:
     void SetMaxParticles(size_t max) { maxParticles_ = max; }
     void SetSnowMode(bool enable)           { snowMode_ = enable; }
 
-        // 让这个发射器的 3D 粒子跟随相机平移
+        // このエミッタの 3D 粒子をカメラの平行移動に追従させる
     void SetFollowCamera(bool follow) { followCamera_ = follow; }
 
-    // 每帧把相机的位移量传进来，用来修正粒子位置
+    // 毎フレームのカメラ移動量を渡し、粒子位置の補正に使う
     void ApplyCameraMove(const Vector3& delta);
 
 private:
@@ -43,7 +43,7 @@ private:
 
     std::vector<Particle> particles_;
 
-    // ★ 拥有：用 unique_ptr 管池子
+    // ★ 所有権を持ち、unique_ptr でプールを管理する
     std::vector<std::unique_ptr<Object3d>> modelPool_;
     std::vector<std::unique_ptr<Sprite>>   spritePool_;
 

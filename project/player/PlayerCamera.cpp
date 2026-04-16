@@ -13,10 +13,10 @@ void PlayerCamera::Initialize(Camera* camera, const Player* player, const MapChi
 void PlayerCamera::Update() {
     if (!camera_ || !player_ || !map_) return;
 
-    // 计算目标位置
+    // 目標位置を計算
     Vector3 targetPos = CalculateTargetPosition();
     
-    // 平滑跟随
+    // なめらかに追従
     Vector3 currentPos = camera_->GetTransform().translate;
     Vector3 newPos = {
         currentPos.x + (targetPos.x - currentPos.x) * followSpeed_,
@@ -24,12 +24,25 @@ void PlayerCamera::Update() {
         currentPos.z + (targetPos.z - currentPos.z) * followSpeed_
     };
 
-    // 应用约束
+    // 制約を適用
     if (constrainToMap_) {
         newPos = ConstrainPosition(newPos);
     }
 
     camera_->SetTranslate(newPos);
+    camera_->Update();
+}
+
+void PlayerCamera::SnapToTarget()
+{
+    if (!camera_ || !player_ || !map_) return;
+
+    Vector3 targetPos = CalculateTargetPosition();
+    if (constrainToMap_) {
+        targetPos = ConstrainPosition(targetPos);
+    }
+
+    camera_->SetTranslate(targetPos);
     camera_->Update();
 }
 
@@ -45,22 +58,22 @@ Vector3 PlayerCamera::CalculateTargetPosition() const {
 Vector3 PlayerCamera::ConstrainPosition(const Vector3& position) const {
   if (!map_ || !camera_) return position;
 
-    // 获取地图实际边界
+    // マップの実際の境界を取得
     Vector3 mapMin = useCustomBounds_ ? mapMin_ : map_->GetMapMinPosition();
     Vector3 mapMax = useCustomBounds_ ? mapMax_ : map_->GetMapMaxPosition();
     
-    // 使用相机实际位置计算视口
+    // カメラの実際の位置でビューポートを計算
     float cameraZ = camera_->GetTransform().translate.z;
     float halfViewHeight = std::abs(cameraZ) * std::tan(camera_->GetFovY() / 2.0f);
     float halfViewWidth = halfViewHeight * camera_->GetAspectRatio();
 
-    // 计算约束边界（考虑地图偏移）
+    // 制約境界を計算する（マップの余白も考慮）
     float minX = mapMin.x + halfViewWidth;
     float maxX = mapMax.x - halfViewWidth;
     float minY = mapMin.y + halfViewHeight;
     float maxY = mapMax.y - halfViewHeight;
 
-    // 处理地图过小的情况
+    // マップが小さすぎる場合を処理
     if (maxX < minX) minX = maxX = (mapMin.x + mapMax.x) / 2.0f;
     if (maxY < minY) minY = maxY = (mapMin.y + mapMax.y) / 2.0f;
 

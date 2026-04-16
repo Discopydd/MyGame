@@ -64,7 +64,7 @@ public:
 	D3D12_GPU_DESCRIPTOR_HANDLE GetSrvHandleGPU(const std::string& filePath);
 
 	// ======== GIF 追加 API ========
-    void LoadGif(const std::string& filePath); // GIF 拆帧 + 上传
+    void LoadGif(const std::string& filePath); // GIF 拆帧 + 上伝
     bool IsGifLoaded(const std::string& filePath) const;
     const DirectX::TexMetadata& GetGifMetaData(const std::string& filePath) const;
 

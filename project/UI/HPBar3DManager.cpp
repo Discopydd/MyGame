@@ -2,7 +2,7 @@
 #include "ModelManager.h"
 #include <cmath>
 
-// 声明 GameScene.cpp 里已有的全局函数（链接时会找到实现）
+// GameScene.cpp に既存のグローバル関数を宣言する（リンク時に実装が見つかる）
 Vector3 ScreenToWorld(float screenX, float screenY, float ndcZ, Camera* camera);
 
 void HPBar3DManager::Initialize(Object3dCommon* objCommon,
@@ -39,17 +39,17 @@ void HPBar3DManager::Finalize()
 
 Vector3 HPBar3DManager::ScreenToWorld_(float sx, float sy, float ndcZ)
 {
-    // 直接调用 GameScene 提供的全局函数
+    // GameScene が提供するグローバル関数を直接呼び出す
     return ScreenToWorld(sx, sy, ndcZ, camera_);
 }
 
 void HPBar3DManager::Update(float dt)
 {
-    (void)dt; // 目前没用到时间
+    (void)dt; // 現状では時間を使用しない
 
     if (!camera_ || strips_.empty()) return;
 
-    // 1) 根据玩家当前 HP 比例计算可见段数
+    // 1) プレイヤーの現在 HP 比率から可視段数を計算
     float hpRatio = 1.0f;
     if (player_) {
         hpRatio = player_->GetHpRatio();
@@ -58,12 +58,12 @@ void HPBar3DManager::Update(float dt)
     if (visibleCount_ < 0)          visibleCount_ = 0;
     if (visibleCount_ > segments_)  visibleCount_ = segments_;
 
-    // 2) 计算屏幕起点
+    // 2) 画面上の開始位置を計算
     const float pad  = 16.0f;
     float baseX = pad + insetX_;
     float baseY = pad + insetY_;
 
-    // 3) 为每一段计算世界坐标并更新
+    // 3) 各区間ごとにワールド座標を計算して更新する
     for (int i = 0; i < segments_; ++i) {
         float sx = baseX + i * (segPixelW_ + gapPixel_);
         float sy = baseY;
@@ -77,7 +77,7 @@ void HPBar3DManager::Update(float dt)
 
 void HPBar3DManager::Draw3D()
 {
-    // 只画可见段数
+    // 可視段数だけ描画
     for (int i = 0; i < visibleCount_; ++i) {
         if (strips_[i]) {
             strips_[i]->Draw();

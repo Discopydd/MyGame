@@ -30,7 +30,7 @@ void WinApp::Initialize()
 
     assert(SUCCEEDED(hr));
 
-    // 设置窗口类
+    // 設定ウィンドウ類
     wc.lpfnWndProc = WindowProc;
     wc.lpszClassName = L"WindowClass";
     wc.hInstance = GetModuleHandle(nullptr);

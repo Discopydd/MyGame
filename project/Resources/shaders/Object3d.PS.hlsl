@@ -64,12 +64,12 @@ PixelShaderOutput main(VertexShaderOutput input)
     float NDotH = dot(normalize(input.normal), halfVector);
     float speclarPow = pow(saturate(NDotH), gMaterial.shininess);
 
-    // 0：完全不使用光照（原逻辑）
+    // 0: 光源をまったく使わない（元ロジック）
     if (gMaterial.enableLighting == 0)
     {
         output.color = gMaterial.color * textureColor;
     }
-    // 2：固定光照模式
+    // 2: 固定光照模式
     else if (gMaterial.enableLighting == 2)
     {
         float32_t3 baseColor = gMaterial.color.rgb * textureColor.rgb;
@@ -81,13 +81,13 @@ PixelShaderOutput main(VertexShaderOutput input)
         float32_t3 diffuseFixed =
         baseColor * gDirectionalLight.color.rgb * NdotLFixed * gDirectionalLight.intensity;
 
-    // --- 高光（反光）：用视线方向 + 半角向量 ---
-        float32_t3 V = normalize(gCamera.worldPosition - input.worldPosition); // 视线方向
+    // --- 高光（反光）: 用視線方向 + 半角向量 ---
+        float32_t3 V = normalize(gCamera.worldPosition - input.worldPosition); // 視線方向
         float32_t3 H = normalize(L + V); // 半角向量
         float NdotH = saturate(dot(N, H));
         float specPow = pow(NdotH, gMaterial.shininess); // 用同一个 shininess
 
-    // 高光颜色：强度不要太大，否则一转镜头就很闪
+    // 高光颜色: 强度しない太大、否なら一转カメラそのまま很闪
         float specIntensity = 0.8f; // 想更强可以 0.5f, 太闪就 0.1f
         float32_t3 specularFixed =
         gDirectionalLight.color.rgb * specPow * specIntensity;
@@ -98,7 +98,7 @@ PixelShaderOutput main(VertexShaderOutput input)
         output.color.rgb = ambientFixed + diffuseFixed + specularFixed;
         output.color.a = gMaterial.color.a * textureColor.a;
     }
-    // 其它值（1）：保持原来的完整光照逻辑
+    // その他の値（1）: 元の完全なライティングロジックを維持
     else
     {
         float32_t3 toEye = normalize(gCamera.worldPosition - input.worldPosition);
@@ -106,7 +106,7 @@ PixelShaderOutput main(VertexShaderOutput input)
         float NDotH = dot(normalize(input.normal), halfVector);
         float specularPow = pow(saturate(NDotH), gMaterial.shininess);
 
-        // 平行光计算
+        // 平行光の計算
         float NdotL = dot(normalize(input.normal), -gDirectionalLight.direction);
         float cos = pow(NdotL * 0.5f + 0.5f, 2.0f);
         float32_t3 diffuseDirectional =
@@ -114,7 +114,7 @@ PixelShaderOutput main(VertexShaderOutput input)
         float32_t3 specularDirectional =
             gDirectionalLight.color.rgb * gDirectionalLight.intensity * specularPow * float32_t3(1.0f, 1.0f, 1.0f);
 
-        // 点光源计算
+        // 点光源の計算
         float32_t distancePoint = length(gPointLight.position - input.worldPosition);
         float32_t factorPoint = 1.0f / (distancePoint * distancePoint + 0.001f);
         float32_t3 pointLightDir = normalize(gPointLight.position - input.worldPosition);
@@ -124,7 +124,7 @@ PixelShaderOutput main(VertexShaderOutput input)
             gMaterial.color.rgb * textureColor.rgb * gPointLight.color.rgb * cosPoint *
             gPointLight.intensity * factorPoint;
 
-        // 聚光灯计算
+        // スポットライトの計算
         float32_t3 spotLightDir = normalize(gSpotLight.position - input.worldPosition);
         float cosAngle = dot(spotLightDir, gSpotLight.direction);
         float falloffFactor =
@@ -135,7 +135,7 @@ PixelShaderOutput main(VertexShaderOutput input)
         float32_t factorSpot;
         if (distanceSpot > gSpotLight.distance)
         {
-            factorSpot = 0.0f; // 超出距离范围无光照
+            factorSpot = 0.0f; // 距離範囲外では無光照
         }
         else
         {
@@ -149,7 +149,7 @@ PixelShaderOutput main(VertexShaderOutput input)
             gMaterial.color.rgb * textureColor.rgb * gSpotLight.color.rgb * cosSpot *
             gSpotLight.intensity * factorSpot * falloffFactor;
 
-        // 合并所有光照
+        // 合並すべて光照
         output.color.rgb = diffuseDirectional + specularDirectional + diffusePoint + diffuseSpot;
         output.color.a = gMaterial.color.a * textureColor.a; // 保留 Alpha 通道
     }

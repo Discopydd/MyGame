@@ -67,6 +67,5 @@ void Input::Finalize() {
     winApp_ = nullptr;
 }
 void Input::ResetAllKeys() {
-    memset(key,    0, sizeof(key));
-    memset(keyPre, 0, sizeof(keyPre));
+    memcpy(keyPre, key, sizeof(key));
 }

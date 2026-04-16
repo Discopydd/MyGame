@@ -3,7 +3,7 @@
 #include "Sprite.h"
 #include "WinApp.h"
 #include <memory>
-// 和你原来的一样的枚举名字，方便复用
+// 元の列挙名をそのまま使い、再利用しやすくする
 enum class FadePhase { None, FadingOut, LoadingHold, FadingIn };
 
 class FadeManager {
@@ -17,7 +17,7 @@ public:
     void Update(float dt);
     void Draw();
 
-    // Phase / Alpha 访问
+    // Phase / Alpha へのアクセス
     FadePhase GetPhase() const { return phase_; }
     void      SetPhase(FadePhase p) { phase_ = p; }
 
@@ -26,10 +26,8 @@ public:
         alpha_ = a;
         if (alpha_ < 0.0f) alpha_ = 0.0f;
         if (alpha_ > 1.0f) alpha_ = 1.0f;
-        if (sprite_) {
-            sprite_->SetColor({ 1.0f, 1.0f, 1.0f, alpha_ });
-            sprite_->Update();
-        }
+        SyncVisual_();
+    }
     }
 
     float GetSpeed() const { return speed_; }
@@ -37,13 +35,13 @@ public:
 
     Sprite* GetSprite() { return sprite_.get(); }
 
-    // 快捷操作
-    void StartFadeOut();   // 从 0 淡到 1
-    void StartFadeIn();    // 从 1 淡到 0
-    void SetBlack();       // 直接全黑
-    void Clear();          // 直接透明
+    // 簡易操作
+    void StartFadeOut();   // 0 から 1 へフェード
+    void StartFadeIn();    // 1 から 0 へフェード
+    void SetBlack();       // 即座に全黒
+    void Clear();          // 即座に透明
 
-    // 你目前逻辑用到的「黑到头 + 停留」也保留
+    // 現在のロジックで使っている「全黒到達 + 停留」もそのまま残す
     bool  ReachedBlack() const { return reachedBlack_; }
     void  SetReachedBlack(bool v) { reachedBlack_ = v; }
 
@@ -54,8 +52,14 @@ public:
     void  SetOverlayPushed(bool v) { overlayPushed_ = v; }
 
 private:
+    void SyncVisual_();
+
     SpriteCommon* spriteCommon_ = nullptr;
     std::unique_ptr<Sprite> sprite_;
+    std::unique_ptr<Sprite> portalRingSprite_;
+
+    float ringRotation_  = 0.0f;
+    float ringPulseTime_ = 0.0f;
 
     FadePhase phase_   = FadePhase::None;
     float     alpha_   = 0.0f;

@@ -10,7 +10,7 @@ void IntroManager::Initialize(SpriteCommon* spriteCommon, Input* input)
     const float W = (float)WinApp::kClientWidth;
     const float H = (float)WinApp::kClientHeight;
 
-    // 电影黑边
+    // シネマ風の黒帯
     letterboxTop_ = std::make_unique<Sprite>();
     letterboxTop_->Initialize(spriteCommon_, "Resources/black.png");
     letterboxTop_->SetSize({ W, H * 0.14f });
@@ -23,20 +23,20 @@ void IntroManager::Initialize(SpriteCommon* spriteCommon, Input* input)
     letterboxBottom_->SetPosition({ 0.0f, H });
     letterboxBottom_->SetColor({ 1,1,1,0 });
 
-    // 暗角
+    // ビネット
     vignette_ = std::make_unique<Sprite>();
-    vignette_->Initialize(spriteCommon_, "Resources/gray.png");
+    vignette_->Initialize(spriteCommon_, "Resources/gray2.png");
     vignette_->SetSize({ W, H });
     vignette_->SetPosition({ 0.0f, 0.0f });
     vignette_->SetColor({ 1,1,1,0.0f });
 
-    // 标题
+    // タイトル
     introTitle_ = std::make_unique<Sprite>();
-    introTitle_->Initialize(spriteCommon_, "Resources/GameTitle.dds");
-    introTitle_->SetPosition({ 0.0f, H * 0.15f });
+    introTitle_->Initialize(spriteCommon_, "Resources/PortalReady_LeapIn.png");
+    introTitle_->SetPosition({ 150.0f, H * 0.20f });
     introTitle_->SetColor({ 1,1,1,0 });
 
-    // Skip 提示
+    // スキップ表示
     skipHint_ = std::make_unique<Sprite>();
     skipHint_->Initialize(spriteCommon_, "Resources/Start.dds");
     skipHint_->SetPosition({ W * 0.5f - 100.0f, H * 0.8f });
@@ -83,7 +83,7 @@ void IntroManager::Update(float dt)
         return;
     }
 
-    // 跳过（只在 BarsIn / OrbitZoom / TitleShow 这些阶段有效）
+    // スキップ（BarsIn / OrbitZoom / TitleShow の各段階でのみ有効）
     if (skippable_ && input_) {
         if (input_->TriggerKey(DIK_SPACE) ||
             input_->TriggerKey(DIK_RETURN) ||
@@ -136,15 +136,15 @@ void IntroManager::Update(float dt)
     case State::OrbitZoom: {
         float d = (std::min)(t_ / 0.5f, 1.0f);
         float e = EaseInOutSine_(d);
-        (void)e; // 目前没有直接用到 e，你以后加镜头动可以用
+        (void)e; // 現状では e を直接使っていないが、後でカメラ演出を追加する際に使える
 
-        // 标题淡入
+        // タイトルフェードイン
         if (introTitle_) {
             float titleAlpha = std::clamp((d - 0.35f) / 0.35f, 0.0f, 1.0f);
             introTitle_->SetColor({ 1,1,1, titleAlpha });
         }
 
-        // Skip 提示闪烁
+        // スキップ表示を点滅させる
         if (skipHint_) {
             skipHint_->SetVisible(true);
             float blink = (std::sinf(t_ * 12.0f) * 0.5f + 0.5f) * 0.85f;
@@ -162,7 +162,7 @@ void IntroManager::Update(float dt)
         float d = (std::min)(t_ / 0.25f, 1.0f);
         if (vignette_) vignette_->SetColor({1,1,1, 0.25f + 0.10f * d});
 
-        // 轻微震动（数值照搬原来的）
+        // 軽い揺れ（数値は元の設定をそのまま使用）
         if (t_ < 0.2f) {
             shakeTime_ = 0.2f;
             shakeAmp_  = 0.12f;
@@ -217,7 +217,7 @@ void IntroManager::Update(float dt)
     if (letterboxBottom_) letterboxBottom_->Update();
     if (vignette_)        vignette_->Update();
     if (introTitle_)      introTitle_->Update();
-    // （如果以后想要镜头摇晃，可以在这里根据 shakeTime_/shakeAmp_ 返回一个偏移量）
+    // （後でカメラ揺れを入れたい場合は、ここで shakeTime_/shakeAmp_ に応じたオフセットを返せる）
 }
 
 void IntroManager::Draw()
@@ -229,6 +229,6 @@ void IntroManager::Draw()
     if (introTitle_)      introTitle_->Draw();
     if (letterboxTop_)    letterboxTop_->Draw();
     if (letterboxBottom_) letterboxBottom_->Draw();
-    // 如果想显示 Skip 提示，解开下面的注释
+    // Skip 表示を出したいなら下のコメントを外す
     // if (skipHint_ && skipHint_->IsVisible()) skipHint_->Draw();
 }

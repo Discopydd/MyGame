@@ -128,7 +128,7 @@ ModelData Model::LoadObjectFile(const std::string& directoryPath, const std::str
 			}
 			if (tokensF.size() < 3) { continue; }
 
-			// 工具：保留空段分割 "v/vt/vn" 或 "v//vn" 或 "v/vt"
+			// ツール: 保留空段分割 "v/vt/vn" 或 "v//vn" 或 "v/vt"
 			auto splitKeepEmpty = [](const std::string& str) -> std::array<std::string, 3> {
 				std::array<std::string, 3> out{};
 				size_t p1 = str.find('/');
@@ -144,13 +144,13 @@ ModelData Model::LoadObjectFile(const std::string& directoryPath, const std::str
 
 			auto parseIndex = [](const std::string& s, int count) -> int {
 				if (s.empty()) return -1;            // 缺项
-				int idx = std::stoi(s);              // 允许负索引
-				if (idx > 0) return idx - 1;         // OBJ 正索引从1开始
-				if (idx < 0) return count + idx;     // 负索引：-1 表示最后
+				int idx = std::stoi(s);              // 許可负索引
+				if (idx > 0) return idx - 1;         // OBJ 正索引从1開始
+				if (idx < 0) return count + idx;     // 负索引: -1 表示最後
 				return -1;
 				};
 
-			// 解析本面的所有索引
+			// 解析本面的すべて索引
 			std::vector<int> vIdx, vtIdx, vnIdx;
 			vIdx.reserve(tokensF.size());
 			vtIdx.reserve(tokensF.size());
@@ -162,7 +162,7 @@ ModelData Model::LoadObjectFile(const std::string& directoryPath, const std::str
 				int vti = parseIndex(parts[1], (int)texcoords.size()); // 可能为空 → -1
 				int vni = parseIndex(parts[2], (int)normals.size());   // 可能为空 → -1
 				if (vi < 0 || vi >= (int)positions.size()) {
-					// 非法索引，整面跳过
+					// 非法索引、整面跳過
 					vIdx.clear(); vtIdx.clear(); vnIdx.clear();
 					break;
 				}
@@ -172,14 +172,14 @@ ModelData Model::LoadObjectFile(const std::string& directoryPath, const std::str
 			}
 			if (vIdx.size() < 3) { continue; }
 
-			// 三角扇切分 (0, i, i+1)，并按你原来的“逆序入栈”保持绕序
+			// 三角扇切分 (0, i, i+1)、かつ按你元の「逆序入栈」保持绕序
 			for (size_t i = 1; i + 1 < vIdx.size(); ++i) {
 				int ids[3] = { 0, (int)i, (int)i + 1 };
 				VertexData tri[3];
 				for (int k = 0; k < 3; ++k) {
 					int a = ids[k];
 					Vector4 position = positions[vIdx[a]];
-					// 你的坐标系在读 v 时已把 x *= -1；这里保持一致即可。:contentReference[oaicite:2]{index=2}
+					// 你的坐标系在読 v 時已 x *= -1；ここでは保持一致即可。:contentReference[oaicite:2]{index=2}
 
 					Vector2 texcoord = { 0.0f, 0.0f };
 					if (vtIdx[a] >= 0 && vtIdx[a] < (int)texcoords.size()) {
@@ -194,7 +194,7 @@ ModelData Model::LoadObjectFile(const std::string& directoryPath, const std::str
 					tri[k] = { position, texcoord, normal };
 				}
 
-				// 如果三点法线都为零，计算面法线回填
+				// もし三点法線都为零、计算面法線回填
 				auto isZero = [](const Vector3& n) { return n.x == 0 && n.y == 0 && n.z == 0; };
 				if (isZero(tri[0].normal) && isZero(tri[1].normal) && isZero(tri[2].normal)) {
 					Vector3 e1 = (Vector3{ tri[1].position.x, tri[1].position.y, tri[1].position.z } -
@@ -205,7 +205,7 @@ ModelData Model::LoadObjectFile(const std::string& directoryPath, const std::str
 					tri[0].normal = tri[1].normal = tri[2].normal = n;
 				}
 
-				// 与原代码一致：逆序 push（2,1,0）
+				// 与原代码一致: 逆序 push（2,1,0）
 				modelData.vertices.push_back(tri[2]);
 				modelData.vertices.push_back(tri[1]);
 				modelData.vertices.push_back(tri[0]);

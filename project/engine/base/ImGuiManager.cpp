@@ -58,7 +58,7 @@ void ImGuiManager::Draw() {
 	ID3D12GraphicsCommandList* commandList = directXCommon_->GetCommandList().Get();
 
     ImDrawData* dd = ImGui::GetDrawData();
-    // 关键判空/判尺寸/判命令条数 — 没数据就直接跳过，避免崩溃
+    // null／サイズ／コマンド数の重要チェック — データが無ければそのままスキップしてクラッシュを防ぐ
     if (dd == nullptr || dd->CmdListsCount == 0 || dd->DisplaySize.x <= 0.0f || dd->DisplaySize.y <= 0.0f) {
         return;
     }

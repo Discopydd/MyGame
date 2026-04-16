@@ -6,7 +6,7 @@
 #include "MyMath.h"
 #include <vector>
 #include <memory>
-// 需要用到 Player 的 GetHpRatio
+// Player の GetHpRatio を使用する
 #include <player/Player.h>
 
 class HPBar3DManager {
@@ -14,7 +14,7 @@ public:
     HPBar3DManager() = default;
     ~HPBar3DManager() = default;
 
-    // hpNdcZ: 用来控制血条离相机的深度（和你 GameScene 里的 hpNdcZ_ 同一个值）
+    // hpNdcZ: HPバーのカメラからの奥行きを制御する値（GameScene の hpNdcZ_ と同じ）
     void Initialize(Object3dCommon* objCommon,
                     Camera* camera,
                     Player* player,
@@ -22,13 +22,13 @@ public:
 
     void Finalize();
 
-    // 每帧更新（计算可见段数 & 重新摆放位置）
+    // 毎フレーム更新（可視段数の計算と再配置）
     void Update(float dt);
 
-    // 在 GameScene::Draw 的 3D 阶段调用
+    // GameScene::Draw の 3D 描画段階で呼び出す
     void Draw3D();
 
-    // 如果以后玩家指针变了，可以重新设置
+    // 後でプレイヤーポインタが変わった場合は再設定できる
     void SetPlayer(Player* player) { player_ = player; }
 
 private:
@@ -36,16 +36,16 @@ private:
     Camera*         camera_         = nullptr;
     Player*         player_         = nullptr;
 
-    std::vector<std::unique_ptr<Object3d>> strips_;   // 每一段血条
+    std::vector<std::unique_ptr<Object3d>> strips_;   // 各HPバーセグメント
 
-    int   segments_      = 5;        // 总段数
-    int   visibleCount_  = 5;        // 当前可见段数
-    float insetX_        = 40.0f;     // 屏幕左侧内边距
-    float insetY_        = 50.0f;     // 屏幕上侧内边距
-    float segPixelW_     = 45.0f;     // 每段宽度（屏幕像素）
-    float gapPixel_      = 4.0f;      // 段间距（像素）
-    float hpNdcZ_        = 0.08f;     // 深度
+    int   segments_      = 5;        // 総段数
+    int   visibleCount_  = 5;        // 現在可視段数
+    float insetX_        = 40.0f;     // 画面左側内側余白
+    float insetY_        = 50.0f;     // 画面上側内側余白
+    float segPixelW_     = 45.0f;     // 各段の幅（画面ピクセル）
+    float gapPixel_      = 4.0f;      // 段間の間隔（ピクセル）
+    float hpNdcZ_        = 0.08f;     // 奥行き
 
-    // 把屏幕坐标转成世界坐标（GameScene.cpp 里已有同名函数）
+    // 画面座標をワールド座標に変換（GameScene.cpp 内既存の同名関数）
     Vector3 ScreenToWorld_(float sx, float sy, float ndcZ);
 };

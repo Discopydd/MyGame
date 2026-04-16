@@ -408,12 +408,11 @@ namespace Math {
                  a.w * (1.0f - t) + b.w * t };
     }
     float Math::ToRadian(float degrees) {
-        // 使用你头文件里已定义的 PI 常量
         return degrees * (PI / 180.0f);
     }
 
     Quaternion Math::MakeAxisAngleQuaternion(const Vector3& axis, float angleRad) {
-        // 允许 axis 非单位向量；零向量则返回单位四元数
+        // axis は非単位ベクトルでも可；ゼロベクトルなら単位クォータニオンを返す
         float len = Math::Length(axis);
         if (len <= 1e-8f) {
             return Quaternion{ 0.0f, 0.0f, 0.0f, 1.0f }; // Identity (x,y,z,w)
@@ -424,10 +423,10 @@ namespace Math {
         float s = sinf(half);
         float c = cosf(half);
 
-        // 返回 (x, y, z, w) —— 向量部 = 轴 * sin(θ/2)，标量部 = cos(θ/2)
+        // 返す (x, y, z, w) —— 向量部 = 轴 * sin(θ/2)、标量部 = cos(θ/2)
         return Quaternion{ n.x * s, n.y * s, n.z * s, c };
     }
-    // ------------- 工具：长度与单位化（四元数为 x,y,z,w） -------------
+    // ------------- ツール: 長度与正規化（クォータニオン为 x,y,z,w） -------------
     static inline float QDot(const Quaternion& q1, const Quaternion& q2) {
         return q1.x * q2.x + q1.y * q2.y + q1.z * q2.z + q1.w * q2.w;
     }
@@ -441,15 +440,15 @@ namespace Math {
         return Quaternion{ q.x * inv, q.y * inv, q.z * inv, q.w * inv };
     }
 
-    // 线性插值（单位化后的 Lerp = Nlerp）
+    // 線性插值（单位化後的 Lerp = Nlerp）
     Quaternion Math::Lerp(const Quaternion& a, const Quaternion& b, float t, bool shortestPath) {
-        // 走最短弧：若点积为负，则取 -b
+        // 走最短弧: もし点积为负、なら取 -b
         Quaternion bb = b;
         float d = QDot(a, b);
         if (shortestPath && d < 0.0f) {
             bb = Quaternion{ -b.x, -b.y, -b.z, -b.w };
         }
-        // 线性插值并单位化
+        // 線性插值並单位化
         Quaternion q{
             a.x * (1.0f - t) + bb.x * t,
             a.y * (1.0f - t) + bb.y * t,
@@ -459,7 +458,7 @@ namespace Math {
         return QNormalize(q);
     }
 
-    // 球面线性插值（等角速度）
+    // 球面線形補間（等角速度）
     Quaternion Math::Slerp(const Quaternion& a, const Quaternion& b, float t, float eps) {
         float d = QDot(a, b);
         Quaternion bb = b;
@@ -469,7 +468,7 @@ namespace Math {
             bb = Quaternion{ -b.x, -b.y, -b.z, -b.w };
         }
 
-        // 非常接近时退化为 Nlerp（避免除以很小的数）
+        // 非常接近時退化为 Nlerp（避免除以很小的数）
         if (1.0f - d < eps) {
             return Lerp(a, bb, t, /*shortestPath=*/false);
         }
@@ -493,7 +492,6 @@ namespace Math {
         return (v < lo) ? lo : (v > hi) ? hi : v;
     }
 
-    // 约定：Quaternion 按 (x,y,z,w) 存储
     Vector3 Math::QuaternionToEuler(const Quaternion& q)
     {
         const float x = q.x, y = q.y, z = q.z, w = q.w;
@@ -528,7 +526,7 @@ namespace Math {
             rollZ = std::atan2(m01, m11);
         }
         else {
-            // 近奇异：合并一个角
+            // 特異点近傍: 合かつ一个角
             yawY = 0.0f;
             rollZ = std::atan2(-m10, m00);
         }

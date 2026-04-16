@@ -93,7 +93,7 @@ void TextureManager::LoadTexture(const std::string& filePath) {
 
     // 5) SRV フォーマット（色テクスチャは sRGB を優先）
     DXGI_FORMAT srvFormat = tex.metadata.format;
-    // より安全に：どの入力でも sRGB 変種があればそれを使う
+    // より安全に: どの入力でも sRGB 変種があればそれを使う
     if (!DirectX::IsSRGB(srvFormat)) {
         srvFormat = DirectX::MakeSRGB(srvFormat);
     }

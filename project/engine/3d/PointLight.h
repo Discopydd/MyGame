@@ -11,5 +11,5 @@ struct alignas(16) PointLight {
     int32_t pointLighting; // 4 bytes
     float padding[3];      // 补满16字节对齐
 
-    // 总计：16 + 16 + 16 = 48 bytes
+    // 合計: 16 + 16 + 16 = 48 bytes
 };

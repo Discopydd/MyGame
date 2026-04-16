@@ -1,4 +1,7 @@
 #include "Framework.h"
+#include "TextureManager.h"
+#include "ModelManager.h"
+#include "SoundManager.h"
 void Framework::Initialize() {
     sceneManager_ = std::make_unique<SceneManager>();
      WinApp::GetInstance()->Initialize();
@@ -29,6 +32,10 @@ void Framework::Draw() {
 }
 void Framework::Finalize() {
     sceneManager_.reset();
+
+    SoundManager::GetInstance()->Finalize();
+    TextureManager::GetInstance()->Finalize();
+    ModelManager::GetInstants()->Finalize();
 
     DirectXCommon::GetInstance()->Finalize();
     WinApp::GetInstance()->Finalize();

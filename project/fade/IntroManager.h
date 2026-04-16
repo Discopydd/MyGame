@@ -15,16 +15,16 @@ public:
     void Initialize(SpriteCommon* spriteCommon, Input* input);
     void Finalize();
 
-    // 开始 Intro，playerPos 用来当环绕中心（现在只是存着，之后你想加镜头动也可以用）
+    // Intro を開始し、playerPos を周回中心として保持する（現状では保持のみで、後からカメラ演出にも使える）
     void Start(const Vector3& playerPos);
 
-    // 每帧更新（在 GameScene::Update 里调用）
+    // 毎フレーム更新（GameScene::Update から呼び出す）
     void Update(float dt);
 
-    // 绘制 Intro UI（在 GameScene::Draw 里调用）
+    // イントロ UI を描画（GameScene::Draw から呼び出す）
     void Draw();
 
-    // 状态查询
+    // 状態確認
     bool IsPlaying() const {
         return (state_ != State::None && state_ != State::Done);
     }
@@ -32,33 +32,33 @@ public:
     State GetState() const { return state_; }
 
 private:
-    // 状态
+    // 状態
     State state_   = State::None;
     float t_       = 0.0f;
-    bool  skippable_ = true;   // 是否允许按键跳过
-    bool  started_   = false;  // 是否已经启动过一次
+    bool  skippable_ = true;   // キー入力でスキップ可能か
+    bool  started_   = false;  // すでに一度開始したか
 
-    // Sprite 们
+    // 各種 Sprite
     std::unique_ptr<Sprite> letterboxTop_;
     std::unique_ptr<Sprite> letterboxBottom_;
     std::unique_ptr<Sprite> vignette_;
     std::unique_ptr<Sprite> introTitle_;
     std::unique_ptr<Sprite> skipHint_;
 
-    // 摄像机相关（目前只保存，不在这里直接动相机）
+    // カメラ関連（今は保持のみで、ここでは直接カメラを動かさない）
     Vector3 camStartPos_{ 0, 12, -85 };
     Vector3 camTargetPos_{ 0,  8, -38 };
     Vector3 camPivot_{ 0, 0, 0 };
     float   camOrbitDeg_ = 0.0f;
 
-    // 屏幕震动（如果以后想用，可以从这里对 camera 做位移）
+    // 画面揺れ（後で使いたくなったら、ここから camera にオフセットをかけられる）
     float shakeTime_ = 0.0f;
     float shakeAmp_  = 0.0f;
 
     SpriteCommon* spriteCommon_ = nullptr;
     Input*        input_        = nullptr;
 
-    // Easing（照搬你 GameScene 里的实现）
+    // Easing（GameScene の実装をそのまま使用）
     float EaseOutCubic_(float t) { return 1.0f - powf(1.0f - t, 3.0f); }
     float EaseInOutSine_(float t) { return 0.5f * (1.0f - cosf(3.1415926f * t)); }
 };

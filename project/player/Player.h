@@ -34,13 +34,13 @@ public:
 
     void SetVelocity(const Vector3& v) { velocity_ = v; }
 
-    // 给外部（移动平台）用的“落地在某个高度”
+    // 外部用（移動床など）の「特定の高さに着地させる」処理
     void LandOnExternalGround(float groundTopY);
     int GetMaxHp() const { return maxHP_; }
-    // 让玩家“落在某个 Y 高度的地面上（平台/方块都可以用）”
+    // プレイヤーを「指定した Y 高さの地面上」に乗せる（足場 / ブロックのどちらでも使える）
     void SnapOnGround(float groundTopY);
 
-    // 外部强制位移（比如被移动平台带着走）
+    // 外部からの強制移動量（たとえば移動床に運ばれるとき）
     void ApplyExternalDisplacement(const Vector3& delta);
 
 
@@ -55,22 +55,32 @@ public:
     void   Heal(float v) { hp_ = (std::min)(hp_ + v, (float)maxHP_); }
     bool IsOnGround() const { return isOnGround_; }
 
-     // 水相关状态（可选：UI / 特效用）
+     // 水関連の状態（任意: UI / エフェクト用）
     bool IsInWater() const { return inWater_; }
     bool IsOnWaterSurface() const { return onWaterSurface_; }
 
-    bool  IsInvincible() const { return isInvincible_; }
-    void  StartInvincible(float duration);
+        bool  IsInvincible() const { return isInvincible_; }
+    bool  IsDamageInvincible() const { return damageInvincibleTimer_ > 0.0f; } // 「被ダメージ無敵」のみ（点滅あり）
+    void  StartInvincible(float duration);          // 被ダメージ無敵（点滅あり）
+    void  StartDashInvincible(float duration);      // ダッシュ無敵（点滅なし）
+    void  StartStompInvincible(float duration);     // 踏みつけ無敵（点滅なし）
+    
+    // 踏みつけクールダウン: Boss の頭上での無限連続踏みを防ぐため
+    bool  IsStompCooldown() const { return stompCooldownTimer_ > 0.0f; }
+    void  StartStompCooldown(float duration);
+
+    // 踏みつけノックバック: 踏んだ後の横方向への弾きを短時間だけ安定して効かせる（通常の空中操作感には影響しない）
+    void  StartStompKick(float vx, float duration);
 
     bool  IsDead() const { return isDead_; }
-    void  StartDeathFall();   // 触发死亡演出（被 GameScene 调用）
+    void  StartDeathFall();   // トリガー死亡演出（GameScene から呼び出す）
 
     bool ConsumeDoubleJumpEvent() {
         bool v = didDoubleJumpThisFrame_;
         didDoubleJumpThisFrame_ = false;
         return v;
     }
-    // 玩家是否面向右
+    // プレイヤーが右を向いているかどうか
     bool IsFacingRight() const { return lrDirection_ == LRDirection::kRight; }
 
     const Vector3& GetDashDirection() const { return dashDirection_; }
@@ -86,24 +96,24 @@ private:
     float moveSpeed_ = 0.25f;
 
     // ===== Jump tuning =====
-    // 起跳瞬间给一次“初速度”；长按在限定时窗内给予少量“向上加速度”，并对上升速度设上限
-    float jumpVelInit_ = 0.56f;   // 起跳初速度
-    float jumpVelMax_ = 1.05f;   // 上升速度上限
-    float jumpHoldAccel_ = 1.5f;   // 长按时的额外向上加速度（单位：世界单位/秒^2）
-    float maxJumpHoldTimeFirst_ = 0.15f;   // 长按生效的最大时长（秒）
-    float maxJumpHoldTimeSecond_ = 0.13f;   // 二段跳可蓄力时间
+    // ジャンプ開始時に初速度を与え、長押し中は一定時間だけ上向き加速度を追加し、上昇速度には上限を設ける
+    float jumpVelInit_ = 0.56f;   // ジャンプ開始初速度
+    float jumpVelMax_ = 1.05f;   // 上昇速度上限
+    float jumpHoldAccel_ = 1.5f;   // 長押し時の追加上向き加速度（単位: ワールド単位 / 秒^2）
+    float maxJumpHoldTimeFirst_ = 0.15f;   // 長押しが有効な最大時間（秒）
+    float maxJumpHoldTimeSecond_ = 0.13f;   // 2段ジャンプで溜められる時間
     bool  isOnGround_ = false;
-    bool  isJumping_ = false;   // “可控上升”阶段（在 hold 窗口内且还在上升）
-    float jumpPressDuration_ = 0.0f;   // 已长按时长（秒）
+    bool  isJumping_ = false;   // 「制御可能な上昇」状態（hold 窓内で、まだ上昇中）
+    float jumpPressDuration_ = 0.0f;   // 長押ししている時間（秒）
 
-    // 当前这一跳实际使用的最大蓄力时间（根据是第几段跳赋值）
+    // 現在のジャンプで実際に使う最大溜め時間（何段目かに応じて設定）
     float currentMaxJumpHoldTime_ = 0.0f;
-    // 可变重力：让“早松手/下落”更利落
-    float gravityBase_ = -2.20f; // 基础重力（向下为负）
-    float lowJumpGravityScale_ = 1.60f;  // 早松手仍在上升时的额外下拉倍率
-    float fallGravityScale_ = 2.20f;  // 下落期的额外下拉倍率
+    // 可変重力: 「早離し / 落下」をよりキビキビさせる
+    float gravityBase_ = -2.20f; // 基本重力（下向きは負）
+    float lowJumpGravityScale_ = 1.60f;  // 早離ししても上昇中のときの追加下向き倍率
+    float fallGravityScale_ = 2.20f;  // 落下中の追加下向き倍率
 
-    // 朝向 / 转身
+    // 向き / 旋回
     enum class LRDirection { kRight, kLeft };
     LRDirection lrDirection_ = LRDirection::kRight;
     float turnStartRotationY_ = 0;
@@ -112,7 +122,7 @@ private:
     const int turnTotalFrames_ = 10;
     float currentRotationY_ = 0.0f;
 
-    // 碰撞体积
+    // 当たり判定サイズ
     float width_ = 1.5f;
     float height_ = 1.5f;
 
@@ -127,44 +137,61 @@ private:
     const float dashCooldownThreshold_ = 0.1f;
     Vector3 dashDirection_ = { 1, 0, 0 };
 
-    bool  isDashJumping_ = false;       // 空中冲刺：无重力漂移
-    float dashGravity_ = 0.0f;          // 仅用于保持兼容（Update 内以 isDashJumping_ 控制 g=0）
+    bool  isDashJumping_ = false;       // 空中ダッシュ: 無重力で移動する
+    float dashGravity_ = 0.0f;          // 互換性維持用のみ（Update 内では isDashJumping_ で g=0 を制御）
 
-    // 顶头后的短锁
+    // 頭上衝突後の短いロック
     float headBonkTimer_ = 0.0f;
     static inline const float kHeadBonkLock_ = 0.05f;
 
     // --- HP members ---
     int   maxHP_ = 100;
     float hp_ = 100.0f;
-    float hpDrainPerSec_ = 5.0f;   // 每秒扣 5 点
+    float hpDrainPerSec_ = 5.0f;   // 毎秒 5 減少
 
-    // 兼容旧接口（现在不再直接使用外部“每帧重力值”，但保留复位逻辑）
-    float originalGravity_ = -2.20f; // 与 gravityBase_ 对齐
+    // 旧インターフェース互換用（現在は毎フレームの重力値を直接使わないが、復帰ロジックは残す）
+    float originalGravity_ = -2.20f; // gravityBase_ に合わせる
 
     // ---- Death (GameOver) ----
     bool  isDead_ = false;
     bool  deathStarted_ = false;
     float deathTimer_ = 0.0f;
-    float deathJumpVel_ = 0.78f;     // 微跳初速度(与现有单位一致, 直接加到velocity_.y)
-    float deathRotateTime_ = 0.35f;  // 旋转到倒立所需时间(s)
-    float deathExtraGravScale_ = 2.2f; // 死亡下坠时的重力放大
-    float deathSpinZ_ = 0.0f;        // 倒立旋转Z角(0→π)
+    float deathJumpVel_ = 0.78f;     // 小さく跳ねる初速度（既存単位系に合わせ、そのまま velocity_.y に加える）
+    float deathRotateTime_ = 0.35f;  // 倒立するまでの回転時間（秒）
+    float deathExtraGravScale_ = 2.2f; // 死亡落下時の重力倍率
+    float deathSpinZ_ = 0.0f;        // 倒立時の Z 回転角（0→π）
 
     // ---- Jump / Double Jump ----
-    int   jumpCount_ = 0;        // 已使用的跳跃次数
-    int   maxJumpCount_ = 2;     // 最大跳跃次数（2 = 二段跳）
+    int   jumpCount_ = 0;        // 使用済みのジャンプ回数
+    int   maxJumpCount_ = 2;     // 最大ジャンプ回数（2 = 2段ジャンプ）
 
-    bool  didDoubleJumpThisFrame_ = false; // 本帧是否触发了二段跳
 
-    // --- 受伤无敌 & 闪烁 ---
+    bool  didDoubleJumpThisFrame_ = false; // このフレームで 2段ジャンプが発動したかどうか
+    // --- 無敵（被ダメージ / ダッシュ / 踏みつけ）と点滅（被ダメージ無敵のみ） ---
     bool  isInvincible_ = false;
-    float invincibleTimer_ = 0.0f;
-    float damageBlinkTimer_ = 0.0f;
-    float damageBlinkInterval_ = 0.08f; // 闪烁间隔（秒）
-    bool  damageBlinkVisible_ = true;
 
-     // ---- 水状态 ----
-    bool inWater_ = false;        // 是否处于水块内部（按下 S 下潜）
-    bool onWaterSurface_ = false; // 是否在水面上漂浮
+    // 被ダメージ無敵: 点滅あり（被ダメージ後 1 秒無敵など）
+    float damageInvincibleTimer_ = 0.0f;
+
+    // ダッシュ無敵: ダッシュ中は無敵（点滅なし）
+    float dashInvincibleTimer_ = 0.0f;
+
+    // 踏みつけ無敵: 敵を踏んだ後の短時間無敵（点滅なし）
+    float stompInvincibleTimer_ = 0.0f;
+
+
+    // 踏みつけクールダウン: Boss の頭上での無限連続踏みを防ぐ
+    float stompCooldownTimer_ = 0.0f;
+
+    // 踏みつけノックバック: 短時間だけ水平速度を上書き / 混合し、「棒立ち踏み」を防ぎつつ自然な手触りにする
+    float stompKickTimer_ = 0.0f;
+    float stompKickTotal_ = 0.0f;
+    float stompKickVx_    = 0.0f;
+    // 点滅（damageInvincibleTimer_ > 0 のときのみ有効）
+    float damageBlinkTimer_ = 0.0f;
+    float damageBlinkInterval_ = 0.08f; // 点滅間隔（秒）
+    bool  damageBlinkVisible_ = true;
+     // ---- 水状態 ----
+    bool inWater_ = false;        // 水ブロック内部にいるかどうか（S を押すと潜る）
+    bool onWaterSurface_ = false; // 水面に浮いているかどうか
 };

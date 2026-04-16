@@ -9,13 +9,17 @@ void DashUIManager::Initialize(SpriteCommon* spriteCommon, Player* player)
 
     icon_ = std::make_unique<Sprite>();
     icon_->Initialize(spriteCommon_, textureFilePath[0]);
-    icon_->SetPosition({ 40.0f, 80.0f });
-    icon_->SetSize({ 32.0f, 32.0f });
+    icon_->SetPosition({ 30.0f, 80.0f });
+    icon_->SetSize({ 64.0f, 64.0f });
 
     overlay_ = std::make_unique<Sprite>();
     overlay_->Initialize(spriteCommon_, textureFilePath[1]);
-    overlay_->SetPosition({ 40.0f, 80.0f });
-    overlay_->SetSize({ 32.0f, 32.0f });
+
+    // overlay の元テクスチャサイズを保存する（Initialize 内で textureSize_ は「元画像サイズ」になる）
+    overlayFullTexSize_ = overlay_->GetTextureSize();
+
+    overlay_->SetPosition({ 30.0f, 80.0f });
+    overlay_->SetSize({ 64.0f, 64.0f });
 }
 
 void DashUIManager::Finalize()
@@ -42,11 +46,26 @@ void DashUIManager::Update(float dt)
 
     if (overlay_) {
         if (ratio > 0.0f) {
-            float fullH     = 32.0f;
-            float visibleH  = fullH * ratio;
-            overlay_->SetTextureLeftTop({ 0.0f, 0.0f });
-            overlay_->SetTextureSize({ 32.0f, visibleH });
-            overlay_->SetSize({ 32.0f, visibleH });
+            // アイコンの画面サイズ／位置（位置合わせ用）
+            const Vector2 iconSize = icon_ ? icon_->GetSize() : Vector2{ 32.0f, 32.0f };
+            const Vector2 iconPos  = icon_ ? icon_->GetPosition() : Vector2{ 40.0f, 80.0f };
+
+            const float fullSpriteH    = iconSize.y;
+            const float visibleSpriteH = fullSpriteH * ratio;
+
+            // テクスチャの切り抜きは必ず「元テクスチャの高さ」で計算する（例: 52 * ratio）。そうしないと切り抜き位置がずれる
+            const float texW        = overlayFullTexSize_.x;
+            const float texH        = overlayFullTexSize_.y;
+            const float visibleTexH = texH * ratio;
+
+            // 下から表示を開始（下揃え）
+            overlay_->SetTextureLeftTop({ 0.0f, texH - visibleTexH });
+            overlay_->SetTextureSize({ texW, visibleTexH });
+
+            // 画面上では幅をそのままにし、高さだけ ratio に応じて縮め、位置を下げて下揃えを維持する
+            overlay_->SetSize({ iconSize.x, visibleSpriteH });
+            overlay_->SetPosition({ iconPos.x, iconPos.y + (fullSpriteH - visibleSpriteH) });
+
             overlay_->SetVisible(true);
         } else {
             overlay_->SetVisible(false);

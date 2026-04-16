@@ -1,11 +1,17 @@
 #include "GameScene.h"
 #include <numbers>
+#include <algorithm>
+#include <cmath>
 #include <scene/LoadingScene.h>
 #include "SceneManager.h"
 #include <cstdlib>
 namespace {
-    // 0.0f = 完全没有伤害高度, 1.0f = 整个格子都算刺
+    // 0.0f = ダメージ高さなし、1.0f = セル全体をトゲとして扱う
     constexpr float kSpikeHeightRatio = 0.5f;
+
+    // Boss 演出中: プレイヤー位置を固定し、重力／慣性／衝突による移動を防ぐ
+    bool    gBossIntroFreezePlayer = false;
+    Vector3 gBossIntroFrozenPlayerPos{};
 }
 
 static float RandRangeFloat(float a, float b)
@@ -13,25 +19,46 @@ static float RandRangeFloat(float a, float b)
     float t = static_cast<float>(rand()) / RAND_MAX;
     return a + (b - a) * t;
 }
-// 将3D世界坐标转换为屏幕坐标
+
+static float SmoothStep01(float t)
+{
+    if (t < 0.0f) t = 0.0f;
+    if (t > 1.0f) t = 1.0f;
+    return t * t * (3.0f - 2.0f * t);
+}
+
+static float LerpFloat(float a, float b, float t)
+{
+    return a + (b - a) * t;
+}
+
+static Vector3 LerpVec3(const Vector3& a, const Vector3& b, float t)
+{
+    return {
+        a.x + (b.x - a.x) * t,
+        a.y + (b.y - a.y) * t,
+        a.z + (b.z - a.z) * t
+    };
+}
+// 3Dワールド座標を画面座標に変換
 Vector3 WorldToScreen(const Vector3& worldPos, Camera* camera)
 {
-    // 先构建齐次坐标
+    // まず同次座標を構築
     float x = worldPos.x;
     float y = worldPos.y;
     float z = worldPos.z;
     float w = 1.0f;
 
-    // VP 矩阵
+    // VP 行列
     const Matrix4x4& vp = camera->GetViewprojectionMatrix();
 
-    // 变换到 clip space
+    // クリップ空間へ変換
     float clipX = x * vp.m[0][0] + y * vp.m[1][0] + z * vp.m[2][0] + w * vp.m[3][0];
     float clipY = x * vp.m[0][1] + y * vp.m[1][1] + z * vp.m[2][1] + w * vp.m[3][1];
     float clipZ = x * vp.m[0][2] + y * vp.m[1][2] + z * vp.m[2][2] + w * vp.m[3][2];
     float clipW = x * vp.m[0][3] + y * vp.m[1][3] + z * vp.m[2][3] + w * vp.m[3][3];
 
-    // 透视除法
+    // 透視除法
     if (clipW != 0.0f)
     {
         clipX /= clipW;
@@ -39,221 +66,55 @@ Vector3 WorldToScreen(const Vector3& worldPos, Camera* camera)
         clipZ /= clipW;
     }
 
-    // NDC (-1~1) -> 屏幕坐标
+    // NDC (-1~1) -> 画面座標
     float screenX = (clipX * 0.5f + 0.5f) * float(WinApp::kClientWidth);
     float screenY = (1.0f - (clipY * 0.5f + 0.5f)) * float(WinApp::kClientHeight);
     float ndcZ    = clipZ * 0.5f + 0.5f;
     return { screenX, screenY, ndcZ };
 }
-// 将屏幕像素坐标(x,y)映射到世界坐标，ndcZ∈[0,1]：0=近裁剪面, 1=远裁剪面
+// 画面ピクセル座標(x,y)をワールド座標へ変換。ndcZ∈[0,1]: 0=ニアクリップ面、1=ファークリップ面
 Vector3 ScreenToWorld(float screenX, float screenY, float ndcZ, Camera* camera)
 {
     const Matrix4x4& vp = camera->GetViewprojectionMatrix();
-    Matrix4x4 invVP = Math::Inverse(vp); // 需要你项目里的矩阵求逆函数
+    Matrix4x4 invVP = Math::Inverse(vp); // プロジェクト内の逆行列計算関数が必要
 
     float ndcX = (screenX / float(WinApp::kClientWidth)) * 2.0f - 1.0f;
-    float ndcY = -(screenY / float(WinApp::kClientHeight)) * 2.0f + 1.0f; // 注意Y翻转
+    float ndcY = -(screenY / float(WinApp::kClientHeight)) * 2.0f + 1.0f; // Y反転に注意
 
     Vector3 world = Math::TransformCoordLocal(Vector3{ ndcX, ndcY, ndcZ }, invVP);
     return world;
 }
 
-void GameScene::GenerateBlocks() {
-    // 先清理旧的方块 / 水块 / 平台 / 敌人
-    mapBlocks_.clear();
-    waterBlocks_.clear();
-    movingPlatforms_.clear();
-    enemies_.clear();
 
-    for (uint32_t y = 0; y < mapChipField_.numBlockVertical_; y++) {
-        for (uint32_t x = 0; x < mapChipField_.numBlockHorizontal_; x++) {
-            MapChipType type     = mapChipField_.GetMapChipTypeByIndex(x, y);
-            Vector3     position = mapChipField_.GetMapChipPositionByIndex(x, y);
-
-            // 普通方块
-            if (type == MapChipType::kBlock) {
-                auto block = std::make_unique<Object3d>();
-                block->Initialize(object3dCommon_.get());
-                block->SetModel("cube/cube.obj");
-                block->SetCamera(camera_.get());
-                block->SetTranslate(position);
-                mapBlocks_.push_back(std::move(block));
-            }
-            // 第二种方块
-            else if (type == MapChipType::kBlock2) {
-                auto block2 = std::make_unique<Object3d>();
-                block2->Initialize(object3dCommon_.get());
-                block2->SetModel("cube2/cube2.obj");
-                block2->SetCamera(camera_.get());
-                block2->SetTranslate(position);
-                mapBlocks_.push_back(std::move(block2));
-            }
-            // 传送门（可视方块）
-            else if (type == MapChipType::kPortal) {
-                auto portal = std::make_unique<Object3d>();
-                portal->Initialize(object3dCommon_.get());
-                portal->SetModel("door/Door.obj");
-                portal->SetCamera(camera_.get());
-                portal->SetTranslate(position);
-                mapBlocks_.push_back(std::move(portal));
-            }
-            // 道具格
-            else if (type == MapChipType::kItem) {
-                if (!itemMgr_) { continue; }
-
-                // 若该格在此地图已经被拾取过，则不再生成
-                if (!itemMgr_->CanSpawnItem(currentMapPath_, x, y)) {
-                    continue;
-                }
-
-                auto item = std::make_unique<Object3d>();
-                item->Initialize(object3dCommon_.get());
-                item->SetModel("coin/coin.obj");
-                item->SetCamera(camera_.get());
-
-                Vector3 itemPos = position;
-                itemPos.y += 0.4f;
-                item->SetTranslate(itemPos);
-                item->SetEnableLighting(true);
-                item->SetDirectionalLightIntensity(2.0f);
-                item->SetPointLightIntensity(2.0f);
-
-                itemMgr_->RegisterItem(currentMapPath_, x, y, std::move(item));
-            }
-            // 地刺
-            else if (type == MapChipType::kSpike) {
-                auto spike = std::make_unique<Object3d>();
-                spike->Initialize(object3dCommon_.get());
-                spike->SetModel("strip/strip.obj");
-                spike->SetCamera(camera_.get());
-
-                Vector3 spikePos = position;
-                spikePos.y -= 0.1f;
-                spike->SetTranslate(spikePos);
-                spike->SetLightingMode(2);
-                mapBlocks_.push_back(std::move(spike));
-            }
-            // 水块
-            else if (type == MapChipType::kWater) {
-                auto water = std::make_unique<Object3d>();
-                water->Initialize(object3dCommon_.get());
-                water->SetModel("water/water.obj");
-                water->SetCamera(camera_.get());
-                water->SetTranslate(position);
-                Vector4 color = water->GetColor();
-                color.w = 0.5f;
-                water->SetColor(color);
-                waterBlocks_.push_back(std::move(water));
-            }
-            // 敌人
-            else if (type == MapChipType::kEnemy) {
-                uint8_t subID = mapChipField_.GetMapChipSubIDByIndex(x, y);
-
-                EnemyType eType = EnemyType::Type0;
-                if (subID == 1) {
-                    eType = EnemyType::Type1;
-                }
-
-                auto enemy = std::make_unique<Enemy>();
-                enemy->Initialize(object3dCommon_.get(), camera_.get(), position, eType);
-                enemies_.push_back(std::move(enemy));
-            }
-        }
-    }
-
-    // === 生成左右移动平台（连续的 kMoveHorizontal 一条为一个 MovingPlatform）===
-    for (uint32_t y = 0; y < mapChipField_.numBlockVertical_; ++y) {
-        uint32_t x = 0;
-        while (x < mapChipField_.numBlockHorizontal_) {
-            MapChipType t = mapChipField_.GetMapChipTypeByIndex(x, y);
-            if (t != MapChipType::kMoveHorizontal) {
-                ++x;
-                continue;
-            }
-
-            uint32_t startX = x;
-            uint32_t endX   = x;
-            while (endX + 1 < mapChipField_.numBlockHorizontal_ &&
-                   mapChipField_.GetMapChipTypeByIndex(endX + 1, y) == MapChipType::kMoveHorizontal) {
-                ++endX;
-            }
-
-            int length = static_cast<int>(endX - startX + 1);
-
-            Vector3 leftPos  = mapChipField_.GetMapChipPositionByIndex(startX, y);
-            Vector3 rightPos = mapChipField_.GetMapChipPositionByIndex(endX, y);
-            Vector3 center{};
-            center.x = (leftPos.x + rightPos.x) * 0.5f;
-            center.y = leftPos.y;
-            center.z = leftPos.z;
-
-            auto platform = std::make_unique<MovingPlatform>();
-            platform->Initialize(
-                object3dCommon_.get(),
-                camera_.get(),
-                center,
-                MovingPlatform::Axis::Horizontal,
-                movingPlatformSpeed_,
-                length
-            );
-            movingPlatforms_.push_back(std::move(platform));
-
-            x = endX + 1;
-        }
-    }
-
-    // === 生成上下移动平台（连续的 kMoveVertical 一条为一个 MovingPlatform）===
-    for (uint32_t y = 0; y < mapChipField_.numBlockVertical_; ++y) {
-        uint32_t x = 0;
-        while (x < mapChipField_.numBlockHorizontal_) {
-            MapChipType t = mapChipField_.GetMapChipTypeByIndex(x, y);
-            if (t != MapChipType::kMoveVertical) {
-                ++x;
-                continue;
-            }
-
-            uint32_t startX = x;
-            uint32_t endX   = x;
-            while (endX + 1 < mapChipField_.numBlockHorizontal_ &&
-                   mapChipField_.GetMapChipTypeByIndex(endX + 1, y) == MapChipType::kMoveVertical) {
-                ++endX;
-            }
-
-            int length = static_cast<int>(endX - startX + 1);
-
-            Vector3 leftPos  = mapChipField_.GetMapChipPositionByIndex(startX, y);
-            Vector3 rightPos = mapChipField_.GetMapChipPositionByIndex(endX, y);
-            Vector3 center{};
-            center.x = (leftPos.x + rightPos.x) * 0.5f;
-            center.y = leftPos.y;
-            center.z = leftPos.z;
-
-            auto platform = std::make_unique<MovingPlatform>();
-            platform->Initialize(
-                object3dCommon_.get(),
-                camera_.get(),
-                center,
-                MovingPlatform::Axis::Vertical,
-                movingPlatformSpeed_,
-                length
-            );
-            movingPlatforms_.push_back(std::move(platform));
-
-            x = endX + 1;
-        }
-    }
+namespace {
+    const char* kDeferredInitModelPaths[] = {
+        "cube/cube.obj",
+        "player/player.obj",
+        "door/Door.obj",
+        "strip/strip.obj",
+        "coin/coin.obj",
+        "coin_ui/coin_ui.obj",
+        "snow/snow.obj",
+        "jump/jump.obj",
+        "star/star.obj",
+        "hurd/hurd.obj",
+        "cube2/cube2.obj",
+        "water/water.obj",
+        "enemy0/enemy0.obj",
+        "enemy1/enemy1.obj",
+        "enemy2/enemy2.obj",
+        "enemy3/enemy3.obj",
+        "enemyBullet/enemyBullet.obj",
+    };
 }
 
-void GameScene::Initialize() {
-    winApp_      = WinApp::GetInstance();
-    dxCommon_    = DirectXCommon::GetInstance();
-    input_       = Input::GetInstance();
-    srvManager_  = SrvManager::GetInstance();
-    spriteCommon_= SpriteCommon::GetInstance();
+bool GameScene::IsInitializationComplete() const
+{
+    return initComplete_;
+}
 
-    // 纹理管理器（单例）初始化
-    TextureManager::GetInstance()->Initialize(dxCommon_, srvManager_);
-
+void GameScene::InitializeUiSprites_()
+{
     // === 背景 Sprite ===
     const std::string kSkyTexPath = "Resources/sky_bg.png";
 
@@ -264,12 +125,101 @@ void GameScene::Initialize() {
         static_cast<float>(WinApp::kClientWidth),
         static_cast<float>(WinApp::kClientHeight)
     });
+    backgroundSprite_->Update();
 
-    // === ImGui 管理器 ===
+    // ================== Pause Menu（ESC） ==================
+    {
+        const std::string kContinueNormalTex  = "Resources/button_continue_game_q_2x.png";
+        const std::string kBackNormalTex      = "Resources/button_back_to_title_q_2x.png";
+        const std::string kContinueSelectTex  = "Resources/selected_continue_game_2x.png";
+        const std::string kBackSelectTex      = "Resources/selected_back_to_title_2x.png";
+
+        const Vector2 kBtnSize = { 416.0f / 2.0f, 168.0f / 2.0f };
+        const float   kGapY = 18.0f;
+        const float   totalH = kBtnSize.y * 2.0f + kGapY;
+        const float   startY = (WinApp::kClientHeight - totalH) * 0.5f;
+        const float   posX   = (WinApp::kClientWidth - kBtnSize.x) * 0.5f;
+        const Vector2 continuePos = { posX, startY };
+        const Vector2 backPos     = { posX, startY + kBtnSize.y + kGapY };
+
+        pauseContinueNormal_ = std::make_unique<Sprite>();
+        pauseContinueNormal_->Initialize(spriteCommon_, kContinueNormalTex);
+        pauseContinueNormal_->SetPosition(continuePos);
+        pauseContinueNormal_->SetSize(kBtnSize);
+
+        pauseContinueSelected_ = std::make_unique<Sprite>();
+        pauseContinueSelected_->Initialize(spriteCommon_, kContinueSelectTex);
+        pauseContinueSelected_->SetPosition(continuePos);
+        pauseContinueSelected_->SetSize(kBtnSize);
+
+        pauseBackNormal_ = std::make_unique<Sprite>();
+        pauseBackNormal_->Initialize(spriteCommon_, kBackNormalTex);
+        pauseBackNormal_->SetPosition(backPos);
+        pauseBackNormal_->SetSize(kBtnSize);
+
+        pauseBackSelected_ = std::make_unique<Sprite>();
+        pauseBackSelected_->Initialize(spriteCommon_, kBackSelectTex);
+        pauseBackSelected_->SetPosition(backPos);
+        pauseBackSelected_->SetSize(kBtnSize);
+
+        isPaused_ = false;
+        pauseCursor_ = 0;
+    }
+
+    {
+        const std::string kPauseDimTex = "Resources/black.png";
+        pauseDimSprite_ = std::make_unique<Sprite>();
+        pauseDimSprite_->Initialize(spriteCommon_, kPauseDimTex);
+        pauseDimSprite_->SetPosition({ 0.0f, 0.0f });
+        pauseDimSprite_->SetSize({
+            static_cast<float>(WinApp::kClientWidth),
+            static_cast<float>(WinApp::kClientHeight)
+        });
+        pauseDimSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 0.6f });
+        pauseDimSprite_->SetVisible(true);
+        pauseDimSprite_->Update();
+    }
+
+    const std::string kBossDamageBarTex = "Resources/Damagebar.png";
+    const std::string kBossHpBarTex     = "Resources/HPbar.png";
+
+    bossHpDamageSprite_ = std::make_unique<Sprite>();
+    bossHpDamageSprite_->Initialize(spriteCommon_, kBossDamageBarTex);
+
+    bossHpSprite_ = std::make_unique<Sprite>();
+    bossHpSprite_->Initialize(spriteCommon_, kBossHpBarTex);
+
+    bossHpBarSize_ = { 420.0f, 24.0f };
+    bossHpBarPos_  = { (WinApp::kClientWidth - bossHpBarSize_.x) * 0.5f, 24.0f };
+
+    bossHpDamageSprite_->SetPosition(bossHpBarPos_);
+    bossHpDamageSprite_->SetSize(bossHpBarSize_);
+    bossHpDamageSprite_->SetVisible(false);
+
+    bossHpSprite_->SetPosition(bossHpBarPos_);
+    bossHpSprite_->SetSize(bossHpBarSize_);
+    bossHpSprite_->SetVisible(false);
+
+    bossHpRatio_ = 1.0f;
+    bossDamageRatio_ = 1.0f;
+    bossHpVisible_ = false;
+
+    const std::string kBossNameTex = "Resources/Boss_name.png";
+    bossNameSprite_ = std::make_unique<Sprite>();
+    bossNameSprite_->Initialize(spriteCommon_, kBossNameTex);
+    const Vector2 bossNameSize = { 420.0f, 64.0f };
+    const Vector2 bossNamePos  = { (WinApp::kClientWidth - bossNameSize.x) * 0.5f, 16.0f };
+    bossNameSprite_->SetPosition(bossNamePos);
+    bossNameSprite_->SetSize(bossNameSize);
+    bossNameSprite_->SetVisible(false);
+    bossNameVisible_ = false;
+}
+
+void GameScene::InitializeCoreSystems_()
+{
     imguiManager_ = std::make_unique<ImGuiManager>();
     imguiManager_->Initialize(winApp_, dxCommon_, srvManager_);
 
-    // === 3D 共通 & 摄像机 ===
     object3dCommon_ = std::make_unique<Object3dCommon>();
     object3dCommon_->Initialize(dxCommon_);
 
@@ -282,32 +232,16 @@ void GameScene::Initialize() {
     camera_ = std::make_unique<Camera>();
     camera_->SetRotate({ 0, 0, 0 });
     object3dCommon_->SetDefaultCamera(camera_.get());
+}
 
-    // 预先加载所有需要的模型
-    ModelManager::GetInstants()->LoadModel("cube/cube.obj");
-    ModelManager::GetInstants()->LoadModel("player/player.obj");
-    ModelManager::GetInstants()->LoadModel("door/Door.obj");
-    ModelManager::GetInstants()->LoadModel("strip/strip.obj");
-    ModelManager::GetInstants()->LoadModel("coin/coin.obj");
-    ModelManager::GetInstants()->LoadModel("coin_ui/coin_ui.obj");
-    ModelManager::GetInstants()->LoadModel("snow/snow.obj");
-    ModelManager::GetInstants()->LoadModel("jump/jump.obj");
-    ModelManager::GetInstants()->LoadModel("star/star.obj");
-    ModelManager::GetInstants()->LoadModel("hurd/hurd.obj");
-    ModelManager::GetInstants()->LoadModel("cube2/cube2.obj");
-    ModelManager::GetInstants()->LoadModel("water/water.obj");
-    ModelManager::GetInstants()->LoadModel("enemy0/enemy0.obj");
-    ModelManager::GetInstants()->LoadModel("enemy1/enemy1.obj");
-
-    // === 玩家 ===
+void GameScene::InitializeGameplayManagers_()
+{
     player_ = std::make_unique<Player>();
     player_->Initialize(object3dCommon_.get(), camera_.get());
 
-    // === HP 3D 条管理器 ===
     hpBar_ = std::make_unique<HPBar3DManager>();
     hpBar_->Initialize(object3dCommon_.get(), camera_.get(), player_.get(), hpNdcZ_);
 
-    // === 跟随摄像机 ===
     playerCamera_ = std::make_unique<PlayerCamera>();
     playerCamera_->Initialize(camera_.get(), player_.get(), &mapChipField_);
     playerCamera_->SetOffset({ 0, 0.0f, -40.0f });
@@ -316,53 +250,42 @@ void GameScene::Initialize() {
 
     prevCameraPos_ = camera_->GetTransform().translate;
 
-    // === 冲刺技能 UI 管理器 ===
     dashUI_ = std::make_unique<DashUIManager>();
     dashUI_->Initialize(spriteCommon_, player_.get());
 
-    // === Coin UI 管理器 ===
     coinUI_ = std::make_unique<CoinUIManager>();
     coinUI_->Initialize(spriteCommon_, object3dCommon_.get(), camera_.get(), hpNdcZ_);
     coinUI_->SetTotalCoin(totalCoinCollected_);
 
-    // === Hint UI 管理器 ===
     hintUI_ = std::make_unique<HintUIManager>();
     hintUI_->Initialize(spriteCommon_, camera_.get());
-
-    // 把 GameScene 里的 HintSprite 指针交给管理器（注意：这里是借用指针）
     hintUI_->SetSpaceHint(&spaceHint_);
     hintUI_->SetShiftHint(&shiftHint_);
     hintUI_->SetSprintHint(&sprintHint_);
     hintUI_->SetUpHints(&upHints_);
 
-    // === Item 管理器 ===
     itemMgr_ = std::make_unique<ItemManager>();
     itemMgr_->Initialize(object3dCommon_.get(), camera_.get());
 
-    // === Portal 管理器 ===
     portalMgr_ = std::make_unique<PortalManager>();
     portalMgr_->Initialize(spriteCommon_, camera_.get());
 
     isMapLoading_ = false;
     loadingTimer_ = 0.0f;
 
-    // === Fade 管理器 ===
     fade_ = std::make_unique<FadeManager>();
     fade_->Initialize(spriteCommon_);
+    fade_->SetAlpha(1.0f);
 
-    // === Intro 管理器 ===
     intro_ = std::make_unique<IntroManager>();
     intro_->Initialize(spriteCommon_, input_);
 
-    // === GameOver 管理器 ===
     gameOver_ = std::make_unique<GameOverManager>();
     gameOver_->Initialize(spriteCommon_);
 
-    // === GameClear 管理器 ===
     gameClear_ = std::make_unique<GameClearManager>();
     gameClear_->Initialize(spriteCommon_, object3dCommon_.get(), camera_.get(), hpNdcZ_);
 
-    // === 粒子系统 ===
     particleMgr_ = std::make_unique<ParticleManager>();
     particleMgr_->Initialize(object3dCommon_.get(), spriteCommon_);
 
@@ -377,6 +300,450 @@ void GameScene::Initialize() {
         windEmitter_->SetUseOriginalSpriteSize(true);
         windEmitter_->SetMaxParticles(40);
     }
+
+    if (snowEmitter_) {
+        snowEmitter_->SetSnowMode(true);
+        snowEmitter_->SetMaxParticles(200);
+        snowEmitter_->SetFollowCamera(true);
+    }
+
+    if (dashStarEmitter_) {
+        dashStarEmitter_->SetMaxParticles(150);
+        dashStarEmitter_->SetSnowMode(false);
+        dashStarEmitter_->SetWindMode(false);
+        dashStarEmitter_->SetFollowCamera(false);
+    }
+
+    hubStageByMap_.clear();
+    hubStageByMap_["Resources/map/map3.csv"] = 0;
+    hubStageByMap_["Resources/map/map4.csv"] = 1;
+    hubStageByMap_["Resources/map/map5.csv"] = 2;
+    hubStageByMap_["Resources/map/map6.csv"] = 3;
+    hubProgress_      = 0;
+    allStagesCleared_ = false;
+
+    bossDefeated_ = false;
+    playerIndexHistoryCursor_      = 0;
+    playerIndexHistoryInitialized_ = false;
+    playerIndexOneSecAgo_          = MapChipField::IndexSet{};
+}
+
+void GameScene::UpdateInitialization()
+{
+    switch (deferredInitPhase_) {
+    case DeferredInitPhase::UiSprites:
+        InitializeUiSprites_();
+        deferredInitPhase_ = DeferredInitPhase::CoreSystems;
+        break;
+
+    case DeferredInitPhase::CoreSystems:
+        InitializeCoreSystems_();
+        deferredInitPhase_ = DeferredInitPhase::ModelWarmup;
+        break;
+
+    case DeferredInitPhase::ModelWarmup:
+    {
+        size_t loadedThisFrame = 0;
+        const size_t kModelCount = sizeof(kDeferredInitModelPaths) / sizeof(kDeferredInitModelPaths[0]);
+        while (deferredModelLoadCursor_ < kModelCount && loadedThisFrame < kInitModelLoadsPerFrame) {
+            ModelManager::GetInstants()->LoadModel(kDeferredInitModelPaths[deferredModelLoadCursor_]);
+            ++deferredModelLoadCursor_;
+            ++loadedThisFrame;
+        }
+        if (deferredModelLoadCursor_ >= kModelCount) {
+            deferredInitPhase_ = DeferredInitPhase::GameplayManagers;
+        }
+        break;
+    }
+
+    case DeferredInitPhase::GameplayManagers:
+        InitializeGameplayManagers_();
+        deferredInitPhase_ = DeferredInitPhase::InitialMapPrepare;
+        break;
+
+    case DeferredInitPhase::InitialMapPrepare:
+        shouldStartLoading_ = false;
+        LoadMap("Resources/map/map6.csv", { 2, 1, 0 });
+        isIncrementalMapLoading_ = true;
+        deferredInitPhase_ = DeferredInitPhase::InitialMapBuild;
+        break;
+
+    case DeferredInitPhase::InitialMapBuild:
+        ProcessPendingMapSpawns(kMapSpawnBudgetPerFrame);
+        if (IsMapBuildComplete()) {
+            FinishMapLoading(Vector3{ 3, 3, 0 });
+            if (player_) {
+                player_->ResetForMapTransition(true);
+            }
+            initComplete_ = true;
+            deferredInitPhase_ = DeferredInitPhase::Complete;
+        }
+        break;
+
+    case DeferredInitPhase::Complete:
+    case DeferredInitPhase::None:
+    default:
+        break;
+    }
+}
+
+void GameScene::SyncLoadedSceneForReveal()
+{
+    if (player_) {
+        player_->SetVelocity({ 0.0f, 0.0f, 0.0f });
+    }
+
+    if (playerCamera_) {
+        playerCamera_->SnapToTarget();
+    } else if (camera_) {
+        camera_->Update();
+    }
+
+    for (auto& block : mapBlocks_) {
+        if (block) {
+            block->Update();
+        }
+    }
+    for (auto& water : waterBlocks_) {
+        if (water) {
+            water->Update();
+        }
+    }
+
+    if (itemMgr_) {
+        itemMgr_->Update(0.0f);
+    }
+    if (hpBar_) {
+        hpBar_->Update(0.0f);
+    }
+    if (hintUI_) {
+        hintUI_->Update(0.0f);
+    }
+    if (dashUI_) {
+        dashUI_->Update(0.0f);
+    }
+    if (coinUI_) {
+        coinUI_->Update(0.0f);
+    }
+}
+
+void GameScene::GenerateBlocks() {
+    BuildPendingMapSpawns();
+    while (!pendingMapSpawns_.empty()) {
+        ProcessPendingMapSpawns(pendingMapSpawns_.size());
+    }
+}
+
+void GameScene::BuildPendingMapSpawns()
+{
+    pendingMapSpawns_.clear();
+
+    for (uint32_t y = 0; y < mapChipField_.numBlockVertical_; ++y) {
+        for (uint32_t x = 0; x < mapChipField_.numBlockHorizontal_; ++x) {
+            MapChipType type = mapChipField_.GetMapChipTypeByIndex(x, y);
+            Vector3 position = mapChipField_.GetMapChipPositionByIndex(x, y);
+
+            PendingSpawn spawn{};
+            spawn.position = position;
+            spawn.x = x;
+            spawn.y = y;
+            spawn.subID = mapChipField_.GetMapChipSubIDByIndex(x, y);
+
+            switch (type) {
+            case MapChipType::kBlock:
+                spawn.kind = PendingSpawnKind::Block;
+                pendingMapSpawns_.push_back(spawn);
+                break;
+            case MapChipType::kBlock2:
+                spawn.kind = PendingSpawnKind::Block2;
+                pendingMapSpawns_.push_back(spawn);
+                break;
+            case MapChipType::kPortal:
+                spawn.kind = PendingSpawnKind::Portal;
+                pendingMapSpawns_.push_back(spawn);
+                break;
+            case MapChipType::kItem:
+                if (itemMgr_ && itemMgr_->CanSpawnItem(currentMapPath_, x, y)) {
+                    spawn.kind = PendingSpawnKind::Item;
+                    pendingMapSpawns_.push_back(spawn);
+                }
+                break;
+            case MapChipType::kSpike:
+                spawn.kind = PendingSpawnKind::Spike;
+                pendingMapSpawns_.push_back(spawn);
+                break;
+            case MapChipType::kWater:
+                spawn.kind = PendingSpawnKind::Water;
+                pendingMapSpawns_.push_back(spawn);
+                break;
+            case MapChipType::kEnemy:
+                spawn.kind = PendingSpawnKind::Enemy;
+                pendingMapSpawns_.push_back(spawn);
+                break;
+            default:
+                break;
+            }
+        }
+    }
+
+    for (uint32_t y = 0; y < mapChipField_.numBlockVertical_; ++y) {
+        uint32_t x = 0;
+        while (x < mapChipField_.numBlockHorizontal_) {
+            if (mapChipField_.GetMapChipTypeByIndex(x, y) != MapChipType::kMoveHorizontal) {
+                ++x;
+                continue;
+            }
+
+            uint32_t startX = x;
+            uint32_t endX = x;
+            while (endX + 1 < mapChipField_.numBlockHorizontal_ &&
+                mapChipField_.GetMapChipTypeByIndex(endX + 1, y) == MapChipType::kMoveHorizontal) {
+                ++endX;
+            }
+
+            PendingSpawn spawn{};
+            spawn.kind = PendingSpawnKind::MoveHorizontal;
+            spawn.x = startX;
+            spawn.y = y;
+            spawn.length = endX - startX + 1;
+            Vector3 leftPos = mapChipField_.GetMapChipPositionByIndex(startX, y);
+            Vector3 rightPos = mapChipField_.GetMapChipPositionByIndex(endX, y);
+            spawn.position = {
+                (leftPos.x + rightPos.x) * 0.5f,
+                leftPos.y,
+                leftPos.z
+            };
+            pendingMapSpawns_.push_back(spawn);
+            x = endX + 1;
+        }
+    }
+
+    for (uint32_t y = 0; y < mapChipField_.numBlockVertical_; ++y) {
+        uint32_t x = 0;
+        while (x < mapChipField_.numBlockHorizontal_) {
+            if (mapChipField_.GetMapChipTypeByIndex(x, y) != MapChipType::kMoveVertical) {
+                ++x;
+                continue;
+            }
+
+            uint32_t startX = x;
+            uint32_t endX = x;
+            while (endX + 1 < mapChipField_.numBlockHorizontal_ &&
+                mapChipField_.GetMapChipTypeByIndex(endX + 1, y) == MapChipType::kMoveVertical) {
+                ++endX;
+            }
+
+            PendingSpawn spawn{};
+            spawn.kind = PendingSpawnKind::MoveVertical;
+            spawn.x = startX;
+            spawn.y = y;
+            spawn.length = endX - startX + 1;
+            Vector3 leftPos = mapChipField_.GetMapChipPositionByIndex(startX, y);
+            Vector3 rightPos = mapChipField_.GetMapChipPositionByIndex(endX, y);
+            spawn.position = {
+                (leftPos.x + rightPos.x) * 0.5f,
+                leftPos.y,
+                leftPos.z
+            };
+            pendingMapSpawns_.push_back(spawn);
+            x = endX + 1;
+        }
+    }
+}
+
+void GameScene::ProcessPendingMapSpawns(size_t spawnBudget)
+{
+    while (spawnBudget > 0 && !pendingMapSpawns_.empty()) {
+        PendingSpawn spawn = pendingMapSpawns_.front();
+        pendingMapSpawns_.pop_front();
+        --spawnBudget;
+
+        switch (spawn.kind) {
+        case PendingSpawnKind::Block:
+        {
+            auto block = std::make_unique<Object3d>();
+            block->Initialize(object3dCommon_.get());
+            block->SetModel("cube/cube.obj");
+            block->SetCamera(camera_.get());
+            block->SetTranslate(spawn.position);
+            block->Update();
+            mapBlocks_.push_back(std::move(block));
+            break;
+        }
+        case PendingSpawnKind::Block2:
+        {
+            auto block2 = std::make_unique<Object3d>();
+            block2->Initialize(object3dCommon_.get());
+            block2->SetModel("cube2/cube2.obj");
+            block2->SetCamera(camera_.get());
+            block2->SetTranslate(spawn.position);
+            block2->Update();
+            mapBlocks_.push_back(std::move(block2));
+            break;
+        }
+        case PendingSpawnKind::Portal:
+        {
+            auto portal = std::make_unique<Object3d>();
+            portal->Initialize(object3dCommon_.get());
+            portal->SetModel("door/Door.obj");
+            portal->SetCamera(camera_.get());
+            portal->SetTranslate(spawn.position);
+            portal->Update();
+            mapBlocks_.push_back(std::move(portal));
+            break;
+        }
+        case PendingSpawnKind::Item:
+        {
+            if (!itemMgr_) { break; }
+            auto item = std::make_unique<Object3d>();
+            item->Initialize(object3dCommon_.get());
+            item->SetModel("coin/coin.obj");
+            item->SetCamera(camera_.get());
+            Vector3 itemPos = spawn.position;
+            itemPos.y += 0.4f;
+            item->SetTranslate(itemPos);
+            item->SetEnableLighting(true);
+            item->SetDirectionalLightIntensity(2.0f);
+            item->SetPointLightIntensity(2.0f);
+            item->Update();
+            itemMgr_->RegisterItem(currentMapPath_, spawn.x, spawn.y, std::move(item));
+            break;
+        }
+        case PendingSpawnKind::Spike:
+        {
+            auto spike = std::make_unique<Object3d>();
+            spike->Initialize(object3dCommon_.get());
+            spike->SetModel("strip/strip.obj");
+            spike->SetCamera(camera_.get());
+            Vector3 spikePos = spawn.position;
+            spikePos.y -= 0.1f;
+            spike->SetTranslate(spikePos);
+            spike->SetLightingMode(2);
+            spike->Update();
+            mapBlocks_.push_back(std::move(spike));
+            break;
+        }
+        case PendingSpawnKind::Water:
+        {
+            auto water = std::make_unique<Object3d>();
+            water->Initialize(object3dCommon_.get());
+            water->SetModel("water/water.obj");
+            water->SetCamera(camera_.get());
+            water->SetTranslate(spawn.position);
+            Vector4 color = water->GetColor();
+            color.w = 0.5f;
+            water->SetColor(color);
+            water->Update();
+            waterBlocks_.push_back(std::move(water));
+            break;
+        }
+        case PendingSpawnKind::Enemy:
+        {
+            EnemyType eType = EnemyType::Type0;
+            if (spawn.subID == 1) {
+                eType = EnemyType::Type1;
+            }
+            else if (spawn.subID == 2) {
+                eType = EnemyType::Boss;
+            }
+            else if (spawn.subID == 3) {
+                eType = EnemyType::Type2;
+            }
+
+            std::unique_ptr<Enemy> enemy;
+            if (eType == EnemyType::Boss) {
+                enemy = std::make_unique<BossEnemy>();
+            }
+            else {
+                enemy = std::make_unique<NormalEnemy>();
+            }
+            enemy->Initialize(object3dCommon_.get(), camera_.get(), spawn.position, eType);
+            enemies_.push_back(std::move(enemy));
+            break;
+        }
+        case PendingSpawnKind::MoveHorizontal:
+        case PendingSpawnKind::MoveVertical:
+        {
+            auto platform = std::make_unique<MovingPlatform>();
+            platform->Initialize(
+                object3dCommon_.get(),
+                camera_.get(),
+                spawn.position,
+                spawn.kind == PendingSpawnKind::MoveHorizontal ? MovingPlatform::Axis::Horizontal : MovingPlatform::Axis::Vertical,
+                movingPlatformSpeed_,
+                static_cast<int>(spawn.length)
+            );
+            movingPlatforms_.push_back(std::move(platform));
+            break;
+        }
+        default:
+            break;
+        }
+    }
+}
+
+bool GameScene::IsMapBuildComplete() const
+{
+    return loadPrepared_ && pendingMapSpawns_.empty();
+}
+
+void GameScene::FinishMapLoading(const Vector3& startPos)
+{
+    isIncrementalMapLoading_ = false;
+    loadPrepared_ = false;
+    postLoadSettleFrames_ = 0;
+    pendingRevealAfterLoad_ = false;
+
+    if (player_) {
+        player_->SetPosition(startPos);
+        player_->ResetForMapTransition(true);
+    }
+
+    if (fade_) {
+        fade_->SetAlpha(1.0f);
+        fade_->SetPhase(FadePhase::LoadingHold);
+    }
+
+    SyncLoadedSceneForReveal();
+    postLoadSettleFrames_ = kPostLoadSettleFrames;
+    pendingRevealAfterLoad_ = true;
+
+    if (input_) {
+        input_->ResetAllKeys();
+    }
+}
+
+void GameScene::Initialize() {
+    winApp_       = WinApp::GetInstance();
+    dxCommon_     = DirectXCommon::GetInstance();
+    input_        = Input::GetInstance();
+    srvManager_   = SrvManager::GetInstance();
+    spriteCommon_ = SpriteCommon::GetInstance();
+
+    TextureManager::GetInstance()->Initialize(dxCommon_, srvManager_);
+
+    pendingMapSpawns_.clear();
+    isIncrementalMapLoading_ = false;
+    loadPrepared_ = false;
+    postLoadSettleFrames_ = 0;
+    pendingRevealAfterLoad_ = false;
+    shouldStartLoading_ = false;
+    isMapLoading_ = false;
+    isPortalLoading_ = false;
+    loadingTimer_ = 0.0f;
+    portalLoadingTimer_ = 0.0f;
+    bossNameVisible_ = false;
+    returnToTitle_ = false;
+    pendingGameClear_ = false;
+    pendingPortalLoad_ = false;
+    deferredModelLoadCursor_ = 0;
+    initComplete_ = false;
+    deferredInitPhase_ = DeferredInitPhase::UiSprites;
+
+    if (sceneManager_ && !sceneManager_->GetOverlayScene()) {
+        sceneManager_->SetOverlayScene(std::make_unique<LoadingScene>());
+    }
+}
 
     if (snowEmitter_) {
         snowEmitter_->SetSnowMode(true);
@@ -409,33 +776,110 @@ void GameScene::Update() {
     const float deltaTime = 1.0f / 60.0f;
     input_->Update();
     backgroundSprite_->Update();
-    // —— 是否允许玩家操作（淡出/加载/淡入期间 & 开场演出期间都禁止）——
+
+    if (bossNameSprite_) {
+        bossNameSprite_->SetVisible(bossNameVisible_);
+        bossNameSprite_->Update();
+    }
+    // —— プレイヤー操作を許可するかどうか（フェードアウト / ロード / フェードイン中、および開始演出中はすべて禁止）——
     const bool isFading = (fade_ && fade_->GetPhase() != FadePhase::None);
     const bool inIntro = (intro_ && intro_->IsPlaying());
     const bool inGameOver = (gameOver_ && gameOver_->IsPlaying());
     const bool inGameClear = (gameClear_ && gameClear_->IsPlaying());
-    const bool canControl = !(isFading || inIntro || inGameOver || inGameClear);
+    bool inBossIntro = (bossIntroPhase_ != BossIntroPhase::None);
+    bool canControl = !(isFading || inIntro || inGameOver || inGameClear || inBossIntro);
 
-    // ===== Intro 驱动（在加载/淡出等早退之前执行，但不盖过Loading）=====
-    if (fade_ && fade_->GetPhase() == FadePhase::None && intro_) {
-        intro_->Update(deltaTime);
-        // Intro 自己会更新内部 sprite 的属性，这里不用再手动 Update
+    // ================== Pause Menu（ESC） ==================
+    // ・ESCで一時停止/再開
+    // ・W/S or ↑/↓で選択（上下端はループ）
+    // ・SPACE/ENTERで決定
+    bool wasPaused = isPaused_;
+    if (canControl) {
+        if (!isPaused_ && input_ && input_->TriggerKey(DIK_ESCAPE)) {
+            isPaused_ = true;
+            pauseCursor_ = 0; // デフォルトは Continue
+        }
     }
 
-    // ===== 画面淡入淡出状态机（优先执行）=====
+    if (isPaused_) {
+        if (!wasPaused) {
+            // ちょうど一時停止に入ったこの1フレームでは ESC による解除を処理しない。同フレームでのオン / オフ切替を防ぐ
+            return;
+        }
+        // Pause中はゲーム進行を止め、メニュー入力だけを処理する
+        if (input_) {
+            if (input_->TriggerKey(DIK_ESCAPE)) {
+                isPaused_ = false;
+                return;
+            }
+
+            constexpr int kPauseItemCount = 2;
+            if (input_->TriggerKey(DIK_W) || input_->TriggerKey(DIK_UP)) {
+                pauseCursor_ = (pauseCursor_ + kPauseItemCount - 1) % kPauseItemCount;
+            }
+            if (input_->TriggerKey(DIK_S) || input_->TriggerKey(DIK_DOWN)) {
+                pauseCursor_ = (pauseCursor_ + 1) % kPauseItemCount;
+            }
+
+            if (input_->TriggerKey(DIK_SPACE) || input_->TriggerKey(DIK_RETURN)) {
+                if (pauseCursor_ == 0) {
+                    // Continue
+                    isPaused_ = false;
+                    input_->ResetAllKeys();
+                    return;
+                }
+                else {
+                    // Back to Title（Fadeで戻る）
+                    isPaused_ = false;
+
+                    if (!returnToTitle_ && fade_) {
+                        returnToTitle_ = true;
+
+                        // 黒幕パラメータをリセットし、完全な黒までフェードアウトを開始
+                        fade_->SetAlpha(0.0f);
+                        fade_->SetReachedBlack(false);
+                        fade_->SetBlackHoldFrames(0);
+                        fade_->SetOverlayPushed(false);
+
+                        fade_->SetPhase(FadePhase::FadingOut);
+                        if (Sprite* s = fade_->GetSprite()) {
+                            s->SetVisible(true);
+                        }
+                    }
+                    input_->ResetAllKeys();
+                    return;
+                }
+            }
+        }
+
+        // PauseメニューのSpriteは動かないが、今後の拡張のためUpdateしておく
+        if (pauseContinueNormal_) { pauseContinueNormal_->Update(); }
+        if (pauseContinueSelected_) { pauseContinueSelected_->Update(); }
+        if (pauseBackNormal_) { pauseBackNormal_->Update(); }
+        if (pauseBackSelected_) { pauseBackSelected_->Update(); }
+        return;
+    }
+
+    // ===== Intro 駆動（ロード／フェードアウト等の早期 return 前に実行。ただし Loading は上書きしない） =====
+    if (fade_ && fade_->GetPhase() == FadePhase::None && intro_) {
+        intro_->Update(deltaTime);
+        // Intro 側で内部 Sprite の状態は更新されるため、ここでは再度手動 Update しない
+    }
+
+    // ===== 画面フェードイン／フェードアウトのステートマシン（優先実行） =====
     if (fade_ && fade_->GetPhase() == FadePhase::FadingOut) {
-        // 1) alpha 逐帧增加
+        // 1) alpha を毎フレーム増加
         float a = fade_->GetAlpha();
         a += fade_->GetSpeed();
         if (a > 1.0f) a = 1.0f;
         fade_->SetAlpha(a);
 
-        // 2) 完全变黑后的处理
+        // 2) 完全に黒くなった後の処理
         if (a >= 1.0f) {
-            // 2-1) 在纯黑上停留若干帧
+            // 2-1) 完全な黒のまま数フレーム維持
             if (!fade_->ReachedBlack()) {
                 fade_->SetReachedBlack(true);
-                // 第一次到纯黑，先 return，让这一帧只显示纯黑
+                // 初めて完全な黒になったフレームでは先に return し、この1フレームは黒だけを表示する
                 return;
             }
             else if (fade_->GetBlackHoldFrames() > 0) {
@@ -443,7 +887,7 @@ void GameScene::Update() {
                 return;
             }
 
-            // 2-2) 从 GameClear / GameOver 回标题
+            // 2-2) GameClear / GameOver からタイトルへ戻る
             if (returnToTitle_) {
                 returnToTitle_ = false;
                 if (sceneManager_) {
@@ -453,7 +897,7 @@ void GameScene::Update() {
                 return;
             }
 
-            // 2-3) 推入 Loading 叠加场景（只推一次）
+            // 2-3) Loading のオーバーレイシーンを積む（1回だけ）
             if (!fade_->OverlayPushed()) {
                 if (!pendingGameClear_ && !returnToTitle_) {
                     if (sceneManager_) {
@@ -463,7 +907,7 @@ void GameScene::Update() {
                 fade_->SetOverlayPushed(true);
             }
 
-            // 2-4) 传送门：在此刻真正开始加载
+            // 2-4) 転送門: この時点で実際のロードを開始
             if (pendingPortalLoad_) {
                 pendingPortalLoad_ = false;
                 StartLoadingMap(pendingPortalMapPath_, pendingPortalStartPos_, true);
@@ -471,7 +915,7 @@ void GameScene::Update() {
                 return;
             }
 
-            // 2-5) 通关：全黑状态下启动 GameClear 演出
+            // 2-5) クリア: 全黒状態で GameClear 演出を開始
             if (pendingGameClear_) {
                 pendingGameClear_ = false;
                 if (sceneManager_) {
@@ -480,44 +924,34 @@ void GameScene::Update() {
                 if (gameClear_ && !gameClear_->IsPlaying()) {
                     gameClear_->Start();
                 }
-                // 保持黑幕为全黑，由 GameClear 自己画背景
+                // 黒幕は完全な黒のまま維持し、背景は GameClear 側で描く
                 fade_->SetAlpha(1.0f);
                 fade_->SetPhase(FadePhase::None);
                 return;
             }
 
-            // 2-6) 普通情况：从全黑切到淡入
+            // 2-6) 通常時: 完全な黒からフェードインへ切り替える
             fade_->SetPhase(FadePhase::FadingIn);
             return;
         }
 
-        // 还在从 0 → 1 的过程中
+        // まだ 0 → 1 の途中
         return;
     }
 
-    // 在本帧后段会处理 FadingIn（如下）
+    // このフレーム後半で FadingIn を処理する（以下参照）
     if (shouldStartLoading_) {
         shouldStartLoading_ = false;
-        StartLoadingMap("Resources/map/map.csv", { 3,3,0 }, false);
-        return; // 本帧先显示 LoadingScene
+        StartLoadingMap("Resources/map/map6.csv", { 2,1,0 }, false);
+        return; // このフレーム先に表示 LoadingScene
     }
-    // 2️⃣ 初始加载计时
+    // 2️⃣ 初期ロードのタイマー
     if (isMapLoading_) {
         loadingTimer_ += deltaTime;
         if (loadingTimer_ >= LOADING_DURATION) {
             isMapLoading_ = false;
-
-            // 真正加载地图
-            LoadMap("Resources/map/map.csv", { 3,3,0 });
-            if (sceneManager_) sceneManager_->ClearOverlayScene();
-            if (fade_) fade_->SetPhase(FadePhase::FadingIn);
-
-            if (player_) {
-                player_->ResetForMapTransition(true);
-            }
-            if (input_) {
-                input_->ResetAllKeys();
-            }
+            LoadMap("Resources/map/map6.csv", { 2,1,0 });
+            isIncrementalMapLoading_ = true;
         }
         else {
             if (fade_) fade_->Update(deltaTime);
@@ -525,24 +959,13 @@ void GameScene::Update() {
         }
     }
 
-
-    // 3️⃣ 传送门加载计时
+    // 3️⃣ 転送門ロードのタイマー
     if (isPortalLoading_) {
         portalLoadingTimer_ += deltaTime;
         if (portalLoadingTimer_ >= LOADING_DURATION) {
             isPortalLoading_ = false;
-
-            // 真正加载地图
             LoadMap(portalMapPath_, portalStartPos_);
-            if (sceneManager_) sceneManager_->ClearOverlayScene();
-            if (fade_) fade_->SetPhase(FadePhase::FadingIn);
-
-            if (player_) {
-                player_->ResetForMapTransition(true);
-            }
-            if (input_) {
-                input_->ResetAllKeys();
-            }
+            isIncrementalMapLoading_ = true;
         }
         else {
             if (fade_) {
@@ -551,35 +974,112 @@ void GameScene::Update() {
             }
         }
     }
+
+    if (isIncrementalMapLoading_) {
+        ProcessPendingMapSpawns(kMapSpawnBudgetPerFrame);
+        if (IsMapBuildComplete()) {
+            FinishMapLoading(player_ ? player_->GetPosition() : Vector3{ 0, 0, 0 });
+        }
+        return;
+    }
+
+    if (pendingRevealAfterLoad_) {
+        SyncLoadedSceneForReveal();
+
+        if (postLoadSettleFrames_ > 0) {
+            --postLoadSettleFrames_;
+            return;
+        }
+
+        pendingRevealAfterLoad_ = false;
+        if (sceneManager_) {
+            sceneManager_->ClearOverlayScene();
+        }
+        if (fade_) {
+            fade_->SetAlpha(1.0f);
+            fade_->SetPhase(FadePhase::FadingIn);
+        }
+        return;
+    }
+
     imguiManager_->Begin();
-    playerCamera_->Update();
+
+    // ===== Boss トリガー演出: 演出中はプレイヤー追従カメラを動かさない =====
+    if (bossIntroPhase_ != BossIntroPhase::None) {
+        UpdateBossIntro(deltaTime);
+    } else {
+        playerCamera_->Update();
+    }
 
     std::vector<MovingPlatform*> platformPtrs;
     platformPtrs.reserve(movingPlatforms_.size());
     for (auto& mp : movingPlatforms_) {
         platformPtrs.push_back(mp.get());
     }
+    if (!inBossIntro) {
 
-    // 平台自身 Update（传 platformPtrs 给它做平台-平台碰撞）
+    // プラットフォーム自身の Update（platformPtrs を渡して足場同士の衝突を処理）
     for (auto* p : platformPtrs) {
         if (p) {
             p->Update(deltaTime, mapChipField_, platformPtrs);
         }
     }
-
-    // 敌人 Update
-    for (auto& e : enemies_) {
-        if (e) {
-            e->Update(deltaTime);
+    }
+    // 敵 Update
+    // Boss 演出中は「世界を静止させる」ため、すべての敵を更新しない。
+    // ただし Boss 本体だけは Object3d の Transform / 点滅タイマー更新を継続する。そうしないと不可視フレームで止まる可能性がある。
+    if (!inBossIntro) {
+        for (auto& e : enemies_) {
+            if (e) {
+                e->Update(deltaTime, mapChipField_, *player_);
+            }
+        }
+    } else {
+        if (introBoss_) {
+            introBoss_->Update(deltaTime, mapChipField_, *player_);
+        } else {
+            if (BossEnemy* b = FindBossEnemy()) {
+                b->Update(deltaTime, mapChipField_, *player_);
+            }
         }
     }
-    // 淡入淡出/加载/演出期间都不可操作
-    player_->Update(canControl ? input_ : nullptr, mapChipField_);
+    // ===== Boss 演出中: プレイヤーを完全静止させる（重力 / 慣性の影響を受けない）=====
+    if (inBossIntro) {
+        if (!gBossIntroFreezePlayer) {
+            gBossIntroFreezePlayer = true;
+            gBossIntroFrozenPlayerPos = player_->GetPosition();
+        }
 
-    // ========= 阶段1：两条移动平台互相夹住玩家 =========
+        // Player 自身の更新を1フレーム進める（タイマー／アニメ等）。ただし直後に位置／速度を強制的に戻す
+        player_->Update(nullptr, mapChipField_);
+
+        player_->SetPosition(gBossIntroFrozenPlayerPos);
+        player_->SetVelocity({ 0.0f, 0.0f, 0.0f });
+    }
+    else {
+        gBossIntroFreezePlayer = false;
+        player_->Update(canControl ? input_ : nullptr, mapChipField_);
+    }
+
+    // ================== Boss トリガー演出: トリガー地点を判定してカメラ演出を開始 ==================
+    if (bossIntroPhase_ == BossIntroPhase::None && canControl) {
+        BossEnemy* boss = FindBossEnemy();
+        if (boss && !boss->IsBattleTriggered() && boss->IsBattleTriggerReady(*player_, mapChipField_)) {
+            StartBossIntro(boss);
+            // ★ このフレーム開始時点で演出突入とみなす: 以降のロジック（ダメージ / 足場 / 衝突など）はすべてスキップ
+            inBossIntro = true;
+            canControl = false;
+            // 即座にカメラを1フレーム進め、トリガーフレームからそのままカメラ演出が始まるようにする
+            UpdateBossIntro(deltaTime);
+        }
+    }
+
+    // ========= 段階1: 2本の移動床でプレイヤーを挟み込む =========
     crushedByPlatformThisFrame_ = false;
     damagedByEnemyThisFrame_ = false;
-    if (player_ && !player_->IsDead() && !player_->IsInvincible()) {
+    damageSourceEnemy_ = nullptr;
+    if (!inBossIntro) {
+        if (player_ && !player_->IsDead() && !player_->IsInvincible()) {
 
         Vector3 pPos = player_->GetPosition();
         float halfW = player_->GetWidth() * 0.5f;
@@ -599,15 +1099,16 @@ void GameScene::Update() {
             if (overlapX && overlapY) {
                 ++overlapPlatformCount;
                 if (overlapPlatformCount >= 2) {
-                    // 同时和两条平台重叠 ⇒ 直接判定为被夹住
+                    // 同時に2本の足場と重なっている場合は、挟まれたと直接判定する
                     crushedByPlatformThisFrame_ = true;
                     break;
                 }
             }
         }
     }
-    // ========= 玩家与敌人的碰撞 =========
-    if (player_ && !player_->IsDead()) {
+    }
+    // ========= プレイヤーと敵の衝突 =========
+    if (!inBossIntro && player_ && !player_->IsDead()) {
 
         Vector3 pPos = player_->GetPosition();
         float   pHalfW = player_->GetWidth() * 0.5f;
@@ -619,13 +1120,34 @@ void GameScene::Update() {
         float pBottom = pPos.y - pHalfH;
         float pTop = pPos.y + pHalfH;
 
+        // stomp lock: ロック中の敵がすでにリストにいなければ解除する
+        if (stompLockEnemy_) {
+            bool found = false;
+            for (auto& e : enemies_) {
+                if (e.get() == stompLockEnemy_) { found = true; break; }
+            }
+            if (!found) { stompLockEnemy_ = nullptr; }
+        }
+
         for (auto& enemyPtr : enemies_) {
             Enemy* enemy = enemyPtr.get();
             if (!enemy) { continue; }
 
+            // Boss の遠距離弾幕判定（Boss 本体と重なる必要はない）
+            if (enemy->CheckBossProjectileHit(*player_)) {
+                if (!player_->IsInvincible()) {
+                    damagedByEnemyThisFrame_ = true;
+                    if (!damageSourceEnemy_) { damageSourceEnemy_ = enemy; }
+                }
+            }
             Vector3 ePos = enemy->GetPosition();
             float   eHalfW = enemy->GetWidth() * 0.5f;
             float   eHalfH = enemy->GetHeight() * 0.5f;
+
+            // 死亡演出などで当たり判定を消している敵はスキップ
+            if (enemy->GetWidth() <= 0.01f || enemy->GetHeight() <= 0.01f) {
+                continue;
+            }
 
             float eLeft = ePos.x - eHalfW;
             float eRight = ePos.x + eHalfW;
@@ -634,42 +1156,210 @@ void GameScene::Update() {
 
             bool overlapX = !(pRight <= eLeft || pLeft >= eRight);
             bool overlapY = !(pTop <= eBottom || pBottom >= eTop);
+
+            // 踏みつけロック: 同じ敵に対しては、プレイヤーがその当たり判定から離れるまで再判定しない
+            if (enemy == stompLockEnemy_) {
+                if (overlapX && overlapY) {
+                    continue;
+                } else {
+                    stompLockEnemy_ = nullptr;
+                }
+            }
             if (!overlapX || !overlapY) {
                 continue;
             }
 
-            // ====== 判定是否“从上方踩到”敌人 ======
+            // ====== 「上から踏んだ」敵かどうかを判定 ======
             const float stompTolerance = 0.15f;
-            bool isStomp =
-                (pVel.y <= 0.0f) &&          // 玩家正在往下
-                (pBottom >= ePos.y) &&       // 脚大致在敌人中间以下
-                (pBottom <= eTop + stompTolerance);
 
+            float stompMinCenterY = ePos.y; // 通常の敵: 中心以上からなら踏みつけ扱い
+            if (enemy->GetType() == EnemyType::Boss) {
+                // Boss は少し高めなので、プレイヤー中心がやや低くても踏みつけ扱いにする（操作感向上のため）
+                stompMinCenterY = ePos.y - eHalfH * 0.20f;
+            }
+
+           const float kStompFallSpeed = -0.05f;
+
+           bool isStomp =
+               (pVel.y < kStompFallSpeed) &&
+               (pPos.y >= stompMinCenterY) &&
+               (pBottom <= eTop + stompTolerance);
             if (isStomp) {
-                // ☆ 踩到敌人：敌人闪烁，玩家弹一下，不受伤
-                enemy->StartHitReaction(0.4f);   // 闪烁 0.4 秒，可自己调
+                stompLockEnemy_ = enemy;
 
-                Vector3 newVel = pVel;
-                newVel.y = 0.7f;                // 踩完向上弹的力度，可自己调手感
-                player_->SetVelocity(newVel);
+                const bool isBoss = (enemy->GetType() == EnemyType::Boss);
 
-                // 不给玩家伤害，处理完当前敌人就继续下一个
-                continue;
+                auto BounceAndLift = [&](float bounceY, float kickX) {
+                    Vector3 newVel = pVel;
+                    newVel.y = bounceY;
+                    player_->SetVelocity(newVel);
+
+                    Vector3 newPos = pPos;
+                    newPos.y = eTop + pHalfH + 0.01f;
+                    player_->SetPosition(newPos);
+
+                    if (kickX != 0.0f) {
+                        // まずプレイヤーの現在の水平速度方向へ弾く。ほぼ静止している場合は Boss との相対位置で方向を決める
+                        float dir = (std::fabs(pVel.x) > 0.02f) ? (pVel.x > 0.0f ? 1.0f : -1.0f)
+                                                               : (pPos.x >= ePos.x ? 1.0f : -1.0f);
+
+                        float vx = pVel.x * 0.35f + dir * kickX;
+                        vx = std::clamp(vx, -0.45f, 0.45f);
+
+                        // ノックバックを短時間だけ安定して効かせる（プレイヤーの入力に依存しない）。さらに ease-out 減衰で自然に見せる
+                        player_->StartStompKick(vx, 0.18f);
+
+                        Vector3 v = player_->GetVelocity();
+                        v.x = vx;
+                        player_->SetVelocity(v);
+                    }
+                };
+
+                // ✅ 被ダメージ無敵中でも、踏みつけによる撃破 / ダメージは許可する（無敵は「プレイヤーがダメージを受ける側」にのみ影響し、「敵を攻撃する側」には影響しない）
+
+                // ★ Boss: Boss の踏みつけ無敵中、またはプレイヤーの踏みつけクールダウン中
+                // 跳ね返りは可能だが、横方向へ強制的に蹴り出して「頭上で棒立ちして無限踏み / 無限安全」になるのを防ぐ
+                if (isBoss && (!enemy->CanTakeStompDamage() || player_->IsStompCooldown())) {
+                    BounceAndLift(0.55f, 0.40f);
+                    player_->StartStompInvincible(0.08f);
+                    break;
+                }
+
+                // ☆ 正常踏みつけ: 敵ダメージを与える/硬直/死亡判定
+                enemy->OnStomp();
+
+                BounceAndLift(0.70f, isBoss ? 0.32f : 0.0f);
+
+                // 踏みつけ後少し無敵時間を与える（点滅なし）: 主な目的は「踏んだ直後の軽い誤ダメージ」を防ぐこと
+                player_->StartStompInvincible(0.12f);
+
+                // 連続踏みが簡単すぎないよう、クールダウン中は Boss への再度の踏みつけダメージを発生させない
+                player_->StartStompCooldown(isBoss ? 0.45f : 0.25f);
+
+                break;
             }
             else {
-                // ☆ 不是从上面踩 ⇒ 视为被敌人撞到，玩家受伤
+                // ☆ 上から踏んだのでなければ、敵にぶつかったものとしてプレイヤーにダメージを与える
                 if (!player_->IsInvincible()) {
                     damagedByEnemyThisFrame_ = true;
+                    if (!damageSourceEnemy_) { damageSourceEnemy_ = enemy; }
                 }
             }
         }
     }
-    // 先做平台上的落地 / 分离 / 搭乘
-    if (!crushedByPlatformThisFrame_) {
+        // ========= Boss 撃破判定: クリア条件を「Boss を倒す」に変更 =========
+    if (!bossDefeated_ && !pendingGameClear_ && gameClear_ && !gameClear_->IsPlaying()) {
+        bool bossJustDied = false;
+        for (auto& e : enemies_) {
+            if (!e) { continue; }
+            if (e->GetType() == EnemyType::Boss && e->IsDead()) {
+                bossJustDied = true;
+                break;
+            }
+        }
+
+        if (bossJustDied) {
+            bossDefeated_ = true;
+
+            // クリア演出をトリガー: 先に完全な黒までフェードアウトし、その黒の上で GameClear を開始する
+            if (fade_) {
+                pendingGameClear_ = true;
+
+                fade_->SetAlpha(0.0f);
+                fade_->SetReachedBlack(false);
+                fade_->SetBlackHoldFrames(0);
+                fade_->SetOverlayPushed(false);
+
+                fade_->SetPhase(FadePhase::FadingOut);
+                if (Sprite* s = fade_->GetSprite()) {
+                    s->SetVisible(true);
+                }
+            } else {
+                // 万一 FadeManager が無ければ、そのまま直接勝利演出を開始
+                gameClear_->Start();
+            }
+        }
+    }
+
+// ========= 死亡した敵を削除（Boss は x 回踏まれると死亡フラグが立つ） =========
+    enemies_.erase(
+        std::remove_if(enemies_.begin(), enemies_.end(),
+            [](const std::unique_ptr<Enemy>& e) { return (!e) || e->IsDead(); }),
+        enemies_.end());
+
+
+    // ================== Boss HP（2D）の更新 ==================
+    if (bossHpDamageSprite_ && bossHpSprite_) {
+        Enemy* boss = nullptr;
+        for (auto& e : enemies_) {
+            if (e && e->GetType() == EnemyType::Boss) {
+                boss = e.get();
+                break;
+            }
+        }
+
+        if (boss && !boss->IsDead()) {
+            // 「Boss に接近した時（または Boss 戦がトリガーされた時）」のみ HP バーを表示する。ロジックは BossEnemy 側に任せる
+            bool shouldShow = true;
+            if (auto* b = dynamic_cast<BossEnemy*>(boss)) {
+                shouldShow = b->ShouldShowBossHp(*player_, mapChipField_);
+            }
+
+            if (shouldShow) {
+                bossHpVisible_ = true;
+
+                float target = boss->GetHpRatio();
+                target = std::clamp(target, 0.0f, 1.0f);
+                bossHpRatio_ = target;
+
+                // 赤の遅延バー: 緑バーへゆっくり追従して減少する（回復した場合は即座に追いつく）
+                if (bossDamageRatio_ < target) {
+                    bossDamageRatio_ = target;
+                } else {
+                    bossDamageRatio_ -= bossDamageDropSpeed_ * deltaTime;
+                    if (bossDamageRatio_ < target) {
+                        bossDamageRatio_ = target;
+                    }
+                }
+
+                Vector2 dmgSize = bossHpBarSize_;
+                dmgSize.x = bossHpBarSize_.x * bossDamageRatio_;
+                bossHpDamageSprite_->SetPosition(bossHpBarPos_);
+                bossHpDamageSprite_->SetSize(dmgSize);
+                bossHpDamageSprite_->SetVisible(true);
+
+                Vector2 hpSize = bossHpBarSize_;
+                hpSize.x = bossHpBarSize_.x * bossHpRatio_;
+                bossHpSprite_->SetPosition(bossHpBarPos_);
+                bossHpSprite_->SetSize(hpSize);
+                bossHpSprite_->SetVisible(true);
+            } else {
+                // Boss がまだ生きていても、未接近 / 未侵入の状態では HP バーを非表示にする（比率はリセットせず、点滅時に満タンへ跳ねるのを防ぐ）
+                bossHpVisible_ = false;
+                bossHpDamageSprite_->SetVisible(false);
+                bossHpSprite_->SetVisible(false);
+            }
+        }
+        else {
+            // Boss が存在しない、または死亡している場合は非表示にしてリセット
+            bossHpVisible_ = false;
+            bossHpRatio_ = 1.0f;
+            bossDamageRatio_ = 1.0f;
+            bossHpDamageSprite_->SetVisible(false);
+            bossHpSprite_->SetVisible(false);
+        }
+
+        bossHpDamageSprite_->Update();
+        bossHpSprite_->Update();
+    }
+
+    // 先に足場上での着地 / 分離 / 搭乗を処理する（Boss 演出中はすべて固定）
+    if (!inBossIntro && !crushedByPlatformThisFrame_) {
         HandlePlayerOnMovingPlatforms();
     }
 
-    // ========= 阶段2：被平台推进方块 / 刺 / 门，或者推出地图边界 =========
+        if (!inBossIntro) {
+    // ========= 段階2: 足場に押されてブロック / トゲ / 門へめり込む、またはマップ外へ押し出される =========
     if (player_ && !player_->IsDead() && !player_->IsInvincible()) {
         Vector3 pPos = player_->GetPosition();
         float halfW = player_->GetWidth() * 0.5f;
@@ -680,7 +1370,7 @@ void GameScene::Update() {
         float bottom = pPos.y - halfH;
         float top = pPos.y + halfH;
 
-        // 2a) 若此时玩家 AABB 已经扎进任何 Block/Spike/Portal，就认为是被平台挤进去
+        // 2a) この時点でプレイヤー AABB がすでに Block / Spike / Portal に食い込んでいれば、そのまま足場に押し込まれたとみなす
         auto minIdx = mapChipField_.GetMapChipIndexByPosition({ left,  bottom, 0.0f });
         auto maxIdx = mapChipField_.GetMapChipIndexByPosition({ right, top,    0.0f });
 
@@ -695,7 +1385,7 @@ void GameScene::Update() {
 
                 MapChipField::Rect r = mapChipField_.GetRectByIndex(x, y);
 
-                // Block / Block2：整格
+                // Block / Block2: マス全体
                 if (t == MapChipType::kBlock || t == MapChipType::kBlock2) {
                     bool overlapX = !(right <= r.left || left >= r.right);
                     bool overlapY = !(top <= r.bottom || bottom >= r.top);
@@ -704,7 +1394,7 @@ void GameScene::Update() {
                         break;
                     }
                 }
-                // Spike：只用底部 kSpikeHeightRatio 的高度
+                // Spike: 下端 kSpikeHeightRatio 分の高さだけを使う
                 else if (t == MapChipType::kSpike) {
                     float tileHeight = r.top - r.bottom;
                     MapChipField::Rect spikeHitRect = r;
@@ -722,49 +1412,51 @@ void GameScene::Update() {
         }
 
 
-        // 2b) 被平台推到地图外（超出上下边界）也算挤压
+        // 2b) 足場に押されてマップ外（上下境界の外）へ出た場合も圧死扱い
         if (!crushedByPlatformThisFrame_) {
             Vector3 mapMin = mapChipField_.GetMapMinPosition();
             Vector3 mapMax = mapChipField_.GetMapMaxPosition();
 
-            // 这里加一点点裕度，避免浮点抖动
+            // ここでは少し余裕を持たせ、浮動小数点の揺れを避ける
             if (top > mapMax.y + 0.01f || bottom < mapMin.y - 0.01f) {
                 crushedByPlatformThisFrame_ = true;
             }
         }
     }
 
-    if (particleMgr_ && emitter3D_ && player_->ConsumeDoubleJumpEvent()) {
+    }
+
+    if (!inBossIntro && particleMgr_ && emitter3D_ && player_->ConsumeDoubleJumpEvent()) {
         Vector3 playerPos = player_->GetPosition();
 
-        // 可以微微抬高一点，让粒子从身体附近炸开
+        // 少し持ち上げて、粒子が体の近くから弾けるようにする
         Vector3 spawnPos = playerPos + Vector3{ 0.0f, 0.8f, 0.0f };
         float horizontalBias = player_->IsFacingRight() ? -1.0f : 1.0f;
         emitter3D_->Emit(
-            14,                        // 粒子数量，自己喜欢可以调 12~24
+            14,                        // 粒子数。好みに応じて 12〜24 へ調整可
             ParticleType::Model3D,     // 3D 粒子
-            "jump/jump.obj",           // 暂定使用 cube 模型
+            "jump/jump.obj",           // 仮に cube モデルを使用
             spawnPos,
-            4.0f, 8.0f,                // 速度范围：向四周炸开的感觉
-            0.25f, 0.45f, horizontalBias                 // 生命周期：短一点，看起来干脆利落
+            4.0f, 8.0f,                // 速度範囲: 四方へ弾ける感覚
+            0.25f, 0.45f, horizontalBias                 // ライフサイクル: やや短めで、キビキビ見せる
         );
     }
 
     camera_->Update();
-    // === 冲刺星星尾气 ===
-    if (dashStarEmitter_ && player_->IsDashing()) {
+    // === ダッシュ時の星の尾エフェクト ===
+    if (!inBossIntro && dashStarEmitter_ && player_->IsDashing()) {
         Vector3 pos = player_->GetPosition();
         float h = player_->GetHeight();
 
-        // 脚附近
+        // 足元付近
         pos.y -= h * 0.4f;
 
-        // 根据冲刺方向，把生成点往“身后”挪一点
-        Vector3 dashDir = player_->GetDashDirection(); // x>0 右冲, x<0 左冲
+        // ダッシュ方向に応じて生成位置を「背後」へ少しずらす
+        Vector3 dashDir = player_->GetDashDirection(); // x>0 で右ダッシュ、x<0 で左ダッシュ
         pos.x -= dashDir.x * 0.8f;
 
         dashStarEmitter_->Emit(
-            1,                      // 每帧几颗星星
+            1,                      // 毎フレーム数個の星
             ParticleType::Model3D,
             "star/star.obj",
             pos,
@@ -782,7 +1474,7 @@ void GameScene::Update() {
             snowEmitter_->ApplyCameraMove(camDelta);
         }
     }
-    // 若尚未进入GameOver，检测HP
+    // まだ GameOver に入っていなければ HP を確認
     if (player_->GetHP() <= 0.0f) {
         if (gameOver_ && !gameOver_->IsPlaying()) {
             gameOver_->Start();
@@ -794,31 +1486,31 @@ void GameScene::Update() {
     if (hintUI_) {
         hintUI_->Update(deltaTime);
     }
-    // GameOver 状态机推进（交给管理器）
+    // GameOver ステートマシンを進行（マネージャ側へ委譲）
     if (gameOver_) {
         gameOver_->Update(deltaTime);
     }
-    // GameClear 状态机推进
+    // GameClear ステートマシン推進
     if (gameClear_) {
         gameClear_->Update(deltaTime);
     }
-    // ==== 刮风粒子效果（整屏 & 只在 map 中）====
+    // ==== 風パーティクル効果（画面全体 & map のみ）====
     if (windEmitter_ && currentMapPath_ == "Resources/map/map5.csv") {
 
         windSpawnTimer_ -= deltaTime;
         if (windSpawnTimer_ <= 0.0f) {
-            // 发射频率稍微高一点，整个屏幕都会有风线
-            windSpawnTimer_ = 0.1f;   // 约 33 条/秒，可自行调
+            // 発生頻度をやや高めにし、画面全体に風の線が出るようにする
+            windSpawnTimer_ = 0.1f;   // 約 33 本 / 秒。好みに応じて調整可
 
             const float margin = 50.0f;
 
-            // 发射区域：屏幕右上角一块区域
-            // x 在 画面右侧 60% ~ 画面外一点
+            // 発生領域: 画面右上の一帯
+            // x は画面右側 60% 〜 画面外少しまで
             float spawnX = RandRangeFloat(
                 WinApp::kClientWidth * 0.6f,
                 WinApp::kClientWidth + margin
             );
-            // y 在 画面上方 ~ 上半部分
+            // y は画面上端 〜 上半分まで
             float spawnY = RandRangeFloat(
                 -margin,
                 WinApp::kClientHeight * 0.4f
@@ -826,27 +1518,27 @@ void GameScene::Update() {
 
             Vector3 spawnPos = { spawnX, spawnY, 0.0f };
 
-            // 这里的 min/maxSpeed 是“每秒移动的像素量”，
-            // 取 700~1200 左右，可以在 1~1.5 秒内从右上飘到左下
+            // ここでの min/maxSpeed は「1秒あたりの移動ピクセル量」
+            // 700〜1200 程度にすると、1〜1.5 秒ほどで右上から左下へ流れる
             windEmitter_->Emit(
                 1,
                 ParticleType::Sprite2D,
                 "Resources/wind.dds",
                 spawnPos,
                 700.0f, 1200.0f,   // 速度 (px/s)
-                1.0f, 1.5f         // 生命周期 (秒)
+                1.0f, 1.5f         // ライフサイクル (秒)
             );
         }
     }
     if (snowEmitter_ && currentMapPath_ == "Resources/map/map5.csv") {
 
-        // 想要的平均发射间隔（秒）
-        const float snowInterval = 0.1f;   // 约 25 次/秒，可以自己调
+        // 想定する平均発生間隔（秒）
+        const float snowInterval = 0.1f;   // 約 25 回 / 秒。自分で調整可
 
         snowSpawnTimer_ -= deltaTime;
 
-        // 用 while 是为了兼容帧率波动，
-        // 当前你的 deltaTime 固定 1/60，也没问题
+        // while を使うのはフレームレート変動に対応するため
+        // 現在の deltaTime は 1/60 固定なので問題ない
         while (snowSpawnTimer_ <= 0.0f) {
             snowSpawnTimer_ += snowInterval;
 
@@ -862,9 +1554,9 @@ void GameScene::Update() {
 
             Vector3 worldPos = ScreenToWorld(screenX, screenY, ndcZ, camera_.get());
 
-            // ✅ 每次只发 1 片（或者 2 片），多次累积起来就是“连续的雪”
+            // ✅ 1 回につき 1 枚（または 2 枚）だけ発生させ、積み重ねて「連続する雪」に見せる
             snowEmitter_->Emit(
-                1,                          // 改小：1~2 片
+                1,                          // 少なめに変更: 1〜2 枚
                 ParticleType::Model3D,
                 "snow/snow.obj",
                 worldPos,
@@ -876,7 +1568,7 @@ void GameScene::Update() {
     if (particleMgr_) {
         particleMgr_->Update(deltaTime);
     }
-    // === 在 GameClear 演出期间按 Space → 回标题 ===
+    // === GameClear 演出中に Space を押す → タイトルへ戻る ===
     if (gameClear_ && gameClear_->IsPlaying() && input_ && input_->TriggerKey(DIK_SPACE)) {
 
         if (sceneManager_) {
@@ -885,13 +1577,13 @@ void GameScene::Update() {
         }
     }
 
-    // === 在 GameOver 演出期间按 Space → 回标题 ===
+    // === GameOver 演出中に Space を押す → タイトルへ戻る ===
     if (gameOver_ && gameOver_->IsPlaying() && input_ && input_->TriggerKey(DIK_SPACE)) {
 
         if (!returnToTitle_ && fade_) {
             returnToTitle_ = true;
 
-            // 重置黑幕参数，开始淡出到纯黑
+            // 黒幕パラメータをリセットし、完全な黒までフェードアウトを開始
             fade_->SetAlpha(0.0f);
             fade_->SetReachedBlack(false);
             fade_->SetBlackHoldFrames(0);
@@ -901,6 +1593,7 @@ void GameScene::Update() {
             if (Sprite* s = fade_->GetSprite()) {
                 s->SetVisible(true);
             }
+            gameOver_->SetDrawEnabled(false);
         }
     }
 
@@ -925,9 +1618,9 @@ void GameScene::Update() {
 
     MapChipField::IndexSet playerIndex =
         mapChipField_.GetMapChipIndexByPosition(player_->GetPosition());
-    // ===== 记录玩家所在格子的历史，用于“回到 1 秒前的位置” =====
+    // ===== プレイヤーがいたマスの履歴を記録し、「1 秒前の位置へ戻す」ために使う =====
     if (!playerIndexHistoryInitialized_) {
-        // 初次：用当前格子填满整个缓冲区，避免读到垃圾数据
+        // 初回は現在のセルでバッファ全体を埋め、ゴミデータを読まないようにする
         for (int i = 0; i < kPlayerIndexHistoryFrameCount_; ++i) {
             playerIndexHistory_[i] = playerIndex;
         }
@@ -936,31 +1629,31 @@ void GameScene::Update() {
         playerIndexOneSecAgo_ = playerIndex;
     }
 
-    // 1 秒前所在的格子 = 当前写入位置里存放的旧值
+    // 1 秒前のマス = 現在書き込もうとしている位置に残っている古い値
     playerIndexOneSecAgo_ = playerIndexHistory_[playerIndexHistoryCursor_];
 
-    // 将本帧格子写入历史，并推进游标
+    // このフレームのマスを履歴へ書き込み、カーソルを進める
     playerIndexHistory_[playerIndexHistoryCursor_] = playerIndex;
     playerIndexHistoryCursor_++;
     if (playerIndexHistoryCursor_ >= kPlayerIndexHistoryFrameCount_) {
         playerIndexHistoryCursor_ = 0;
     }
 
-    // ===== 踩到地刺：扣血 1 格 & 回到 1 秒前所在格子 =====
+    // ===== トゲを踏んだ場合: 1 ダメージを与え、1 秒前にいたマスへ戻す =====
     {
         MapChipType tileType =
             mapChipField_.GetMapChipTypeByIndex(playerIndex.xIndex, playerIndex.yIndex);
 
         bool onSpike = false;
 
-        // 只对地刺格做“矮一点的判定区域”
+        // トゲマスに対してだけ「少し低い判定領域」を使う
         if (tileType == MapChipType::kSpike) {
 
-            // 1) 地刺所在格子的矩形
+            // 1) トゲがあるマスの矩形
             MapChipField::Rect spikeRect =
                 mapChipField_.GetRectByIndex(playerIndex.xIndex, playerIndex.yIndex);
 
-            // 2) 玩家当前 AABB
+            // 2) プレイヤー現在の AABB
             Vector3 pPos = player_->GetPosition();
             float halfW = player_->GetWidth() * 0.5f;
             float halfH = player_->GetHeight() * 0.5f;
@@ -970,68 +1663,100 @@ void GameScene::Update() {
             float bottom = pPos.y - halfH;
             float top = pPos.y + halfH;
 
-            // 3) 只用格子高度的 60% 作为“有效地刺高度”
+            // 3) マスの高さの 60% だけを「有効なトゲ高さ」として使う
             float tileHeight = spikeRect.top - spikeRect.bottom;
 
             MapChipField::Rect hitRect = spikeRect;
             hitRect.top = hitRect.bottom + tileHeight * kSpikeHeightRatio;
 
-            // 4) 玩家 AABB 和“缩短后的地刺矩形”做重叠判定
+            // 4) プレイヤー AABB と「短くしたトゲ矩形」で重なり判定を行う
             bool overlapX = !(right <= hitRect.left || left >= hitRect.right);
             bool overlapY = !(top <= hitRect.bottom || bottom >= hitRect.top);
 
             onSpike = overlapX && overlapY;
         }
 
-        // 被平台夹死照旧用 crushedByPlatformThisFrame_（全格判定）
-        if ((onSpike || crushedByPlatformThisFrame_ || damagedByEnemyThisFrame_) &&
+        // 足場に挟まれた死亡判定は従来どおり crushedByPlatformThisFrame_（マス全体判定）を使う
+        if (!inBossIntro && (onSpike || crushedByPlatformThisFrame_ || damagedByEnemyThisFrame_) &&
             !player_->IsDead() && !player_->IsInvincible()) {
 
-            MapChipField::IndexSet safeIndex = playerIndexOneSecAgo_;
+            // ✅ 敵がプレイヤーに当たった場合: 「跳ね上げ / 1 秒前へ戻す」は行わず、ダメージ + 無敵のみ与え、軽く分離して敵の中に埋まるのを防ぐ
+            const bool enemyHitOnly = (damagedByEnemyThisFrame_ && !onSpike && !crushedByPlatformThisFrame_);
+            if (enemyHitOnly) {
+                player_->TakeDamage(static_cast<float>(player_->GetMaxHp() * 0.2f));
+                player_->StartInvincible(1.0f);
 
-            // 如果 1 秒前也在地刺上，就再往更早找一个“不是地刺”的格子
-            MapChipType safeType =
-                mapChipField_.GetMapChipTypeByIndex(safeIndex.xIndex, safeIndex.yIndex);
+                // 「上へ飛ばされる」挙動を打ち消す（TakeDamage 内で上向き速度が与えられていても、ここで強制的に抑える）
+                {
+                    Vector3 v = player_->GetVelocity();
+                    if (v.y > 0.0f) { v.y = 0.0f; }
+                    player_->SetVelocity(v);
+                }
 
-            if (safeType == MapChipType::kSpike || safeType == MapChipType::kEnemy) {
-                MapChipField::IndexSet firstNonSpike{};
-                bool found = false;
+                // プレイヤーを敵から少し押し出し、無敵終了直後に再び即ダメージを受けるのを防ぐ
+                if (damageSourceEnemy_) {
+                    Vector3 p = player_->GetPosition();
+                    Vector3 e = damageSourceEnemy_->GetPosition();
+                    const float pHalfW = player_->GetWidth() * 0.5f;
+                    const float eHalfW = damageSourceEnemy_->GetWidth() * 0.5f;
+                    const float eps = 0.03f;
+                    if (p.x < e.x) {
+                        p.x = e.x - eHalfW - pHalfW - eps;
+                    }
+                    else {
+                        p.x = e.x + eHalfW + pHalfW + eps;
+                    }
+                    player_->SetPosition(p);
+                }
+            }
+            else {
+                // トゲ / 圧死: 元のロジックを維持し、1 秒前にいたマスへ戻してダメージを与える
+                MapChipField::IndexSet safeIndex = playerIndexOneSecAgo_;
 
-                for (int i = 0; i < kPlayerIndexHistoryFrameCount_; ++i) {
-                    const auto& candidate = playerIndexHistory_[i];
-                    MapChipType type =
-                        mapChipField_.GetMapChipTypeByIndex(candidate.xIndex, candidate.yIndex);
-                    if (type != MapChipType::kSpike) {
-                        firstNonSpike = candidate;
-                        found = true;
-                        break;
+                // もし 1 秒前もトゲの上なら、さらにさかのぼって「トゲでない」マスを探す
+                MapChipType safeType =
+                    mapChipField_.GetMapChipTypeByIndex(safeIndex.xIndex, safeIndex.yIndex);
+
+                if (safeType == MapChipType::kSpike || safeType == MapChipType::kEnemy) {
+                    MapChipField::IndexSet firstNonSpike{};
+                    bool found = false;
+
+                    for (int i = 0; i < kPlayerIndexHistoryFrameCount_; ++i) {
+                        const auto& candidate = playerIndexHistory_[i];
+                        MapChipType type =
+                            mapChipField_.GetMapChipTypeByIndex(candidate.xIndex, candidate.yIndex);
+                        if (type != MapChipType::kSpike && type != MapChipType::kEnemy) {
+                            firstNonSpike = candidate;
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    if (found) {
+                        safeIndex = firstNonSpike;
                     }
                 }
 
-                if (found) {
-                    safeIndex = firstNonSpike;
-                }
+                auto rectPrev = mapChipField_.GetRectByIndex(
+                    safeIndex.xIndex, safeIndex.yIndex);
+
+                // プレイヤーをこのマスの「上」に立たせる
+                Vector3 targetPos{};
+                targetPos.x = (rectPrev.left + rectPrev.right) * 0.5f;
+
+                float halfH = player_->GetHeight() * 0.5f;
+                targetPos.y = rectPrev.top + halfH;
+                targetPos.z = player_->GetPosition().z;
+
+                player_->SetPosition(targetPos);
+                player_->ResetForMapTransition(true);
+
+                player_->TakeDamage(static_cast<float>(player_->GetMaxHp() * 0.2f));
+                player_->StartInvincible(1.0f);
             }
-
-            auto rectPrev = mapChipField_.GetRectByIndex(
-                safeIndex.xIndex, safeIndex.yIndex);
-
-            // 让玩家站在这个格子的“上表面”
-            Vector3 targetPos{};
-            targetPos.x = (rectPrev.left + rectPrev.right) * 0.5f;
-
-            float halfH = player_->GetHeight() * 0.5f;
-            targetPos.y = rectPrev.top + halfH;
-            targetPos.z = player_->GetPosition().z;
-
-            player_->SetPosition(targetPos);
-            player_->ResetForMapTransition(true);
-
-            player_->TakeDamage(static_cast<float>(player_->GetMaxHp() * 0.2f));
-            player_->StartInvincible(1.0f);
         }
     }
-    // 更新传送门提示图标（是否显示 + 位置）
+    // 転送門ヒントアイコンを更新（表示するかどうか + 位置）
     const PortalInfo* currentPortal = nullptr;
     if (portalMgr_) {
         portalMgr_->UpdateHint(playerIndex, player_->GetPosition(), canControl);
@@ -1048,53 +1773,34 @@ void GameScene::Update() {
         }
     }
     if (currentPortal) {
-        // 玩家正站在某个门格子上
+        // プレイヤーがいずれかの門マスの上に立っている
         if (canControl && input_->TriggerKey(DIK_E)) {
-            // ==== 如果是从子关卡回到 Hub(map2)，更新解锁进度 ====
+                        // ==== 子ステージから Hub(map2) に戻る場合は解放進捗を更新する（解放専用であり、以後クリア条件には使わない）====
             auto itStage = hubStageByMap_.find(currentMapPath_);
-            bool triggerGameClear = false;
             if (currentPortal->targetMap == "Resources/map/map2.csv" && itStage != hubStageByMap_.end()) {
-                int stageIndex = itStage->second;   // 这是第几关(0~3)
+                int stageIndex = itStage->second;   // これは第何関か (0〜3)
                 if (hubProgress_ < stageIndex + 1) {
                     hubProgress_ = stageIndex + 1;
                     if (hubProgress_ >= 4) {
                         allStagesCleared_ = true;
-                        triggerGameClear = true;
                     }
                 }
             }
 
-            if (triggerGameClear) {
-                if (!pendingGameClear_ && gameClear_ && !gameClear_->IsPlaying() && fade_) {
-                    pendingGameClear_ = true;
+            // ==== 通常の転送処理 ====
+            pendingPortalMapPath_ = currentPortal->targetMap;
+            pendingPortalStartPos_ = currentPortal->targetStartPos;
+            pendingPortalLoad_ = true;
 
-                    fade_->SetAlpha(0.0f);
-                    fade_->SetReachedBlack(false);
-                    fade_->SetBlackHoldFrames(0);
-                    fade_->SetOverlayPushed(false);
+            if (fade_) {
+                fade_->SetAlpha(0.0f);
+                fade_->SetReachedBlack(false);
+                fade_->SetBlackHoldFrames(0);
+                fade_->SetOverlayPushed(false);
 
-                    fade_->SetPhase(FadePhase::FadingOut);
-                    if (Sprite* s = fade_->GetSprite()) {
-                        s->SetVisible(true);
-                    }
-                }
-            }
-            else {
-                // ==== 普通传送处理 ====
-                pendingPortalMapPath_ = currentPortal->targetMap;
-                pendingPortalStartPos_ = currentPortal->targetStartPos;
-                pendingPortalLoad_ = true;
-
-                if (fade_) {
-                    fade_->SetAlpha(0.0f);
-                    fade_->SetReachedBlack(false);
-                    fade_->SetBlackHoldFrames(0);
-                    fade_->SetOverlayPushed(false);
-
-                    fade_->SetPhase(FadePhase::FadingOut);
-                    if (Sprite* s = fade_->GetSprite()) {
-                        s->SetVisible(true);
-                    }
+                fade_->SetPhase(FadePhase::FadingOut);
+                if (Sprite* s = fade_->GetSprite()) {
+                    s->SetVisible(true);
                 }
             }
         }
@@ -1105,7 +1811,7 @@ void GameScene::Update() {
     if (input_->TriggerKey(DIK_P)) {
         SoundManager::GetInstance()->Play("fanfare", false, 1.0f);
     }
-    // ===== FadingIn：从全黑淡入 =====
+    // ===== FadingIn: 完全な黒からフェードイン =====
     if (fade_ && fade_->GetPhase() == FadePhase::FadingIn) {
         float a = fade_->GetAlpha();
         a -= fade_->GetSpeed();
@@ -1113,7 +1819,7 @@ void GameScene::Update() {
             a = 0.0f;
             fade_->SetPhase(FadePhase::None); // 淡入完成
 
-            // 淡入完成→启动开场演出（只启动一次）
+            // フェードイン完了 → 開始演出を起動（1 回のみ）
             if (intro_ && !intro_->HasStarted() &&
                 !(gameOver_ && gameOver_->IsPlaying()) &&
                 !(gameClear_ && gameClear_->IsPlaying())) {
@@ -1150,14 +1856,14 @@ void GameScene::Update() {
     }
     // ======= Player Info =======
     if (ImGui::CollapsingHeader("Player Info", ImGuiTreeNodeFlags_DefaultOpen)) {
-        // 位置信息
+        // 位置情報
         Vector3 playerPos = player_->GetPosition();
         float playerPosArr[3] = { playerPos.x, playerPos.y, playerPos.z };
         ImGui::Text("Position: (%.2f, %.2f, %.2f)", playerPos.x, playerPos.y, playerPos.z);
         MapChipField::IndexSet playerIndex = mapChipField_.GetMapChipIndexByPosition(player_->GetPosition());
         ImGui::Text("MapChip Index: (%d, %d)", playerIndex.xIndex, playerIndex.yIndex);
 
-        // 添加当前格子类型信息
+        // 現在のセル種別情報を追加
         MapChipType currentType = mapChipField_.GetMapChipTypeByIndex(playerIndex.xIndex, playerIndex.yIndex);
         const char* typeName = "Unknown";
         switch (currentType) {
@@ -1181,10 +1887,10 @@ void GameScene::Update() {
 void GameScene::Draw() {
     dxCommon_->Begin();
 
-    // 是否处于 GameClear 演出中
+    // GameClear 演出中かどうか
     bool inGameClear = (gameClear_ && gameClear_->IsPlaying());
 
-    // ================== 0) 背景天空（2D Sprite） ==================
+    // ================== 0) 背景の空（2D Sprite） ==================
     srvManager_->PreDraw();
     spriteCommon_->CommonDraw();
     if (backgroundSprite_) {
@@ -1192,42 +1898,42 @@ void GameScene::Draw() {
     }
     dxCommon_->ClearDepthBuffer();
 
-    // ================== 1) 3D 场景（地图、HP 3D条等） ==================
+    // ================== 1) 3D シーン（地図、HP 3D バーなど） ==================
     srvManager_->PreDraw();
     object3dCommon_->CommonDraw();
 
-    // 地图方块
+    // マップブロック
     for (auto& block : mapBlocks_) {
         if (block) {
             block->Draw();
         }
     }
 
-    // 移动平台
+    // 移動床
     for (auto& p : movingPlatforms_) {
         if (p) {
             p->Draw();
         }
     }
 
-    // 敌人
+    // 敵
     for (auto& e : enemies_) {
         if (e) {
             e->Draw();
         }
     }
 
-    // 道具
+    // アイテム
     if (itemMgr_) {
         itemMgr_->Draw3D();
     }
 
-    // HP 3D 条段
+    // HP 3D バー
     if (hpBar_) {
         hpBar_->Draw3D();
     }
 
-    // ================== 1.5) GameClear 用全屏黑背景 ==================
+    // ================== 1.5) GameClear 用の全画面黒背景 ==================
     if (inGameClear && fade_) {
         Sprite* s = fade_->GetSprite();
         spriteCommon_->CommonDraw();
@@ -1237,45 +1943,42 @@ void GameScene::Draw() {
         }
     }
 
-    // ================== 2) 中间层：交互提示 Sprite ==================
+    // ================== 2) 中間レイヤー: 交互ヒント Sprite ==================
     spriteCommon_->CommonDraw();
     if (!inGameClear) {
         if (hintUI_) {
             hintUI_->Draw();
         }
 
-        // 冲刺技能 UI
+        // ダッシュスキル UI
         if (dashUI_) {
             dashUI_->Draw();
         }
 
-        // Coin 数字 UI（冒号 + 数字）
+        // Coin 数字 UI（コイン + 数字）
         if (coinUI_) {
             coinUI_->Draw2D();
         }
 
-        // 传送门提示
+        // 転送門提示
         if (portalMgr_) {
             portalMgr_->DrawHint();
         }
     }
 
-    // ================== 3) 前景 3D：玩家（盖住提示） ==================
+    // ================== 3) 前景 3D: プレイヤー（ヒントの手前に描画） ==================
     dxCommon_->ClearDepthBuffer();
 
     srvManager_->PreDraw();
     object3dCommon_->CommonDraw();
 
-    // 如果 GameClear 正在播放，就画 GameClear 的玩家，否则画正常玩家
-    if (gameClear_ && gameClear_->IsPlaying()) {
-        gameClear_->DrawPlayer();
-    }
-    else {
+    // 勝利画面中は通常プレイヤー / 3D コイン / 3D 粒子 / 水ブロックを描画しない
+    if (!(gameClear_ && gameClear_->IsPlaying())) {
         if (player_) {
             player_->Draw();
         }
 
-        // 右上角 3D coin
+        // 右上の 3D コイン
         if (coinUI_) {
             coinUI_->Draw3D();
         }
@@ -1285,7 +1988,7 @@ void GameScene::Draw() {
             particleMgr_->Draw3D();
         }
 
-        // 水块（放在玩家前面）
+        // 水ブロック（プレイヤーの前面に配置）
         for (auto& water : waterBlocks_) {
             if (water) {
                 water->Draw();
@@ -1296,12 +1999,23 @@ void GameScene::Draw() {
     // ================== 4) 最前景 UI Sprite ==================
     spriteCommon_->CommonDraw();
 
-    // Intro / 黑边 / 暗角 / 标题 / Skip 提示
+    // ===== Boss Name（2D）=====
+    if (!inGameClear && bossNameVisible_) {
+        if (bossNameSprite_) { bossNameSprite_->Draw(); }
+    }
+
+    // ===== Boss HP（2D）=====
+    if (!inGameClear && bossHpVisible_) {
+        if (bossHpDamageSprite_) { bossHpDamageSprite_->Draw(); }
+        if (bossHpSprite_)       { bossHpSprite_->Draw(); }
+    }
+
+    // Intro / 黒縁 / 暗角 / タイトル / Skip 表示
     if (intro_) {
         intro_->Draw();
     }
 
-    // 黑幕淡入淡出（GameClear 时不用这个黑幕，避免挡住胜利画面）
+    // 黒幕のフェードイン / フェードアウト（GameClear 時はこの黒幕を使わず、勝利画面を隠さないようにする）
     if (fade_ && !inGameClear) {
         fade_->Draw();
     }
@@ -1311,7 +2025,7 @@ void GameScene::Draw() {
         gameOver_->Draw();
     }
 
-    // GameClear 标题
+    // GameClear タイトル
     if (gameClear_) {
         gameClear_->DrawTitle();
     }
@@ -1319,6 +2033,30 @@ void GameScene::Draw() {
     // 2D 粒子
     if (particleMgr_) {
         particleMgr_->Draw2D();
+    }
+
+    // ================== Pause Menu（ESC） ==================
+    if (isPaused_ && !inGameClear) {
+        spriteCommon_->CommonDraw();
+
+        // 1) 背景を暗くする（Fade 用の黒幕 Sprite を一時的に借りて描画する）
+        if (pauseDimSprite_) {
+            pauseDimSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 0.6f });
+            pauseDimSprite_->Update();
+            pauseDimSprite_->Draw();
+        }
+
+
+
+        // 2) ボタン（選択中のみ金枠）
+        if (pauseCursor_ == 0) {
+            if (pauseContinueSelected_) { pauseContinueSelected_->Draw(); }
+            if (pauseBackNormal_) { pauseBackNormal_->Draw(); }
+        }
+        else {
+            if (pauseContinueNormal_) { pauseContinueNormal_->Draw(); }
+            if (pauseBackSelected_) { pauseBackSelected_->Draw(); }
+        }
     }
 
     // ImGui（debug UI）
@@ -1331,18 +2069,13 @@ void GameScene::Draw() {
 
 
 void GameScene::Finalize() {
-    // ==== 全局 / 单例资源 ====
-    SoundManager::GetInstance()->Finalize();
-    TextureManager::GetInstance()->Finalize();
-    ModelManager::GetInstants()->Finalize();
-
     // ==== ImGui ====
     if (imguiManager_) {
         imguiManager_->Finalize();
         imguiManager_.reset();
     }
 
-    // ==== 各种管理器 / UI ====
+    // ==== 各種マネージャ / UI ====
     if (dashUI_) {
         dashUI_->Finalize();
         dashUI_.reset();
@@ -1393,12 +2126,12 @@ void GameScene::Finalize() {
         hintUI_.reset();
     }
 
-    // ==== 粒子系统 ====
+    // ==== パーティクル系 ====
     if (particleMgr_) {
         particleMgr_->Finalize();
         particleMgr_.reset();
     }
-    // 发射器只是借用的裸指针，ParticleManager 已经管好它们的 delete 了
+    // エミッタはここでは借用の生ポインタのみを保持し、delete は ParticleManager 側で管理済み
     emitter2D_ = nullptr;
     emitter3D_ = nullptr;
     dashStarEmitter_ = nullptr;
@@ -1408,14 +2141,29 @@ void GameScene::Finalize() {
     // ==== 背景 Sprite ====
     backgroundSprite_.reset();
 
-    // ==== 3D 物体容器（方块 / 水面 / 敌人 / 平台）====
-    // 里面是 unique_ptr，clear() 时会自动 delete 元素
+    // ==== Pause Menu Sprites ====
+    pauseContinueNormal_.reset();
+    pauseContinueSelected_.reset();
+    pauseBackNormal_.reset();
+    pauseBackSelected_.reset();
+    pauseDimSprite_.reset();
+    isPaused_ = false;
+    pauseCursor_ = 0;
+
+    // ==== Boss HP（2D）Sprite ====
+    bossHpDamageSprite_.reset();
+    bossHpSprite_.reset();
+    bossNameSprite_.reset();
+    bossNameVisible_ = false;
+
+    // ==== 3D オブジェクトコンテナ（ブロック / 水面 / 敵 / 足場）====
+    // 中身は unique_ptr のため、clear() 時に要素は自動 delete される
     mapBlocks_.clear();
     waterBlocks_.clear();
     enemies_.clear();
     movingPlatforms_.clear();
 
-    // ==== 玩家 / 摄像机 / 3D 共通 ====
+    // ==== プレイヤー / カメラ / 3D 共通 ====
     playerCamera_.reset();
     player_.reset();
     camera_.reset();
@@ -1425,22 +2173,33 @@ void GameScene::Finalize() {
     shiftHint_.sprite.reset();
     sprintHint_.sprite.reset();
     upHints_.clear();
+
+    deferredInitPhase_ = DeferredInitPhase::None;
+    initComplete_ = false;
+    deferredModelLoadCursor_ = 0;
+    postLoadSettleFrames_ = 0;
+    pendingRevealAfterLoad_ = false;
 }
 
 
-void GameScene::StartLoadingMap(const std::string& mapPath, const Vector3& startPos, bool isPortal = false) {
-    if (sceneManager_) {
+void GameScene::StartLoadingMap(const std::string& mapPath, const Vector3& startPos, bool isPortal) {
+    if (sceneManager_ && !sceneManager_->GetOverlayScene()) {
         sceneManager_->SetOverlayScene(std::make_unique<LoadingScene>());
     }
+    pendingMapSpawns_.clear();
+    isIncrementalMapLoading_ = false;
+    loadPrepared_ = false;
+    postLoadSettleFrames_ = 0;
+    pendingRevealAfterLoad_ = false;
     if (isPortal) {
-        // 传送门加载
+        // 転送門ロード
         isPortalLoading_ = true;
         portalMapPath_ = mapPath;
         portalStartPos_ = startPos;
         portalLoadingTimer_ = 0.0f;
     }
     else {
-        // 初始化加载
+        // 初期ロード
         isMapLoading_ = true;
         loadingTimer_ = 0.0f;
     }
@@ -1448,49 +2207,50 @@ void GameScene::StartLoadingMap(const std::string& mapPath, const Vector3& start
 
 void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
 {
-    // 记录本次地图路径
+    // 今回のマップパスを記録
     currentMapPath_ = mapPath;
 
-    // 清理旧 items 渲染对象
+    // 古い item 描画オブジェクトをクリア
     if (itemMgr_) {
         itemMgr_->ClearVisuals();
     }
 
-    // ==== 清理旧的 3D 物体（unique_ptr 容器，直接 clear 即可）====
+    // ==== 古い 3D オブジェクトをクリア（unique_ptr コンテナなのでそのまま clear でよい）====
     mapBlocks_.clear();
     waterBlocks_.clear();
     enemies_.clear();
     movingPlatforms_.clear();
 
-    // ==== 清理旧的 Hint Sprite（unique_ptr reset）====
+    // ==== 古い Hint Sprite をクリア（unique_ptr を reset）====
     spaceHint_.sprite.reset();
     shiftHint_.sprite.reset();
     sprintHint_.sprite.reset();
     upHints_.clear();
 
-    // 重新读地图
+    // マップを再ロード
     mapChipField_.LoadMapChipCsv(mapPath);
-    GenerateBlocks();
+    BuildPendingMapSpawns();
+    loadPrepared_ = true;
 
-    // ==== 刷新右上角 Coin UI：显示「总共拾取的 coin 数」 ====
+    // ==== 右上 Coin UI を更新: 「合計で取得した coin 数」を表示 ====
     if (coinUI_) {
         coinUI_->SetTotalCoin(totalCoinCollected_);
     }
 
-    // === 只在 map1 生成 Space / Shift / Sprint / Up 提示 ===
+    // === map1 のみ Space / Shift / Sprint / Up のヒントを生成 ===
     if (mapPath == "Resources/map/map.csv") {
 
         // (5,2) → space.png
         spaceHint_.sprite = std::make_unique<Sprite>();
         spaceHint_.sprite->Initialize(spriteCommon_, "Resources/space2.png");
-        spaceHint_.sprite->SetSize({ 64.0f, 64.0f });
+        spaceHint_.sprite->SetSize({ 48.0f, 32.0f });
         spaceHint_.worldPos = mapChipField_.GetMapChipPositionByIndex(5, 2);
         spaceHint_.worldPos.y += 0.4f;
 
         // (19,6) → shift.png
         shiftHint_.sprite = std::make_unique<Sprite>();
         shiftHint_.sprite->Initialize(spriteCommon_, "Resources/shift.png");
-        shiftHint_.sprite->SetSize({ 64.0f, 48.0f });
+        shiftHint_.sprite->SetSize({ 48.0f, 32.0f });
         shiftHint_.worldPos = mapChipField_.GetMapChipPositionByIndex(19, 6);
         shiftHint_.worldPos.x -= 0.2f;
         shiftHint_.worldPos.y += 0.5f;
@@ -1503,33 +2263,33 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
         sprintHint_.worldPos.x -= 0.3f;
         sprintHint_.worldPos.y += 0.5f;
 
-        // Up 一组
+        // Up ヒント一式
         auto makeUpHint = [&](int x, int y) {
             HintSprite h;
             h.sprite = std::make_unique<Sprite>();
             h.sprite->Initialize(spriteCommon_, "Resources/up.dds");
             h.sprite->SetSize({ 32.0f, 32.0f });
             h.worldPos = mapChipField_.GetMapChipPositionByIndex(x, y);
-            // vector 里有 unique_ptr，必须 move
+            // vector 内は unique_ptr なので、必ず move する
             upHints_.push_back(std::move(h));
-        };
+            };
 
         // (6,2), (11,4), (12,4)
         makeUpHint(6, 2);
         makeUpHint(11, 4);
         makeUpHint(12, 4);
     }
-    // === Hub 地图（map2）：只显示一个方向箭头，指向“下一关的门” ===
+    // === Hub マップ（map2）: 次の関への門を指す方向矢印だけを表示する ===
     else if (mapPath == "Resources/map/map2.csv") {
-        // 教学用的 Space/Shift 提示在 Hub 不显示，只清掉位置
-        spaceHint_.worldPos  = { 0,0,0 };
-        shiftHint_.worldPos  = { 0,0,0 };
+        // チュートリアル用の Space / Shift ヒントは Hub では表示せず、位置だけクリアする
+        spaceHint_.worldPos = { 0,0,0 };
+        shiftHint_.worldPos = { 0,0,0 };
         sprintHint_.worldPos = { 0,0,0 };
 
         int nextX = -1;
         int nextY = -1;
 
-        // 门索引（在 map2 内）：
+        // 門インデックス（map2 内）:
         //   map3: (11,5)
         //   map4: (14,5)
         //   map5: (23,1)
@@ -1547,7 +2307,7 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
             nextX = 12; nextY = 14;
         }
         else {
-            // hubProgress_ >= 4 → 所有关卡通关，不再显示方向
+            // hubProgress_ >= 4 なら全ステージクリア済みなので、以後は方向を表示しない
         }
 
         if (nextX >= 0) {
@@ -1558,30 +2318,29 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
             h.sprite->SetRotation(std::numbers::pi_v<float>);
             h.worldPos = mapChipField_.GetMapChipPositionByIndex(nextX, nextY);
             h.worldPos.x += 0.4f;
-            h.worldPos.y += 2.0f;   // 稍微抬高一点，在门上方飘
+            h.worldPos.y += 2.0f;   // 少し持ち上げて、門の上に浮かせる
             upHints_.push_back(std::move(h));
         }
     }
     else {
-        // 不是 map1 / map2：确保不画教学提示
-        spaceHint_.worldPos  = { 0,0,0 };
-        shiftHint_.worldPos  = { 0,0,0 };
+        // map1 / map2 以外では、チュートリアルヒントを確実に描画しない
+        spaceHint_.worldPos = { 0,0,0 };
+        shiftHint_.worldPos = { 0,0,0 };
         sprintHint_.worldPos = { 0,0,0 };
     }
 
-    // ==== 设置玩家起点 ====
+    // ==== プレイヤー開始位置を設定 ====
     if (player_) {
         player_->SetPosition(startPos);
-        player_->ResetForMapTransition(true);
     }
 
     MapChipField::IndexSet startIndex = mapChipField_.GetMapChipIndexByPosition(startPos);
     for (int i = 0; i < kPlayerIndexHistoryFrameCount_; ++i) {
         playerIndexHistory_[i] = startIndex;
     }
-    playerIndexHistoryCursor_      = 0;
+    playerIndexHistoryCursor_ = 0;
     playerIndexHistoryInitialized_ = true;
-    playerIndexOneSecAgo_          = startIndex;
+    playerIndexOneSecAgo_ = startIndex;
 
     // 相机同步
     if (camera_) {
@@ -1596,12 +2355,12 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
         );
     }
 
-    // 根据当前地图更新传送门列表
+    // 現在のマップに応じて転送門リストを更新
     if (portalMgr_) {
         portalMgr_->ClearPortals();
     }
 
-    // ========== map1（起始地图） ==========
+    // ========== map1（開始マップ） ==========
     if (mapPath == "Resources/map/map.csv") {
         if (portalMgr_) {
             portalMgr_->AddPortal(
@@ -1611,10 +2370,10 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
             );
         }
     }
-    // ========== map2（中心地图 / Hub） ==========
+    // ========== map2（中央マップ / Hub） ==========
     else if (mapPath == "Resources/map/map2.csv") {
         if (portalMgr_) {
-            // Hub → 返回 map1 的门
+            // Hub → map1 に戻る門
             portalMgr_->AddPortal(
                 { 2, 1 },
                 "Resources/map/map.csv",
@@ -1649,36 +2408,24 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
             }
         }
     }
-    // ========== 各子关卡内部：返回 Hub ==========
+    // ========== 各子ステージ内部: Hub へ戻す ==========
     else {
         if (portalMgr_) {
             if (mapPath == "Resources/map/map3.csv") {
-                portalMgr_->AddPortal(
-                    { 2, 1 },
-                    "Resources/map/map2.csv",
-                    mapChipField_.GetMapChipPositionByIndex(11, 5)
-                );
+                portalMgr_->AddPortal({ 61, 1 }, "Resources/map/map2.csv",
+                    mapChipField_.GetMapChipPositionByIndex(11, 5));
             }
             else if (mapPath == "Resources/map/map4.csv") {
-                portalMgr_->AddPortal(
-                    { 2, 1 },
-                    "Resources/map/map2.csv",
-                    mapChipField_.GetMapChipPositionByIndex(14, 5)
-                );
+                portalMgr_->AddPortal({ 69, 1 }, "Resources/map/map2.csv",
+                    mapChipField_.GetMapChipPositionByIndex(14, 5));
             }
             else if (mapPath == "Resources/map/map5.csv") {
-                portalMgr_->AddPortal(
-                    { 2, 1 },
-                    "Resources/map/map2.csv",
-                    mapChipField_.GetMapChipPositionByIndex(23, 1)
-                );
+                portalMgr_->AddPortal({ 81, 1 }, "Resources/map/map2.csv",
+                    mapChipField_.GetMapChipPositionByIndex(23, 1));
             }
             else if (mapPath == "Resources/map/map6.csv") {
-                portalMgr_->AddPortal(
-                    { 2, 1 },
-                    "Resources/map/map2.csv",
-                    mapChipField_.GetMapChipPositionByIndex(12, 14)
-                );
+                portalMgr_->AddPortal({ 89, 1 }, "Resources/map/map2.csv",
+                    mapChipField_.GetMapChipPositionByIndex(12, 14));
             }
         }
     }
@@ -1696,7 +2443,7 @@ void GameScene::HandlePlayerOnMovingPlatforms()
     const float halfW = player_->GetWidth() * 0.5f;
     const float halfH = player_->GetHeight() * 0.5f;
 
-    // movingPlatforms_ 是 vector<unique_ptr<MovingPlatform>>
+    // movingPlatforms_ は vector<unique_ptr<MovingPlatform>>
     for (auto& platformPtr : movingPlatforms_) {
         MovingPlatform* platform = platformPtr.get();
         if (!platform) continue;
@@ -1714,47 +2461,47 @@ void GameScene::HandlePlayerOnMovingPlatforms()
             continue;
         }
 
-        // 计算 X / Y 方向的最小穿透量
+        // X / Y 方向の最小めり込み量を計算
         float penX = (std::min)(r.right - left, right - r.left);
         float penY = (std::min)(r.top - bottom, top - r.bottom);
 
         if (penX < penY) {
-            // 水平方向分离（挡住侧面）
+            // 水平方向に分離（側面を遮る）
             float centerPlayerX = pos.x;
             float centerRectX = (r.left + r.right) * 0.5f;
             if (centerPlayerX < centerRectX) {
-                pos.x -= penX;   // 玩家在左 → 往左推
+                pos.x -= penX;   // プレイヤーが左側 → 左へ押し出す
             }
             else {
-                pos.x += penX;   // 玩家在右 → 往右推
+                pos.x += penX;   // プレイヤーが右側 → 右へ押し出す
             }
             vel.x = 0.0f;
         }
         else {
-            // 垂直方向分离（挡住头顶/脚底）
+            // 垂直方向に分離（頭上 / 足元を遮る）
             float centerPlayerY = pos.y;
             float centerRectY = (r.bottom + r.top) * 0.5f;
 
             if (centerPlayerY < centerRectY) {
-                // 从下往上撞到平台底部
+                // 下から上へ足場の底にぶつかった
                 pos.y -= penY;
                 if (vel.y > 0.0f) {
                     vel.y = 0.0f;
                 }
             }
             else {
-                // 从上踩到平台 → 当做地面 + 站在上面跟着动
+                // 上から足場を踏んだ → 地面として扱い、その上に乗って一緒に動く
                 player_->SetPosition(pos);
                 player_->SetVelocity(vel);
                 player_->LandOnExternalGround(r.top);
 
-                // 取一下修正后的 pos / vel
+                // 補正後の pos / vel を取得し直す
                 pos = player_->GetPosition();
                 vel = player_->GetVelocity();
 
-                // 把玩家跟着平台一起移动（这一帧平台的位移）
+                // プレイヤーを足場と一緒に移動させる（このフレームの足場移動量）
                 Vector3 delta = platform->GetPosition() - platform->GetPrevPosition();
-                pos.x += delta.x;
+                pos = pos + delta;
             }
         }
     }
@@ -1763,3 +2510,204 @@ void GameScene::HandlePlayerOnMovingPlatforms()
     player_->SetVelocity(vel);
 }
 
+
+
+// ================== Boss トリガー演出（カメラ推 Boss + 名字 + 回プレイヤー） ==================
+BossEnemy* GameScene::FindBossEnemy()
+{
+    for (auto& e : enemies_) {
+        if (!e) { continue; }
+        if (e->GetType() != EnemyType::Boss) { continue; }
+        if (auto* b = dynamic_cast<BossEnemy*>(e.get())) {
+            return b;
+        }
+    }
+    return nullptr;
+}
+
+Vector3 GameScene::ConstrainCameraToMap(const Vector3& desiredPos, float fovY, float cameraZ) const
+{
+    if (!camera_) { return desiredPos; }
+
+    Vector3 mapMin = mapChipField_.GetMapMinPosition();
+    Vector3 mapMax = mapChipField_.GetMapMaxPosition();
+
+    float halfViewHeight = std::abs(cameraZ) * std::tan(fovY * 0.5f);
+    float halfViewWidth  = halfViewHeight * camera_->GetAspectRatio();
+
+    float minX = mapMin.x + halfViewWidth;
+    float maxX = mapMax.x - halfViewWidth;
+    float minY = mapMin.y + halfViewHeight;
+    float maxY = mapMax.y - halfViewHeight;
+
+    // マップが小さすぎる場合は、カメラを中央に固定する
+    if (maxX < minX) { minX = maxX = (mapMin.x + mapMax.x) * 0.5f; }
+    if (maxY < minY) { minY = maxY = (mapMin.y + mapMax.y) * 0.5f; }
+
+    Vector3 out = desiredPos;
+    out.x = std::clamp(out.x, minX, maxX);
+    out.y = std::clamp(out.y, minY, maxY);
+    return out;
+}
+
+void GameScene::StartBossIntro(BossEnemy* boss)
+{
+    if (!boss || !camera_) { return; }
+    introBoss_ = boss;
+    bossIntroPhase_ = BossIntroPhase::ToBoss;
+    bossIntroTimer_ = 0.0f;
+
+    // プレイヤーを固定: 演出中はトリガー瞬間の位置を保つ
+    if (player_) {
+        gBossIntroFreezePlayer = true;
+        gBossIntroFrozenPlayerPos = player_->GetPosition();
+        player_->SetVelocity({ 0.0f, 0.0f, 0.0f });
+        player_->SetPosition(gBossIntroFrozenPlayerPos);
+    }
+
+    bossIntroStartCamPos_ = camera_->GetTransform().translate;
+    bossIntroStartFovY_   = camera_->GetFovY();
+
+    // 戻り段階のデフォルト終点: トリガー時のプレイヤーカメラへ戻す（現在の追従カメラへ戻したい場合は終点を毎フレーム再計算してもよい）
+    bossIntroBackStartCamPos_ = bossIntroStartCamPos_;
+    bossIntroBackStartFovY_   = bossIntroStartFovY_;
+
+    bossNameVisible_ = false;
+}
+
+void GameScene::UpdateBossIntro(float dt)
+{
+    if (!camera_) { return; }
+    if (bossIntroPhase_ == BossIntroPhase::None) { return; }
+
+    // Boss が事前に倒されている / 存在しない場合は、演出を即終了する
+    if (!introBoss_ || introBoss_->IsDead()) {
+        bossIntroPhase_ = BossIntroPhase::None;
+        introBoss_ = nullptr;
+        bossNameVisible_ = false;
+        gBossIntroFreezePlayer = false;
+        return;
+    }
+
+    bossIntroTimer_ += dt;
+
+    const Vector3 bossPos = introBoss_->GetPosition();
+
+    switch (bossIntroPhase_) {
+    case BossIntroPhase::ToBoss:
+    {
+        float t = bossIntroToBossDur_ > 0.0f ? (bossIntroTimer_ / bossIntroToBossDur_) : 1.0f;
+        if (t > 1.0f) { t = 1.0f; }
+        float s = SmoothStep01(t);
+
+        float fov = LerpFloat(bossIntroStartFovY_, bossIntroBossFovY_, s);
+        float z   = LerpFloat(bossIntroStartCamPos_.z, bossIntroBossZ_, s);
+
+        // 目標点（★ 全体を少し下へずらす: bossIntroBossCamOffset_.y が負）
+        Vector3 desiredTarget = {
+            bossPos.x + bossIntroBossCamOffset_.x,
+            bossPos.y + bossIntroBossCamOffset_.y,
+            z
+        };
+
+        // ★ 先に目標を制約してから補間する。境界付近では「境界に沿って滑る」ようになり、突然切り詰められない
+        Vector3 target = ConstrainCameraToMap(desiredTarget, fov, z);
+
+        Vector3 newPos = LerpVec3(bossIntroStartCamPos_, target, s);
+        newPos.z = z;
+
+        camera_->SetFovY(fov);
+        camera_->SetTranslate(newPos);
+        camera_->Update();
+
+        if (t >= 1.0f) {
+            bossIntroPhase_ = BossIntroPhase::ShowName;
+            bossIntroTimer_ = 0.0f;
+            bossNameVisible_ = true;
+        }
+        break;
+    }
+
+    case BossIntroPhase::ShowName:
+    {
+        bossNameVisible_ = true;
+
+        float fov = bossIntroBossFovY_;
+        float z   = bossIntroBossZ_;
+
+        Vector3 desiredTarget = {
+            bossPos.x + bossIntroBossCamOffset_.x,
+            bossPos.y + bossIntroBossCamOffset_.y,
+            z
+        };
+        Vector3 target = ConstrainCameraToMap(desiredTarget, fov, z);
+
+        camera_->SetFovY(fov);
+        camera_->SetTranslate(target);
+        camera_->Update();
+
+        if (bossIntroTimer_ >= bossIntroShowDur_) {
+            bossIntroPhase_ = BossIntroPhase::BackToPlayer;
+            bossIntroTimer_ = 0.0f;
+
+            bossIntroBackStartCamPos_ = camera_->GetTransform().translate;
+            bossIntroBackStartFovY_   = camera_->GetFovY();
+
+            bossNameVisible_ = false;
+        }
+        break;
+    }
+
+    case BossIntroPhase::BackToPlayer:
+    {
+        bossNameVisible_ = false;
+
+        float t = bossIntroBackDur_ > 0.0f ? (bossIntroTimer_ / bossIntroBackDur_) : 1.0f;
+        if (t > 1.0f) { t = 1.0f; }
+        float s = SmoothStep01(t);
+
+        // 目標: 「プレイヤー追従カメラ」の位置へ戻る（ここでは Initialize 内の SetOffset と一致する offset を使う）
+        Vector3 playerPos = player_ ? player_->GetPosition() : Vector3{ 0,0,0 };
+        Vector3 desiredTarget = {
+            playerPos.x,
+            playerPos.y,
+            0.0f
+        };
+
+        // FOV / Z も同期して戻す（トリガー瞬間のプレイヤーカメラを終点として使う）
+        float fov = LerpFloat(bossIntroBackStartFovY_, bossIntroStartFovY_, s);
+        float z   = LerpFloat(bossIntroBackStartCamPos_.z, bossIntroStartCamPos_.z, s);
+
+        desiredTarget.z = z;
+
+        // ★ 同様に、先に目標を制約してから補間する（さらに「開始位置」も現在の fov / z で少し制約する）
+        //  こうすると境界付近でも、視口の変化に合わせて滑らかに境界沿いへ動き、急に切り詰められない
+        Vector3 startPos = { bossIntroBackStartCamPos_.x, bossIntroBackStartCamPos_.y, z };
+        startPos = ConstrainCameraToMap(startPos, fov, z);
+
+        Vector3 target = ConstrainCameraToMap(desiredTarget, fov, z);
+        Vector3 newPos = LerpVec3(startPos, target, s);
+        newPos.z = z;
+
+        camera_->SetFovY(fov);
+        camera_->SetTranslate(newPos);
+        camera_->Update();
+
+        if (t >= 1.0f) {
+            bossIntroPhase_ = BossIntroPhase::None;
+            gBossIntroFreezePlayer = false;
+
+            // 正式に戦闘開始
+            if (introBoss_) {
+                introBoss_->TriggerBattleNow();
+            }
+            introBoss_ = nullptr;
+            bossNameVisible_ = false;
+        }
+        break;
+    }
+
+    default:
+        break;
+    }
+}
