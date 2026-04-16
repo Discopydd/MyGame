@@ -15,7 +15,7 @@ void DashUIManager::Initialize(SpriteCommon* spriteCommon, Player* player)
     overlay_ = std::make_unique<Sprite>();
     overlay_->Initialize(spriteCommon_, textureFilePath[1]);
 
-    // overlay ¤ÎÔª¥Æ¥¯¥¹¥Á¥ã¥µ¥¤¥º¤ò±£´æ¤¹¤ë£¨Initialize ÄÚ¤Ç textureSize_ ¤Ï¡¸Ôª»­Ïñ¥µ¥¤¥º¡¹¤Ë¤Ê¤ë£©
+    // overlay ã®å…ƒãƒ†ã‚¯ã‚¹ãƒãƒ£ã‚µã‚¤ã‚ºã‚’ä¿å­˜ã™ã‚‹ï¼ˆInitialize å†…ã§ textureSize_ ã¯ã€Œå…ƒç”»åƒã‚µã‚¤ã‚ºã€ã«ãªã‚‹ï¼‰
     overlayFullTexSize_ = overlay_->GetTextureSize();
 
     overlay_->SetPosition({ 30.0f, 80.0f });
@@ -46,23 +46,23 @@ void DashUIManager::Update(float dt)
 
     if (overlay_) {
         if (ratio > 0.0f) {
-            // ¥¢¥¤¥³¥ó¤Î»­Ãæ¥µ¥¤¥º£¯Î»ÖÃ£¨Î»ÖÃºÏ¤ï¤»ÓÃ£©
+            // ã‚¢ã‚¤ã‚³ãƒ³ã®ç”»é¢ã‚µã‚¤ã‚ºï¼ä½ç½®ï¼ˆä½ç½®åˆã‚ã›ç”¨ï¼‰
             const Vector2 iconSize = icon_ ? icon_->GetSize() : Vector2{ 32.0f, 32.0f };
             const Vector2 iconPos  = icon_ ? icon_->GetPosition() : Vector2{ 40.0f, 80.0f };
 
             const float fullSpriteH    = iconSize.y;
             const float visibleSpriteH = fullSpriteH * ratio;
 
-            // ¥Æ¥¯¥¹¥Á¥ã¤ÎÇÐ¤ê’i¤­¤Ï±Ø¤º¡¸Ôª¥Æ¥¯¥¹¥Á¥ã¤Î¸ß¤µ¡¹¤ÇÓ‹Ëã¤¹¤ë£¨Àý: 52 * ratio£©¡£¤½¤¦¤·¤Ê¤¤¤ÈÇÐ¤ê’i¤­Î»ÖÃ¤¬¤º¤ì¤ë
+            // ãƒ†ã‚¯ã‚¹ãƒãƒ£ã®åˆ‡ã‚ŠæŠœãã¯å¿…ãšã€Œå…ƒãƒ†ã‚¯ã‚¹ãƒãƒ£ã®é«˜ã•ã€ã§è¨ˆç®—ã™ã‚‹ï¼ˆä¾‹: 52 * ratioï¼‰ã€‚ãã†ã—ãªã„ã¨åˆ‡ã‚ŠæŠœãä½ç½®ãŒãšã‚Œã‚‹
             const float texW        = overlayFullTexSize_.x;
             const float texH        = overlayFullTexSize_.y;
             const float visibleTexH = texH * ratio;
 
-            // ÏÂ¤«¤é±íÊ¾¤òé_Ê¼£¨ÏÂ“B¤¨£©
+            // ä¸‹ã‹ã‚‰è¡¨ç¤ºã‚’é–‹å§‹ï¼ˆä¸‹æƒãˆï¼‰
             overlay_->SetTextureLeftTop({ 0.0f, texH - visibleTexH });
             overlay_->SetTextureSize({ texW, visibleTexH });
 
-            // »­ÃæÉÏ¤Ç¤Ï·ù¤ò¤½¤Î¤Þ¤Þ¤Ë¤·¡¢¸ß¤µ¤À¤± ratio ¤Ëê¤¸¤Æ¿s¤á¡¢Î»ÖÃ¤òÏÂ¤²¤ÆÏÂ“B¤¨¤ò¾S³Ö¤¹¤ë
+            // ç”»é¢ä¸Šã§ã¯å¹…ã‚’ãã®ã¾ã¾ã«ã—ã€é«˜ã•ã ã‘ ratio ã«å¿œã˜ã¦ç¸®ã‚ã€ä½ç½®ã‚’ä¸‹ã’ã¦ä¸‹æƒãˆã‚’ç¶­æŒã™ã‚‹
             overlay_->SetSize({ iconSize.x, visibleSpriteH });
             overlay_->SetPosition({ iconPos.x, iconPos.y + (fullSpriteH - visibleSpriteH) });
 

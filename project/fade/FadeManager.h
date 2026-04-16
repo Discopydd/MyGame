@@ -28,7 +28,6 @@ public:
         if (alpha_ > 1.0f) alpha_ = 1.0f;
         SyncVisual_();
     }
-    }
 
     float GetSpeed() const { return speed_; }
     void  SetSpeed(float s) { speed_ = s; }

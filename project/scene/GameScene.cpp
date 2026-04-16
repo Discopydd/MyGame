@@ -745,33 +745,6 @@ void GameScene::Initialize() {
     }
 }
 
-    if (snowEmitter_) {
-        snowEmitter_->SetSnowMode(true);
-        snowEmitter_->SetMaxParticles(200);
-        snowEmitter_->SetFollowCamera(true);
-    }
-
-    if (dashStarEmitter_) {
-        dashStarEmitter_->SetMaxParticles(150);
-        dashStarEmitter_->SetSnowMode(false);
-        dashStarEmitter_->SetWindMode(false);
-        dashStarEmitter_->SetFollowCamera(false);
-    }
-
-    // === Hub（map2）的关卡配置 ===
-    hubStageByMap_.clear();
-    hubStageByMap_["Resources/map/map3.csv"] = 0; // Stage 0
-    hubStageByMap_["Resources/map/map4.csv"] = 1; // Stage 1
-    hubStageByMap_["Resources/map/map5.csv"] = 2; // Stage 2
-    hubStageByMap_["Resources/map/map6.csv"] = 3; // Stage 3 (最终关)
-    hubProgress_      = 0;
-    allStagesCleared_ = false;
-
-    playerIndexHistoryCursor_      = 0;
-    playerIndexHistoryInitialized_ = false;
-    playerIndexOneSecAgo_          = MapChipField::IndexSet{};
-}
-
 void GameScene::Update() {
     const float deltaTime = 1.0f / 60.0f;
     input_->Update();

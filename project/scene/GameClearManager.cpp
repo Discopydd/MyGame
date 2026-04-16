@@ -1,5 +1,4 @@
 #include "GameClearManager.h"
-#include <numbers>
 
 #include <algorithm>
 #include <cmath>
@@ -111,7 +110,6 @@ void GameClearManager::Start() {
     const float W = static_cast<float>(WinApp::kClientWidth);
     const float H = static_cast<float>(WinApp::kClientHeight);
 
-    // 标题从屏幕外上方滑到中间（基本照搬你原来的逻辑）
     titleEndPos_   = { (W - titleSize_.x) * 0.5f, (H - titleSize_.y) * 0.5f };
     titleStartPos_ = { titleEndPos_.x, -titleSize_.y - 40.0f };
     titlePos_      = titleStartPos_;
@@ -291,7 +289,6 @@ void GameClearManager::Update(float dt) {
         if (d >= 1.0f) {
             state_ = State::PlayerShow;
             t_ = 0.0f;
-            clearPlayerSpinT_ = 0.0f;
         }
         break;
     }
@@ -330,9 +327,6 @@ void GameClearManager::Update(float dt) {
             promptSprite_->Update();
         }
 
-        clearPlayerObj_->SetTranslate(pos);
-        clearPlayerObj_->SetRotate({ 0.0f, yaw, 0.0f });
-        clearPlayerObj_->Update();
         break;
     }
 
@@ -340,7 +334,6 @@ void GameClearManager::Update(float dt) {
         break;
     }
 }
-
 void GameClearManager::DrawTitle() {
     if (!spriteCommon_) { return; }
     if (state_ == State::None || state_ == State::Done) { return; }
@@ -365,11 +358,4 @@ void GameClearManager::DrawTitle() {
     if (promptSprite_ && promptSprite_->IsVisible()) {
         promptSprite_->Draw();
     }
-}
-
-void GameClearManager::DrawPlayer() {
-    if (!clearPlayerObj_) { return; }
-    if (state_ == State::None || state_ == State::Done) { return; }
-
-    clearPlayerObj_->Draw();
 }

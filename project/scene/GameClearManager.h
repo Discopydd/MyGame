@@ -29,7 +29,6 @@ public:
 
     // 勝利画面の 2D 要素を描画
     void DrawTitle();
-    void DrawPlayer();
 
     // 状態確認
     bool IsPlaying() const {

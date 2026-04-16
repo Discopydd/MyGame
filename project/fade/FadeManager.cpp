@@ -63,7 +63,6 @@ void FadeManager::StartFadeOut()
 
     if (sprite_) {
         sprite_->SetVisible(true);
-        sprite_->SetColor({ 1.0f, 1.0f, 1.0f, alpha_ });
     }
     SyncVisual_();
 }
@@ -77,7 +76,6 @@ void FadeManager::StartFadeIn()
 
     if (sprite_) {
         sprite_->SetVisible(true);
-        sprite_->SetColor({ 1.0f, 1.0f, 1.0f, alpha_ });
     }
     SyncVisual_();
 }
@@ -91,7 +89,6 @@ void FadeManager::SetBlack()
 
     if (sprite_) {
         sprite_->SetVisible(true);
-        sprite_->SetColor({ 1.0f, 1.0f, 1.0f, alpha_ });
     }
     SyncVisual_();
 }
@@ -107,15 +104,12 @@ void FadeManager::Clear()
 
     if (sprite_) {
         sprite_->SetVisible(false);
-        sprite_->SetColor({ 1.0f, 1.0f, 1.0f, 0.0f });
     }
     SyncVisual_();
 }
 
 void FadeManager::Update(float dt)
 {
-    (void)dt; // 目前我们还是在 GameScene 里控制 alpha/phase，这里只同步到 sprite
-
     if (!sprite_) { return; }
 
     // 遷移中は portal_ring を軽く回転・脈動させる（タイトル画面と同じ素材）
