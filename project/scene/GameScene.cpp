@@ -1039,7 +1039,7 @@ void GameScene::Update() {
         BossEnemy* boss = FindBossEnemy();
         if (boss && !boss->IsBattleTriggered() && boss->IsBattleTriggerReady(*player_, mapChipField_)) {
             StartBossIntro(boss);
-            // ★ このフレーム開始時点で演出突入とみなす: 以降のロジック（ダメージ / 足場 / 衝突など）はすべてスキップ
+            //このフレーム開始時点で演出突入とみなす: 以降のロジック（ダメージ / 足場 / 衝突など）はすべてスキップ
             inBossIntro = true;
             canControl = false;
             // 即座にカメラを1フレーム進め、トリガーフレームからそのままカメラ演出が始まるようにする
