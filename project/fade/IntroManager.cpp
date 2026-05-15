@@ -38,7 +38,7 @@ void IntroManager::Initialize(SpriteCommon* spriteCommon, Input* input)
 
     // スキップ表示
     skipHint_ = std::make_unique<Sprite>();
-    skipHint_->Initialize(spriteCommon_, "Resources/Start.dds");
+    skipHint_->Initialize(spriteCommon_, "Resources/Start.png");
     skipHint_->SetPosition({ W * 0.5f - 100.0f, H * 0.8f });
     skipHint_->SetColor({ 1,1,1,0 });
     skipHint_->SetVisible(false);
