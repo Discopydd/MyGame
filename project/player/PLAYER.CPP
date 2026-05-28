@@ -40,7 +40,7 @@ void Player::Initialize(Object3dCommon* object3dCommon, Camera* camera) {
     stompKickVx_ = 0.0f;
 }
 
-void Player::Update(Input* input, const MapChipField& mapChipField) {
+void Player::Update(Input* input, const MapChipField& mapChipField, bool snowWindActive) {
     const float deltaTime = 1.0f / 60.0f; // とりあえず 60FPS 固定。必要なら後で外部から渡せる
     didDoubleJumpThisFrame_ = false;
 
@@ -332,6 +332,28 @@ void Player::Update(Input* input, const MapChipField& mapChipField) {
         moveVelocity = dashDirection_ * dashSpeed;
         if (isDashJumping_) {
             moveVelocity.y = 0.0f;
+        }
+    }
+
+    // ===== Snow stage wind =====
+    // 右から左へ吹く風: 静止中は左へゆっくり流され、右移動には抵抗がかかる。
+    // moveSpeed_ は「1フレームあたりの移動量」なので、数値は小さめにして操作感を崩しすぎないようにする。
+    if (snowWindActive) {
+        const float kSnowIdleDrift       = -0.035f; // 無入力時に左へ流される量
+        const float kSnowRightResistance =  0.075f; // 右移動速度から引く量
+        const float kSnowLeftAssist      = -0.020f; // 左移動時の軽い追い風
+        const float kSnowDashScale       =  0.45f;  // ダッシュ中は風の影響を弱める
+
+        float scale = isDashing_ ? kSnowDashScale : 1.0f;
+
+        if (moveVelocity.x > 0.0f) {
+            moveVelocity.x = (std::max)(0.0f, moveVelocity.x - kSnowRightResistance * scale);
+        }
+        else if (moveVelocity.x < 0.0f) {
+            moveVelocity.x += kSnowLeftAssist * scale;
+        }
+        else {
+            moveVelocity.x += kSnowIdleDrift * scale;
         }
     }
 

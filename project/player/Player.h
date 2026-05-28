@@ -9,7 +9,7 @@ public:
     ~Player();
 
     void Initialize(Object3dCommon* object3dCommon, Camera* camera);
-    void Update(Input* input, const MapChipField& mapChipField);
+    void Update(Input* input, const MapChipField& mapChipField, bool snowWindActive = false);
     void Draw();
 
     void HandleMapCollision(const MapChipField& mapChipField);

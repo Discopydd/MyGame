@@ -713,6 +713,20 @@ void GameScene::FinishMapLoading(const Vector3& startPos)
     }
 }
 
+bool GameScene::CanUsePortalOnCurrentMap_() const
+{
+    // map2 は Hub なので例外: コイン条件なしで各ステージへ入れる
+    if (currentMapPath_ == "Resources/map/map2.csv") {
+        return true;
+    }
+
+    // map2 以外は、そのマップ内の全コインを取得してから転送門を使える
+    if (!itemMgr_) {
+        return true;
+    }
+    return itemMgr_->GetRemainingItemCount() <= 0;
+}
+
 void GameScene::Initialize() {
     winApp_       = WinApp::GetInstance();
     dxCommon_     = DirectXCommon::GetInstance();
@@ -1031,7 +1045,12 @@ void GameScene::Update() {
     }
     else {
         gBossIntroFreezePlayer = false;
-        player_->Update(canControl ? input_ : nullptr, mapChipField_);
+
+        // map5 は雪ステージ: 右から左へ吹く風をプレイヤー物理へ反映する。
+        // canControl が false の演出中 / ロード中は勝手に流されないようにする。
+        const bool snowWindActive =
+            canControl && (currentMapPath_ == "Resources/map/map5.csv");
+        player_->Update(canControl ? input_ : nullptr, mapChipField_, snowWindActive);
     }
 
     // ================== Boss トリガー演出: トリガー地点を判定してカメラ演出を開始 ==================
@@ -1729,13 +1748,6 @@ void GameScene::Update() {
             }
         }
     }
-    // 転送門ヒントアイコンを更新（表示するかどうか + 位置）
-    const PortalInfo* currentPortal = nullptr;
-    if (portalMgr_) {
-        portalMgr_->UpdateHint(playerIndex, player_->GetPosition(), canControl);
-        currentPortal = portalMgr_->GetPortalAt(playerIndex);
-    }
-
     if (itemMgr_) {
         bool picked = itemMgr_->OnPlayerStepOnTile(currentMapPath_, playerIndex, mapChipField_, player_.get());
         if (picked) {
@@ -1745,9 +1757,18 @@ void GameScene::Update() {
             }
         }
     }
+
+    // 転送門ヒントアイコンを更新（map2 以外では全コイン取得後だけ表示）
+    const bool canUsePortalOnCurrentMap = CanUsePortalOnCurrentMap_();
+    const PortalInfo* currentPortal = nullptr;
+    if (portalMgr_) {
+        portalMgr_->UpdateHint(playerIndex, player_->GetPosition(), canControl && canUsePortalOnCurrentMap);
+        currentPortal = portalMgr_->GetPortalAt(playerIndex);
+    }
+
     if (currentPortal) {
         // プレイヤーがいずれかの門マスの上に立っている
-        if (canControl && input_->TriggerKey(DIK_E)) {
+        if (canControl && canUsePortalOnCurrentMap && input_->TriggerKey(DIK_E)) {
                         // ==== 子ステージから Hub(map2) に戻る場合は解放進捗を更新する（解放専用であり、以後クリア条件には使わない）====
             auto itStage = hubStageByMap_.find(currentMapPath_);
             if (currentPortal->targetMap == "Resources/map/map2.csv" && itStage != hubStageByMap_.end()) {
@@ -2213,14 +2234,14 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
     // === map1 のみ Space / Shift / Sprint / Up のヒントを生成 ===
     if (mapPath == "Resources/map/map.csv") {
 
-        // (5,2) → space.png
+        // (5,2)space.png
         spaceHint_.sprite = std::make_unique<Sprite>();
         spaceHint_.sprite->Initialize(spriteCommon_, "Resources/space2.png");
         spaceHint_.sprite->SetSize({ 48.0f, 32.0f });
         spaceHint_.worldPos = mapChipField_.GetMapChipPositionByIndex(5, 2);
         spaceHint_.worldPos.y += 0.4f;
 
-        // (19,6) → shift.png
+        // (19,6)shift.png
         shiftHint_.sprite = std::make_unique<Sprite>();
         shiftHint_.sprite->Initialize(spriteCommon_, "Resources/shift.png");
         shiftHint_.sprite->SetSize({ 48.0f, 32.0f });
@@ -2228,7 +2249,7 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
         shiftHint_.worldPos.x -= 0.2f;
         shiftHint_.worldPos.y += 0.5f;
 
-        // (20,6) → sprint.png
+        // (20,6)sprint.png
         sprintHint_.sprite = std::make_unique<Sprite>();
         sprintHint_.sprite->Initialize(spriteCommon_, "Resources/sprint.png");
         sprintHint_.sprite->SetSize({ 48.0f, 48.0f });
@@ -2396,10 +2417,7 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
                 portalMgr_->AddPortal({ 81, 1 }, "Resources/map/map2.csv",
                     mapChipField_.GetMapChipPositionByIndex(23, 1));
             }
-            else if (mapPath == "Resources/map/map6.csv") {
-                portalMgr_->AddPortal({ 89, 1 }, "Resources/map/map2.csv",
-                    mapChipField_.GetMapChipPositionByIndex(12, 14));
-            }
+            // map6 は Boss 専用ステージなので、戻り転送門は生成しない
         }
     }
 }
@@ -2653,7 +2671,7 @@ void GameScene::UpdateBossIntro(float dt)
 
         desiredTarget.z = z;
 
-        // ★ 同様に、先に目標を制約してから補間する（さらに「開始位置」も現在の fov / z で少し制約する）
+        // 同様に、先に目標を制約してから補間する（さらに「開始位置」も現在の fov / z で少し制約する）
         //  こうすると境界付近でも、視口の変化に合わせて滑らかに境界沿いへ動き、急に切り詰められない
         Vector3 startPos = { bossIntroBackStartCamPos_.x, bossIntroBackStartCamPos_.y, z };
         startPos = ConstrainCameraToMap(startPos, fov, z);

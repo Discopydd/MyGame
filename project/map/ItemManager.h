@@ -50,6 +50,9 @@ public:
     // マップ切替時は現在のマップの可視オブジェクトだけクリア（取得済み記録は保持）
     void ClearVisuals();
 
+    // 現在読み込まれているマップで、まだ取得されていないコイン数を返す
+    int GetRemainingItemCount() const;
+
 private:
     Object3dCommon* object3dCommon_ = nullptr;
     Camera*         camera_         = nullptr;

@@ -146,3 +146,14 @@ void ItemManager::ClearVisuals()
     items_.clear();
     pickupEffects_.clear();
 }
+
+int ItemManager::GetRemainingItemCount() const
+{
+    int count = 0;
+    for (const auto& item : items_) {
+        if (item.obj) {
+            ++count;
+        }
+    }
+    return count;
+}

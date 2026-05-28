@@ -106,6 +106,7 @@ private:
     void LoadMap(const std::string& mapPath, const Vector3& startPos);
     void HandlePlayerOnMovingPlatforms();
     void SyncLoadedSceneForReveal();
+    bool CanUsePortalOnCurrentMap_() const;
 
     // UI / マネージャ
     std::unique_ptr<DashUIManager>   dashUI_;
