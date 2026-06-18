@@ -24,7 +24,6 @@ struct Quaternion {
 
     static constexpr Quaternion Identity() { return Quaternion(1,0,0,0); }
 
-    // 軸角から构造（axis 需非零；内部会正規化）、angle 单位: 弧度
 #if __cpp_concepts
     template <Vec3Like V>
 #else
@@ -42,8 +41,6 @@ struct Quaternion {
         return Quaternion(c, ax*inv*s, ay*inv*s, az*inv*s);
     }
 
-    // Yaw-Pitch-Roll（Yaw 绕 +Y、Pitch 绕 +X、Roll 绕 +Z）、弧度
-    // 合成顺序: R = Rz(roll) * Rx(pitch) * Ry(yaw) （一般的游戏系: 先に yaw、再度 pitch、再度 roll 的等价実现）
     static Quaternion FromYawPitchRoll(float yawY, float pitchX, float rollZ) {
         float cy = std::cosf(yawY * 0.5f);
         float sy = std::sinf(yawY * 0.5f);

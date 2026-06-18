@@ -42,7 +42,6 @@ void BossEnemy::Initialize(
 preAttackJitter_ = { 0.0f, 0.0f, 0.0f };
 preAttackJitterTime_ = 0.0f;
 
-    // Boss: デフォルトでは先に「スリープ」状態にし、プレイヤーが指定エリアに入ったら起動する（Update 内のトリガー条件を参照）
     battleTriggered_ = (type != EnemyType::Boss);
 
     // ===== HP =====
@@ -134,11 +133,10 @@ preAttackJitterTime_ = 0.0f;
     case EnemyType::Boss: {
         obj_->SetModel("enemy1/enemy1.obj"); // 無ければ既存のモデルパスに差し替える
 
-        // Boss 被弾点滅: 頻度より快少し、より有「打撃感」
+        // Boss 被弾点滅
         damageBlinkInterval_ = 0.055f;
 
         // ===== 拡大 Boss（モデル）+ 增加当たり判定サイズ =====
-        // 説明:Object3d に SetScale() が無ければ、このプロジェクトで対応するスケール API に置き換える。
         const float kBossScale = 1.35f;
 
         // 見た目だけ下げる（モデル原点が足元に無い＆拡大で浮いて見える対策）
@@ -150,12 +148,6 @@ preAttackJitterTime_ = 0.0f;
 
         // モデルスケール
         obj_->SetScale({ kBossScale, kBossScale, kBossScale });
-
-        // Boss の被弾点滅をやや速くして「電流感」を出す
-        damageBlinkInterval_ = 0.055f;
-
-        // Boss 被弾点滅: より明顕少し
-        damageBlinkInterval_ = 0.06f;
 
         bossState_ = BossState::Idle;
         queuedAttack_ = BossAttack::None;
@@ -184,8 +176,6 @@ preAttackJitterTime_ = 0.0f;
     }
 
     // --- 判定尺寸初期化 ---
-    // 現在の width_/height_ を「基礎プレイヤー判定」と「マップ当たり判定サイズ」にする。
-    // Dash 時は width_/height_ を一時的に縮小する（プレイヤー判定）が、マップ衝突には常に mapColliderW_/H_ を使う。
     baseHurtW_ = width_;
     baseHurtH_ = height_;
     mapColliderW_ = width_;
@@ -222,17 +212,10 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
 
     // ===== Boss AI =====
     if (type_ == EnemyType::Boss) {
-        // 未トリガー時: AI や弾幕は更新せず、描画のみ行う（Boss は「彫像／待機」として扱える）
-        // トリガーロジックは GameScene に任せる: 先にカメラ演出を流し、終了後に TriggerBattleNow() を呼ぶ。
         if (!battleTriggered_) {
-preAttackJitter_ = { 0.0f, 0.0f, 0.0f };
-preAttackJitterTime_ = 0.0f;
-
-            // 未トリガーの Boss 戦では AI / 攻撃は行わないが、重力とマップ衝突は引き続き処理する。
-            // そうしないと Boss の中心点がスポーン位置の高さに留まり、カメラが寄ったときに地面へ埋まっている／浮いているように見えやすい。
+            preAttackJitter_ = { 0.0f, 0.0f, 0.0f };
+            preAttackJitterTime_ = 0.0f;
             velocity_.x = 0.0f;
-
-            // Boss を自然に地面へ落とす（静止状態で地形に食い込むのを避けるため、先に下向き速度／重力を与える必要がある）
             velocity_.y += gravityBase_ * dt;
             if (velocity_.y < -2.5f) { velocity_.y = -2.5f; }
             ResolveMapCollision(map, dt);
@@ -279,7 +262,6 @@ preAttackJitterTime_ = 0.0f;
         globalAttackCD_ = (std::max)(0.0f, globalAttackCD_ - dt);
         ultimateCD_ = (std::max)(0.0f, ultimateCD_ - dt);
 
-// 毎フレームデフォルトで「描画揺れ」をクリアし、特定の予備動作ウィンドウ内でのみ UpdatePreAttackJitter() が書き込む
 preAttackJitter_ = { 0.0f, 0.0f, 0.0f };
 const bool wantsJitter = (bossState_ == BossState::Windup) &&
     (queuedAttack_ == BossAttack::Barrage || queuedAttack_ == BossAttack::Nova || queuedAttack_ == BossAttack::Slam);
@@ -311,7 +293,7 @@ if (!wantsJitter) {
             // 予測目標地点
             float targetX = pPos.x + pVel.x * leadTime_;
 
-            // 接近時は後退しない（そうしないとプレイヤーが接近ダッシュを誘発しづらい）
+            // 接近時は後退しない
             float dx2 = targetX - position_.x;
             float absDx2 = std::fabs(dx2);
             int dirToTarget = (dx2 >= 0.0f) ? 1 : -1;
@@ -327,13 +309,12 @@ if (!wantsJitter) {
                 velocity_.x = 0.0f;
             }
 
-            // 簡易的な「障害物ジャンプ」（前方 1 マスが壁ならそのまま跳ぶ）
+            // 簡易的な「障害物ジャンプ」
             if (isOnGround_) {
                 int moveDir = facing_;
                 if (velocity_.x > 0.01f) moveDir = 1;
                 if (velocity_.x < -0.01f) moveDir = -1;
 
-                // 地形探测用「身体サイズ」（Dash の hurtbox 縮小の影響を受けないようにする）
                 float checkX = position_.x + moveDir * (mapColliderW_ * 0.5f + 0.15f);
                 float checkY = position_.y - mapColliderH_ * 0.5f + 0.10f;
 
@@ -343,11 +324,11 @@ if (!wantsJitter) {
                 }
             }
 
-            // 攻撃選択（queuedAttack_ を使って Windup 中の状態上書きを防ぐ）
+            // 攻撃選択
             if (decisionTimer_ <= 0.0f && globalAttackCD_ <= 0.0f) {
                 const bool canDashAny = (dashCD_ <= 0.0f);
 
-                // 本当の「密着」距離: この距離内では遠距離攻撃を禁止し、小ダッシュへ切り替える
+                // この距離内では遠距離攻撃を禁止し、小ダッシュへ切り替える
                 const float pointBlankRange = meleeRange_ + 0.4f; // 约 2.6
                 const bool  tooCloseForRanged = (dist <= pointBlankRange);
 
@@ -365,7 +346,7 @@ if (!wantsJitter) {
                     queuedAttack_ = BossAttack::Ultimate;
                     bossState_ = BossState::Windup;
                     attackFacing_ = facing_;
-                    stateTimer_ = 0.40f; // 必殺技予備動作より明顕
+                    stateTimer_ = 0.40f; // 必殺技予備動作
 
                     ultimateWindupTotal_ = stateTimer_;
                     ultimateWindupBackstepMoved_ = 0.0f;
@@ -376,7 +357,7 @@ if (!wantsJitter) {
                     globalAttackCD_ = 1.10f;
                     decisionTimer_ = 0.35f;
                 }
-                // ② 叩きつけ: 「頭上ジャンプ／密着旋回」対策。着地時に衝撃波弾幕を生成
+                // 叩きつけ: 「頭上ジャンプ／密着旋回」対策。着地時に衝撃波弾幕を生成
                 else if (canSlam && (playerAbove || dist <= (meleeRange_ + 1.2f))){
                     queuedAttack_ = BossAttack::Slam;
                     bossState_ = BossState::Windup;
@@ -387,7 +368,7 @@ if (!wantsJitter) {
                     globalAttackCD_ = 1.15f;
                     decisionTimer_ = 0.30f;
                 }
-                // ②.5 円形爆発: よりド派手なリング弾幕（低HP時に優先し、プレイヤーの後退し続けにも対抗する）
+                // 円形爆発: よりド派手なリング弾幕（低HP時に優先し、プレイヤーの後退し続けにも対抗する）
                 else if (canNova && (hp_ <= enrageHp_ || (playerMovingAway && dist >= 8.0f) || distIncreasing)) {
                     queuedAttack_ = BossAttack::Nova;
                     bossState_ = BossState::Windup;
@@ -399,7 +380,7 @@ if (!wantsJitter) {
                     globalAttackCD_ = 1.15f;
                     decisionTimer_ = 0.32f;
                 }
-                // ③ 旋转弾幕: 中遠距離制圧（より派手）、プレイヤーずっと後退時より容易トリガー
+                // 旋转弾幕: 中遠距離制圧（より派手）、プレイヤーずっと後退時より容易トリガー
                 else if (canBarrage && (hp_ <= enrageHp_ || playerMovingAway || dist >= farRangedPrefer_)) {
                     queuedAttack_ = BossAttack::Barrage;
                     bossState_ = BossState::Windup;
@@ -411,7 +392,7 @@ if (!wantsJitter) {
                     globalAttackCD_ = 1.05f;
                     decisionTimer_ = 0.30f;
                 }
-                // ④ 遠距離: 優先に远程制圧
+                // 遠距離: 優先に远程制圧
                 else if (canRanged && dist >= farRangedPrefer_ && dist > dashMaxRange_) {
                     queuedAttack_ = BossAttack::Ranged;
                     bossState_ = BossState::Windup;
@@ -422,7 +403,7 @@ if (!wantsJitter) {
                     globalAttackCD_ = 0.85f;
                     decisionTimer_ = 0.25f;
                 }
-                // ③ プレイヤー接近: 朝プレイヤーダッシュ（ただし連続では突進せず、dashCD_ で制御する）
+                // プレイヤー接近: 朝プレイヤーダッシュ（ただし連続では突進せず、dashCD_ で制御する）
                 else if (canDashAny && dist <= closeDashRange_) {
                     queuedAttack_ = BossAttack::Dash;
                     bossState_ = BossState::Windup;
@@ -440,7 +421,7 @@ if (!wantsJitter) {
                     globalAttackCD_ = 1.05f;
                     decisionTimer_ = 0.25f;
                 }
-                // ③.5 dashCD_ が進行中でも、プレイヤー密着時は遠距離を使わず小ダッシュ 1 回に切り替える
+                // dashCD_ が進行中でも、プレイヤー密着時は遠距離を使わず小ダッシュ 1 回に切り替える
                 else if (!canDashAny && dist <= closeDashRange_ && microDashCD_ <= 0.0f) {
                     queuedAttack_ = BossAttack::Dash;
                     bossState_ = BossState::Windup;
@@ -458,7 +439,7 @@ if (!wantsJitter) {
                     decisionTimer_ = 0.20f;
                 }
 
-                // ④ 中距離: 择机ダッシュ（プレイヤーが引き撃ち／距離を取っている時に発動しやすい）
+                // 中距離: 择机ダッシュ（プレイヤーが引き撃ち／距離を取っている時に発動しやすい）
                 else if (canDashAny && dist >= dashMinRange_ && dist <= dashMaxRange_
                     && (playerMovingAway || distIncreasing || dist <= 7.0f)) {
                     queuedAttack_ = BossAttack::Dash;
@@ -476,7 +457,7 @@ if (!wantsJitter) {
                     globalAttackCD_ = 1.00f;
                     decisionTimer_ = 0.25f;
                 }
-                // ⑤ 保険: まだ远程そのまま远程
+                // 保険: まだ远程そのまま远程
                 else if (canRanged) {
                     queuedAttack_ = BossAttack::Ranged;
                     bossState_ = BossState::Windup;
@@ -1251,16 +1232,16 @@ bool BossEnemy::IsBattleTriggerReady(const Player& player, const MapChipField& m
     const float halfW = player.GetWidth()  * 0.5f;
     const float halfH = player.GetHeight() * 0.5f;
 
-    // ① 横方向: 「左境界」を使い、中心点ではなくトリガー列を越えたかを判定（防止端トリガー）
-    const float edgeEps = 0.02f; // 小さな余裕、避ける浮点ちょうど好卡辺
+    // 横方向
+    const float edgeEps = 0.02f; // 小さな余裕
     auto leftIdx = map.GetMapChipIndexByPosition({ pPos.x - halfW + edgeEps, pPos.y, 0.0f });
     const bool passedX = (leftIdx.xIndex >= battleTriggerXIndex_);
 
-    // ② 縦方向: プレイヤーが必ず Boss エリア付近まで降りてきていることを確認する（上層足場でのトリガーを避ける）
+    // 縦方向
     const float dy = std::fabs(pPos.y - position_.y);
     const bool passedY = (dy <= battleTriggerVerticalRange_);
 
-    // ③ 地面: 足元を支えるブロックもトリガー列より先にあることを要求する（外側の地面でのトリガーを避ける）
+    // 地面
     bool onGroundInBossArea = true;
     if (requirePlayerOnGroundToTrigger_) {
         const float probeY = 0.06f;
@@ -1274,7 +1255,6 @@ bool BossEnemy::IsBattleTriggerReady(const Player& player, const MapChipField& m
         for (const auto& q : probes) {
             auto idx = map.GetMapChipIndexByPosition(q);
 
-            // 重要: 必ずトリガー列より先の地面を踏んだ場合のみ有効にする
             if (idx.xIndex < battleTriggerXIndex_) { continue; }
 
             MapChipType t = map.GetMapChipTypeByIndex(idx.xIndex, idx.yIndex);
@@ -1295,14 +1275,14 @@ void BossEnemy::TriggerBattleNow()
     if (battleTriggered_) { return; }
     battleTriggered_ = true;
 
-    // ちょうど入る戦闘: 重置少しテンポ、避ける「ちょうどトリガーそのまま即座に密着必殺技」
+    // ちょうど入る戦闘
     bossState_ = BossState::Idle;
     queuedAttack_ = BossAttack::None;
     stateTimer_ = 0.0f;
     decisionTimer_ = 0.30f;
     globalAttackCD_ = (std::max)(globalAttackCD_, 0.60f);
 
-    // クリアする残留弾幕（オブジェクト再度利用やロード時などに備えて）
+    // クリアする弾幕
     for (auto& p : projectiles_) {
         p.active = false;
         p.life = 0.0f;
@@ -1328,10 +1308,6 @@ bool BossEnemy::IsInEngageRange(const MapChipField& map, const Player& player) c
 
 bool BossEnemy::ShouldShowBossHp(const Player& player, const MapChipField& map) const
 {
-    // 案A（要件に応じて）: のみ「接近 Boss」で初めて表示HPバー
-    //return IsInEngageRange(map, player);
-
-    // 案B（より一般的）: 一度 Boss 戦がトリガーされたら、その後は常に表示する（距離で点滅させない）
     return battleTriggered_;
 }
 
@@ -1351,7 +1327,6 @@ void BossEnemy::UpdateBossFacing(const Player& player)
 
     const float dx = player.GetPosition().x - position_.x;
 
-    // 防抖
     if (std::fabs(dx) <= 0.05f) {
         return;
     }
@@ -1373,7 +1348,6 @@ void BossEnemy::UpdatePreAttackJitter(float dt)
 
     const float settle = std::clamp(preJitterSettle_, 0.0f, lead);
 
-    // 還無入る「最後 lead 秒」時不抖、かつ相位ゼロクリア、避ける突然跳相位
     if (stateTimer_ > lead || stateTimer_ <= 0.0f) {
         if (stateTimer_ > lead) { preAttackJitterTime_ = 0.0f; }
         return;
@@ -1461,8 +1435,6 @@ void BossEnemy::SpawnBossProjectileRaw(const Vector3& spawnPos, const Vector3& v
         }
         return;
     }
-
-    // 満杯なら破棄する（無限に増えないようにする）
 }
 
 void BossEnemy::SpawnRadialBurst(const Vector3& center, int count, float speed, float life, float radius, float angleOffset)
@@ -1524,7 +1496,7 @@ bool BossEnemy::CheckBossProjectileHit(const Player& player)
         bool overlapX = !(pRight <= left || pLeft >= right);
         bool overlapY = !(pTop <= bottom || pBottom >= top);
         if (overlapX && overlapY) {
-            pr.active = false; // 命中後に弾丸を消費
+            pr.active = false;
             return true;
         }
     }
