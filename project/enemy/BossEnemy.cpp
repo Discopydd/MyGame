@@ -17,13 +17,15 @@ namespace {
             || t == MapChipType::kMoveVertical;
 
     }
-    constexpr float kPi = 3.14159265358979323846f;
+    constexpr float kStepScaleBaseFps = 60.0f;
+    constexpr float kStepScaleMin = 0.0f;
+    constexpr float kStepScaleMax = 3.0f;
 
     inline float StepScale(float dt) {
         // 60fps を基準とし、フレーム落ちで 1 フレームの移動量が大きくなりすぎて壁抜けしないよう上限を設ける
-        float s = dt * 60.0f;
-        if (s < 0.0f) s = 0.0f;
-        if (s > 3.0f) s = 3.0f;
+        float s = dt * kStepScaleBaseFps;
+        if (s < kStepScaleMin) s = kStepScaleMin;
+        if (s > kStepScaleMax) s = kStepScaleMax;
         return s;
     }
 } // namespace
@@ -39,7 +41,7 @@ void BossEnemy::Initialize(
     visualOffsetY_ = 0.0f;
 
 
-preAttackJitter_ = { 0.0f, 0.0f, 0.0f };
+preAttackJitter_ = kZeroVector_;
 preAttackJitterTime_ = 0.0f;
 
     battleTriggered_ = (type != EnemyType::Boss);
@@ -48,14 +50,14 @@ preAttackJitterTime_ = 0.0f;
     isDead_ = false;
     stompInvuln_ = 0.0f;
     if (type == EnemyType::Boss) {
-        maxHp_ = 3;
+        maxHp_ = kBossMaxHp_;
         // 低HP閾値: 20%（30 -> 6）
-        enrageHp_ = (std::max)(1, maxHp_ / 5);
+        enrageHp_ = (std::max)(kNormalEnemyMaxHp_, maxHp_ / kEnrageHpDivisor_);
         hp_ = maxHp_;
     } else {
-        maxHp_ = 1;
+        maxHp_ = kNormalEnemyMaxHp_;
         enrageHp_ = 0;
-        hp_ = 1;
+        hp_ = kNormalEnemyMaxHp_;
     }
     // 状態リセット
     isHitReacting_ = false;
@@ -63,9 +65,9 @@ preAttackJitterTime_ = 0.0f;
     damageBlinkTimer_ = 0.0f;
     damageBlinkVisible_ = true;
     // デフォルトの点滅頻度（Boss で下面覆写成より快少し）
-    damageBlinkInterval_ = 0.08f;
+    damageBlinkInterval_ = kDefaultDamageBlinkInterval_;
 
-    velocity_ = { 0.0f, 0.0f, 0.0f };
+    velocity_ = kZeroVector_;
     isOnGround_ = false;
     facing_ = 1;
     attackFacing_ = 1;
@@ -77,7 +79,7 @@ preAttackJitterTime_ = 0.0f;
 
 
     // Dash パラメータをリセット
-    queuedDashDuration_ = 0.30f;
+    queuedDashDuration_ = kBarrageWindupTime_;
     queuedDashSpeed_    = dashSpeed_;
     isShortDash_        = false;
     microDashCD_        = 0.0f;
@@ -99,7 +101,7 @@ preAttackJitterTime_ = 0.0f;
     novaRingsLeft_ = 0;
     novaRingOffset_ = 0.0f;
 
-    ultimateCD_ = 2.0f;
+    ultimateCD_ = kUltimateInitialCooldown_;
     ultimateBounces_ = 0;
     ultimateWindupTotal_ = 0.0f;
     ultimateWindupBackstepMoved_ = 0.0f;
@@ -107,7 +109,7 @@ preAttackJitterTime_ = 0.0f;
 
     shotsLeft_ = 0;
     shotsTotal_ = 0;
-    shotInterval_ = 0.16f;
+    shotInterval_ = kShotInterval_;
     shotTimer_ = 0.0f;
     fanShot_ = false;
 
@@ -116,8 +118,8 @@ preAttackJitterTime_ = 0.0f;
     obj_->SetCamera(camera);
 
     // デフォルトのサイズ
-    width_  = 1.5f;
-    height_ = 1.5f;
+    width_  = kDefaultEnemyWidth_;
+    height_ = kDefaultEnemyHeight_;
 
     // 敵タイプに応じてモデルを切り替える（パスはプロジェクトのリソースに合わせて変より）
     switch (type_) {
@@ -134,17 +136,17 @@ preAttackJitterTime_ = 0.0f;
         obj_->SetModel("enemy1/enemy1.obj"); // 無ければ既存のモデルパスに差し替える
 
         // Boss 被弾点滅
-        damageBlinkInterval_ = 0.055f;
+        damageBlinkInterval_ = kBossDamageBlinkInterval_;
 
         // ===== 拡大 Boss（モデル）+ 增加当たり判定サイズ =====
-        const float kBossScale = 1.35f;
+        const float kBossScale = kBossModelScale_;
 
         // 見た目だけ下げる（モデル原点が足元に無い＆拡大で浮いて見える対策）
-        visualOffsetY_ = -0.85f;
+        visualOffsetY_ = kBossVisualOffsetY_;
 
         // 当たり判定サイズ（AABB）跟着拡大
-        width_  = 2.6f * kBossScale;
-        height_ = 3.0f * kBossScale;
+        width_  = kBossBaseWidth_ * kBossScale;
+        height_ = kBossBaseHeight_ * kBossScale;
 
         // モデルスケール
         obj_->SetScale({ kBossScale, kBossScale, kBossScale });
@@ -166,8 +168,8 @@ preAttackJitterTime_ = 0.0f;
             p.obj->Update();
             p.active = false;
             p.life = 0.0f;
-            p.radius = 0.35f;
-            p.obj->SetColor({ 1.0f, 0.4f, 0.0f, 1.0f });
+            p.radius = kProjectileRadius_;
+            p.obj->SetColor({ 1.0f, kPointBlankRangeMargin_, 0.0f, 1.0f });
         }
         break;
     }
@@ -213,11 +215,11 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
     // ===== Boss AI =====
     if (type_ == EnemyType::Boss) {
         if (!battleTriggered_) {
-            preAttackJitter_ = { 0.0f, 0.0f, 0.0f };
+            preAttackJitter_ = kZeroVector_;
             preAttackJitterTime_ = 0.0f;
             velocity_.x = 0.0f;
             velocity_.y += gravityBase_ * dt;
-            if (velocity_.y < -2.5f) { velocity_.y = -2.5f; }
+            if (velocity_.y < kMinFallVelocity_) { velocity_.y = kMinFallVelocity_; }
             ResolveMapCollision(map, dt);
             if (isOnGround_) { velocity_.y = 0.0f; }
 
@@ -237,7 +239,7 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
 
         // ---- 重力 ----
         velocity_.y += gravityBase_ * dt;
-        if (velocity_.y < -2.5f) { velocity_.y = -2.5f; }
+        if (velocity_.y < kMinFallVelocity_) { velocity_.y = kMinFallVelocity_; }
 
         // ---- 感知 ----
         const Vector3 pPos = player.GetPosition();
@@ -245,8 +247,8 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
 
         float dx = pPos.x - position_.x;
         float dist = std::fabs(dx);
-        const bool playerMovingAway = (pVel.x * facing_ > 0.05f);      // プレイヤーが Boss から離れる方向に走っている
-        const bool distIncreasing = (dist > prevDistToPlayer_ + 0.08f); // 距離が広がっている（引き撃ち）
+        const bool playerMovingAway = (pVel.x * facing_ > kPlayerMovingAwayThreshold_);      // プレイヤーが Boss から離れる方向に走っている
+        const bool distIncreasing = (dist > prevDistToPlayer_ + kDistanceIncreasingMargin_); // 距離が広がっている（引き撃ち）
         prevDistToPlayer_ = dist;
         // ---- 计時器 ----
         decisionTimer_ = (std::max)(0.0f, decisionTimer_ - dt);
@@ -262,7 +264,7 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
         globalAttackCD_ = (std::max)(0.0f, globalAttackCD_ - dt);
         ultimateCD_ = (std::max)(0.0f, ultimateCD_ - dt);
 
-preAttackJitter_ = { 0.0f, 0.0f, 0.0f };
+preAttackJitter_ = kZeroVector_;
 const bool wantsJitter = (bossState_ == BossState::Windup) &&
     (queuedAttack_ == BossAttack::Barrage || queuedAttack_ == BossAttack::Nova || queuedAttack_ == BossAttack::Slam);
 if (!wantsJitter) {
@@ -276,7 +278,7 @@ if (!wantsJitter) {
             velocity_.x = 0.0f;
             if (stateTimer_ <= 0.0f) {
                 bossState_ = BossState::Chase;
-                decisionTimer_ = 0.12f;
+                decisionTimer_ = kStunnedNextDecisionTime_;
             }
             break;
 
@@ -298,7 +300,7 @@ if (!wantsJitter) {
             float absDx2 = std::fabs(dx2);
             int dirToTarget = (dx2 >= 0.0f) ? 1 : -1;
 
-            const float deadZone = 0.35f;
+            const float deadZone = kChaseDeadZone_;
             if (absDx2 > idealRange_ + deadZone) {
                 velocity_.x = dirToTarget * moveSpeed_;
             }
@@ -312,11 +314,11 @@ if (!wantsJitter) {
             // 簡易的な「障害物ジャンプ」
             if (isOnGround_) {
                 int moveDir = facing_;
-                if (velocity_.x > 0.01f) moveDir = 1;
-                if (velocity_.x < -0.01f) moveDir = -1;
+                if (velocity_.x > kMoveEpsilon_) moveDir = 1;
+                if (velocity_.x < -kMoveEpsilon_) moveDir = -1;
 
-                float checkX = position_.x + moveDir * (mapColliderW_ * 0.5f + 0.15f);
-                float checkY = position_.y - mapColliderH_ * 0.5f + 0.10f;
+                float checkX = position_.x + moveDir * (mapColliderW_ * kHalf_ + kObstacleCheckXMargin_);
+                float checkY = position_.y - mapColliderH_ * kHalf_ + kObstacleCheckYMargin_;
 
                 auto idx = map.GetMapChipIndexByPosition({ checkX, checkY, 0.0f });
                 if (IsSolid(map.GetMapChipTypeByIndex(idx.xIndex, idx.yIndex))) {
@@ -329,79 +331,79 @@ if (!wantsJitter) {
                 const bool canDashAny = (dashCD_ <= 0.0f);
 
                 // この距離内では遠距離攻撃を禁止し、小ダッシュへ切り替える
-                const float pointBlankRange = meleeRange_ + 0.4f; // 约 2.6
+                const float pointBlankRange = meleeRange_ + kPointBlankRangeMargin_; // 约 2.6
                 const bool  tooCloseForRanged = (dist <= pointBlankRange);
 
                 const bool canRanged = (!tooCloseForRanged && dist >= rangedMinRange_ && dist <= rangedMaxRange_ && rangedCD_ <= 0.0f);
                 const bool canUltimate = (ultimateCD_ <= 0.0f);
-                const bool canBarrage = (!tooCloseForRanged && dist >= 5.5f && dist <= 13.5f && barrageCD_ <= 0.0f);
-                const bool playerAbove = (pPos.y > position_.y + height_ * 0.15f);
-                const bool canSlam = (isOnGround_ && slamCD_ <= 0.0f && dist <= 6.5f);
-                const bool canNova = (!tooCloseForRanged && dist >= 4.8f && dist <= 12.8f && novaCD_ <= 0.0f);
+                const bool canBarrage = (!tooCloseForRanged && dist >= kBarrageMinRange_ && dist <= kBarrageMaxRange_ && barrageCD_ <= 0.0f);
+                const bool playerAbove = (pPos.y > position_.y + height_ * kPlayerAboveHeightRate_);
+                const bool canSlam = (isOnGround_ && slamCD_ <= 0.0f && dist <= kSlamEnableRange_);
+                const bool canNova = (!tooCloseForRanged && dist >= kNovaMinRange_ && dist <= kNovaMaxRange_ && novaCD_ <= 0.0f);
 
 
 
 
-                if (canUltimate && dist >= 2.0f && dist <= 14.0f) {
+                if (canUltimate && dist >= kUltimateMinRange_ && dist <= kUltimateMaxRange_) {
                     queuedAttack_ = BossAttack::Ultimate;
                     bossState_ = BossState::Windup;
                     attackFacing_ = facing_;
-                    stateTimer_ = 0.40f; // 必殺技予備動作
+                    stateTimer_ = kUltimateWindupTime_; // 必殺技予備動作
 
                     ultimateWindupTotal_ = stateTimer_;
                     ultimateWindupBackstepMoved_ = 0.0f;
 
                     // 先に CD を引き上げ、必殺技終了後にランダム CD を再設定する
-                    ultimateCD_ = 399.0f;
+                    ultimateCD_ = kUltimateCooldownLock_;
                     ultimateLocked_ = true;
-                    globalAttackCD_ = 1.10f;
-                    decisionTimer_ = 0.35f;
+                    globalAttackCD_ = kUltimateGlobalCooldown_;
+                    decisionTimer_ = kUltimateDecisionDelay_;
                 }
                 // 叩きつけ: 「頭上ジャンプ／密着旋回」対策。着地時に衝撃波弾幕を生成
-                else if (canSlam && (playerAbove || dist <= (meleeRange_ + 1.2f))){
+                else if (canSlam && (playerAbove || dist <= (meleeRange_ + kSlamCloseRangeMargin_))){
                     queuedAttack_ = BossAttack::Slam;
                     bossState_ = BossState::Windup;
                     attackFacing_ = facing_;
                     stateTimer_ = slamWindup_;
 
-                    slamCD_ = (hp_ <= enrageHp_) ? 3.0f : 4.2f;
-                    globalAttackCD_ = 1.15f;
-                    decisionTimer_ = 0.30f;
+                    slamCD_ = (hp_ <= enrageHp_) ? kSlamCooldownEnrage_ : kSlamCooldownNormal_;
+                    globalAttackCD_ = kSlamGlobalCooldown_;
+                    decisionTimer_ = kSlamDecisionDelay_;
                 }
                 // 円形爆発: よりド派手なリング弾幕（低HP時に優先し、プレイヤーの後退し続けにも対抗する）
-                else if (canNova && (hp_ <= enrageHp_ || (playerMovingAway && dist >= 8.0f) || distIncreasing)) {
+                else if (canNova && (hp_ <= enrageHp_ || (playerMovingAway && dist >= kNovaAntiRetreatRange_) || distIncreasing)) {
                     queuedAttack_ = BossAttack::Nova;
                     bossState_ = BossState::Windup;
                     attackFacing_ = facing_;
                     stateTimer_ = novaWindup_;
 
                     float r = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
-                    novaCD_ = (hp_ <= enrageHp_) ? (3.2f + 1.0f * r) : (4.6f + 1.2f * r);
-                    globalAttackCD_ = 1.15f;
-                    decisionTimer_ = 0.32f;
+                    novaCD_ = (hp_ <= enrageHp_) ? (kNovaCooldownEnrageBase_ + kNovaCooldownEnrageRandom_ * r) : (kNovaCooldownNormalBase_ + kNovaCooldownNormalRandom_ * r);
+                    globalAttackCD_ = kNovaGlobalCooldown_;
+                    decisionTimer_ = kNovaDecisionDelay_;
                 }
                 // 旋转弾幕: 中遠距離制圧（より派手）、プレイヤーずっと後退時より容易トリガー
                 else if (canBarrage && (hp_ <= enrageHp_ || playerMovingAway || dist >= farRangedPrefer_)) {
                     queuedAttack_ = BossAttack::Barrage;
                     bossState_ = BossState::Windup;
                     attackFacing_ = facing_;
-                    stateTimer_ = 0.30f;
+                    stateTimer_ = kBarrageWindupTime_;
 
                     float r = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
-                    barrageCD_ = (hp_ <= enrageHp_) ? (3.0f + 1.0f * r) : (4.0f + 1.2f * r);
-                    globalAttackCD_ = 1.05f;
-                    decisionTimer_ = 0.30f;
+                    barrageCD_ = (hp_ <= enrageHp_) ? (kBarrageCooldownEnrageBase_ + kBarrageCooldownEnrageRandom_ * r) : (kBarrageCooldownNormalBase_ + kBarrageCooldownNormalRandom_ * r);
+                    globalAttackCD_ = kBarrageGlobalCooldown_;
+                    decisionTimer_ = kBarrageDecisionDelay_;
                 }
                 // 遠距離: 優先に远程制圧
                 else if (canRanged && dist >= farRangedPrefer_ && dist > dashMaxRange_) {
                     queuedAttack_ = BossAttack::Ranged;
                     bossState_ = BossState::Windup;
                     attackFacing_ = facing_;
-                    stateTimer_ = 0.28f;
+                    stateTimer_ = kRangedWindupTime_;
 
-                    rangedCD_ = (hp_ <= enrageHp_) ? 1.25f : 1.75f;
-                    globalAttackCD_ = 0.85f;
-                    decisionTimer_ = 0.25f;
+                    rangedCD_ = (hp_ <= enrageHp_) ? kRangedCooldownEnrage_ : kRangedCooldownNormal_;
+                    globalAttackCD_ = kRangedGlobalCooldown_;
+                    decisionTimer_ = kRangedDecisionDelay_;
                 }
                 // プレイヤー接近: 朝プレイヤーダッシュ（ただし連続では突進せず、dashCD_ で制御する）
                 else if (canDashAny && dist <= closeDashRange_) {
@@ -417,9 +419,9 @@ if (!wantsJitter) {
 
                     dashWindupTotal_ = stateTimer_;
                     dashBackstepMoved_ = 0.0f;
-                    dashCD_ = 2.70f;
-                    globalAttackCD_ = 1.05f;
-                    decisionTimer_ = 0.25f;
+                    dashCD_ = kCloseDashCooldown_;
+                    globalAttackCD_ = kCloseDashGlobalCooldown_;
+                    decisionTimer_ = kCloseDashDecisionDelay_;
                 }
                 // dashCD_ が進行中でも、プレイヤー密着時は遠距離を使わず小ダッシュ 1 回に切り替える
                 else if (!canDashAny && dist <= closeDashRange_ && microDashCD_ <= 0.0f) {
@@ -435,38 +437,38 @@ if (!wantsJitter) {
 
                     dashWindupTotal_ = stateTimer_;
                     dashBackstepMoved_ = 0.0f;
-                    globalAttackCD_ = 0.95f;
-                    decisionTimer_ = 0.20f;
+                    globalAttackCD_ = kMicroDashGlobalCooldown_;
+                    decisionTimer_ = kMicroDashDecisionDelay_;
                 }
 
                 // 中距離: 择机ダッシュ（プレイヤーが引き撃ち／距離を取っている時に発動しやすい）
                 else if (canDashAny && dist >= dashMinRange_ && dist <= dashMaxRange_
-                    && (playerMovingAway || distIncreasing || dist <= 7.0f)) {
+                    && (playerMovingAway || distIncreasing || dist <= kMiddleDashNearRange_)) {
                     queuedAttack_ = BossAttack::Dash;
                     bossState_ = BossState::Windup;
                     attackFacing_ = facing_;
-                    stateTimer_ = 0.30f;
-                    queuedDashDuration_ = 0.30f;
+                    stateTimer_ = kBarrageWindupTime_;
+                    queuedDashDuration_ = kBarrageWindupTime_;
                     queuedDashSpeed_ = dashSpeed_;
                     isShortDash_ = false;
 
                     dashWindupTotal_ = stateTimer_;
                     dashBackstepMoved_ = 0.0f;
 
-                    dashCD_ = 2.10f;
-                    globalAttackCD_ = 1.00f;
-                    decisionTimer_ = 0.25f;
+                    dashCD_ = kMiddleDashCooldown_;
+                    globalAttackCD_ = kMiddleDashGlobalCooldown_;
+                    decisionTimer_ = kMiddleDashDecisionDelay_;
                 }
                 // 保険: まだ远程そのまま远程
                 else if (canRanged) {
                     queuedAttack_ = BossAttack::Ranged;
                     bossState_ = BossState::Windup;
                     attackFacing_ = facing_;
-                    stateTimer_ = 0.28f;
+                    stateTimer_ = kRangedWindupTime_;
 
-                    rangedCD_ = (hp_ <= enrageHp_) ? 1.25f : 1.75f;
-                    globalAttackCD_ = 0.85f;
-                    decisionTimer_ = 0.25f;
+                    rangedCD_ = (hp_ <= enrageHp_) ? kRangedCooldownEnrage_ : kRangedCooldownNormal_;
+                    globalAttackCD_ = kRangedGlobalCooldown_;
+                    decisionTimer_ = kRangedDecisionDelay_;
                 }
 
             }
@@ -488,10 +490,10 @@ if (!wantsJitter) {
                 const float step = StepScale(dt);
 
                 float total = dashWindupTotal_;
-                if (total < 0.001f) { total = (std::max)(stateTimer_, 0.001f); }
+                if (total < kSmallEpsilon_) { total = (std::max)(stateTimer_, kSmallEpsilon_); }
 
                 // Windup 総時間に合わせて均等に後退し、Windup 時間が違っても後退距離がだいたい同じになるようにする
-                float baseVel = targetDist / (total * 60.0f); // 60fps を基準にした「1フレーム移動量」
+                float baseVel = targetDist / (total * kFrameRate_); // 60fps を基準にした「1フレーム移動量」
                 baseVel = (std::min)(baseVel, dashBackstepMaxSpeed_);
                 baseVel = (std::max)(baseVel, dashBackstepMinSpeed_);
 
@@ -516,10 +518,10 @@ if (!wantsJitter) {
                 const float step = StepScale(dt);
 
                 float total = ultimateWindupTotal_;
-                if (total < 0.001f) { total = (std::max)(stateTimer_, 0.001f); }
+                if (total < kSmallEpsilon_) { total = (std::max)(stateTimer_, kSmallEpsilon_); }
 
                 // Windup 総時間に合わせて均等に後退
-                float baseVel = targetDist / (total * 60.0f); // 60fps を基準にした「1フレーム移動量」
+                float baseVel = targetDist / (total * kFrameRate_); // 60fps を基準にした「1フレーム移動量」
                 baseVel = (std::min)(baseVel, ultimateWindupBackstepMaxSpeed_);
                 baseVel = (std::max)(baseVel, ultimateWindupBackstepMinSpeed_);
 
@@ -538,7 +540,7 @@ if (!wantsJitter) {
             }
             if (stateTimer_ <= 0.0f) {
                 // 技の開始後に予備動作の揺れを引きずらないよう、ここで確実に止める
-                preAttackJitter_ = { 0.0f, 0.0f, 0.0f };
+                preAttackJitter_ = kZeroVector_;
                 preAttackJitterTime_ = 0.0f;
 
                 if (queuedAttack_ == BossAttack::Dash) {
@@ -549,7 +551,7 @@ if (!wantsJitter) {
                 }
                 else if (queuedAttack_ == BossAttack::Ranged) {
                     // プレイヤー密着時は近距離弾幕を使わず、前方への小ダッシュに切り替える
-                    const float pointBlankRange = meleeRange_ + 0.4f;
+                    const float pointBlankRange = meleeRange_ + kPointBlankRangeMargin_;
                     if (dist <= pointBlankRange) {
                         bossState_ = BossState::Dash;
                         queuedDashDuration_ = closeDashDuration_;
@@ -564,18 +566,18 @@ if (!wantsJitter) {
 
                         // -------- 射撃模式选择 --------
                         // 低HP & 中距離では「扇状散布」に切り替えてより派手にする
-                        fanShot_ = (hp_ <= enrageHp_) && (dist <= 9.5f);
+                        fanShot_ = (hp_ <= enrageHp_) && (dist <= kFanShotMaxDistance_);
 
                         if (fanShot_) {
-                            stateTimer_ = 0.95f;
-                            shotsTotal_ = 2;           // 2 波の散射
-                            shotInterval_ = 0.22f;
+                            stateTimer_ = kFanShotStateTime_;
+                            shotsTotal_ = kFanShotWaveCount_;           // 2 波の散射
+                            shotInterval_ = kFanShotInterval_;
                         }
                         else {
                             // 原有: 単発 / 3連射（縦方向の散布）
-                            stateTimer_ = (hp_ <= enrageHp_) ? 0.85f : 0.55f;
-                            shotsTotal_ = (hp_ <= enrageHp_) ? 3 : 1;
-                            shotInterval_ = 0.16f;
+                            stateTimer_ = (hp_ <= enrageHp_) ? kEnrageShotStateTime_ : kNormalShotStateTime_;
+                            shotsTotal_ = (hp_ <= enrageHp_) ? kEnrageShotCount_ : kNormalShotCount_;
+                            shotInterval_ = kShotInterval_;
                         }
 
                         shotsLeft_ = shotsTotal_;
@@ -586,14 +588,14 @@ if (!wantsJitter) {
                     bossState_ = BossState::Barrage;
 
                     // 低HP時より久、より密集
-                    stateTimer_ = (hp_ <= enrageHp_) ? (barrageDuration_ + 0.25f) : barrageDuration_;
+                    stateTimer_ = (hp_ <= enrageHp_) ? (barrageDuration_ + kBarrageEnrageDurationBonus_) : barrageDuration_;
                     barrageFireTimer_ = 0.0f;
-                    barrageBurstTimer_ = barrageBurstInterval_ * 0.65f;
+                    barrageBurstTimer_ = barrageBurstInterval_ * kBarrageBurstStartRate_;
 
                     // 角度を少しランダムにして、毎回同じにならないようにする
                     float r = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
-                    barrageAngle_ = r * 6.283185307179586f; // 2*pi
-                    barrageSpinDir_ = (r < 0.5f) ? 1.0f : -1.0f;
+                    barrageAngle_ = r * kTwoPi_; // 2*pi
+                    barrageSpinDir_ = (r < kRandomTurnThreshold_) ? 1.0f : -1.0f;
                 }
                 else if (queuedAttack_ == BossAttack::Nova) {
                     bossState_ = BossState::Nova;
@@ -606,7 +608,7 @@ if (!wantsJitter) {
 
                     // リング弾幕ごとに角度を少し回して、「固定模様」を避ける
                     float r = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
-                    novaRingOffset_ = r * 6.283185307179586f;
+                    novaRingOffset_ = r * kTwoPi_;
                 }
                 else if (queuedAttack_ == BossAttack::Slam) {
                     bossState_ = BossState::Jump;
@@ -636,7 +638,7 @@ if (!wantsJitter) {
             velocity_.x = attackFacing_ * queuedDashSpeed_;
             if (stateTimer_ <= 0.0f) {
                 bossState_ = BossState::Recover;
-                stateTimer_ = isShortDash_ ? 0.45f : 0.65f;
+                stateTimer_ = isShortDash_ ? kShortDashRecoverTime_ : kNormalDashRecoverTime_;
                 isShortDash_ = false;
             }
             break;
@@ -663,14 +665,14 @@ if (!wantsJitter) {
             velocity_.x = 0.0f;
             if (stateTimer_ <= 0.0f) {
                 bossState_ = BossState::Chase;
-                decisionTimer_ = 0.25f;
+                decisionTimer_ = kRestNextDecisionDelay_;
             }
             break;
 
         case BossState::Barrage:
         {
             // 保険: 攻撃段階では予備動作の揺れを強制的に止める（発射と重ならないようにする）
-            preAttackJitter_ = { 0.0f, 0.0f, 0.0f };
+            preAttackJitter_ = kZeroVector_;
             preAttackJitterTime_ = 0.0f;
 
 
@@ -679,18 +681,18 @@ if (!wantsJitter) {
             facing_ = attackFacing_;
 
             // 低HP時より密集/旋转より快
-            const float fireInterval = (hp_ <= enrageHp_) ? (barrageFireInterval_ * 0.85f) : barrageFireInterval_;
-            const float angSpeed = (hp_ <= enrageHp_) ? (barrageAngularSpeed_ * 1.15f) : barrageAngularSpeed_;
+            const float fireInterval = (hp_ <= enrageHp_) ? (barrageFireInterval_ * kBarrageEnrageFireIntervalRate_) : barrageFireInterval_;
+            const float angSpeed = (hp_ <= enrageHp_) ? (barrageAngularSpeed_ * kBarrageEnrageSpeedRate_) : barrageAngularSpeed_;
 
             // 追加: 周期的な「爆発リング」を入れて、弾幕により層を持たせる
             barrageBurstTimer_ -= dt;
             if (barrageBurstTimer_ <= 0.0f && stateTimer_ > 0.0f) {
                 barrageBurstTimer_ += barrageBurstInterval_;
-                const int count = (hp_ <= enrageHp_) ? (barrageBurstCount_ + 4) : barrageBurstCount_;
-                const float spd = (hp_ <= enrageHp_) ? (barrageBurstSpeed_ * 1.15f) : barrageBurstSpeed_;
+                const int count = (hp_ <= enrageHp_) ? (barrageBurstCount_ + kBarrageEnrageBurstAdd_) : barrageBurstCount_;
+                const float spd = (hp_ <= enrageHp_) ? (barrageBurstSpeed_ * kBarrageEnrageSpeedRate_) : barrageBurstSpeed_;
                 Vector3 c = position_;
-                c.y += height_ * 0.18f;
-                SpawnRadialBurst(c, count, spd, barrageBurstLife_, 0.28f, barrageAngle_);
+                c.y += height_ * kBossChestHeightRate_;
+                SpawnRadialBurst(c, count, spd, barrageBurstLife_, kBarrageBurstRadius_, barrageAngle_);
             }
 
             barrageFireTimer_ -= dt;
@@ -699,16 +701,16 @@ if (!wantsJitter) {
 
                 // 弾幕スポーン地点: 胸の少し前
                 Vector3 spawn = position_;
-                spawn.x += attackFacing_ * (width_ * 0.15f);
-                spawn.y += height_ * 0.18f;
+                spawn.x += attackFacing_ * (width_ * kBarrageSpawnForwardRate_);
+                spawn.y += height_ * kBossChestHeightRate_;
 
                 // 1〜2 発発射: 低HP時は 2 連射でより派手にする
-                const int emitCount = (hp_ <= enrageHp_) ? 2 : 1;
+                const int emitCount = (hp_ <= enrageHp_) ? kBarrageEmitCountEnrage_ : kBarrageEmitCountNormal_;
                 for (int i = 0; i < emitCount; ++i) {
-                    float ang = barrageAngle_ + (i == 0 ? 0.0f : kPi);
+                    float ang = barrageAngle_ + (i == 0 ? 0.0f : kPi_);
                     Vector3 dir{ std::cos(ang), std::sin(ang), 0.0f };
                     Vector3 vel{ dir.x * barrageProjectileSpd_, dir.y * barrageProjectileSpd_, 0.0f };
-                    SpawnBossProjectileRaw(spawn, vel, barrageProjectileLife_, 0.32f);
+                    SpawnBossProjectileRaw(spawn, vel, barrageProjectileLife_, kBarrageShotRadius_);
                 }
 
                 // 角度推進: 按回転方向旋转
@@ -717,7 +719,7 @@ if (!wantsJitter) {
 
             if (stateTimer_ <= 0.0f) {
                 bossState_ = BossState::Recover;
-                stateTimer_ = 0.70f;
+                stateTimer_ = kBarrageRecoverTime_;
             }
             break;
         }
@@ -725,7 +727,7 @@ if (!wantsJitter) {
         case BossState::Nova:
         {
             // 保険: 攻撃段階では予備動作の揺れを強制的に止める（発射と重ならないようにする）
-            preAttackJitter_ = { 0.0f, 0.0f, 0.0f };
+            preAttackJitter_ = kZeroVector_;
             preAttackJitterTime_ = 0.0f;
 
             // 円形爆発: 多重リング弾幕
@@ -736,23 +738,23 @@ if (!wantsJitter) {
 
             auto emitRing = [&](int ringIndex) {
                 const int count = novaBulletCount_ + ((hp_ <= enrageHp_) ? 2 : 0);
-                const float speed = novaProjectileSpd_ * (1.0f + 0.08f * static_cast<float>(ringIndex));
-                const float offset = novaRingOffset_ + ((ringIndex % 2 == 0) ? 0.0f : (kPi / (float)(count)));
+                const float speed = novaProjectileSpd_ * (1.0f + kNovaRingSpeedStep_ * static_cast<float>(ringIndex));
+                const float offset = novaRingOffset_ + ((ringIndex % 2 == 0) ? 0.0f : (kPi_ / (float)(count)));
 
                 Vector3 c = position_;
-                c.y += height_ * 0.18f;
-                SpawnRadialBurst(c, count, speed, novaProjectileLife_, 0.30f, offset);
+                c.y += height_ * kBossChestHeightRate_;
+                SpawnRadialBurst(c, count, speed, novaProjectileLife_, kNovaBurstRadius_, offset);
 
                 // 第1リングには追加で「十字」状の強い弾を入れ、画面をよりド派手にする
                 if (ringIndex == 0) {
-                    const float spd2 = speed * 1.25f;
-                    SpawnBossProjectileRaw(c, {  spd2, 0.0f, 0.0f }, novaProjectileLife_, 0.34f);
-                    SpawnBossProjectileRaw(c, { -spd2, 0.0f, 0.0f }, novaProjectileLife_, 0.34f);
-                    SpawnBossProjectileRaw(c, { 0.0f,  spd2, 0.0f }, novaProjectileLife_, 0.34f);
-                    SpawnBossProjectileRaw(c, { 0.0f, -spd2, 0.0f }, novaProjectileLife_, 0.34f);
+                    const float spd2 = speed * kNovaCrossSpeedRate_;
+                    SpawnBossProjectileRaw(c, {  spd2, 0.0f, 0.0f }, novaProjectileLife_, kNovaCrossRadius_);
+                    SpawnBossProjectileRaw(c, { -spd2, 0.0f, 0.0f }, novaProjectileLife_, kNovaCrossRadius_);
+                    SpawnBossProjectileRaw(c, { 0.0f,  spd2, 0.0f }, novaProjectileLife_, kNovaCrossRadius_);
+                    SpawnBossProjectileRaw(c, { 0.0f, -spd2, 0.0f }, novaProjectileLife_, kNovaCrossRadius_);
                 }
 
-                novaRingOffset_ += 0.35f;
+                novaRingOffset_ += kNovaRingOffsetStep_;
             };
 
             // 各リングを放つ
@@ -779,7 +781,7 @@ if (!wantsJitter) {
 
         case BossState::Jump:
             // 保険: 攻撃段階では予備動作の揺れを強制的に止める（発射と重ならないようにする）
-            preAttackJitter_ = { 0.0f, 0.0f, 0.0f };
+            preAttackJitter_ = kZeroVector_;
             preAttackJitterTime_ = 0.0f;
 
             // 跳び上がり叩きつけ: 空中不做水平移動（予備動作を読みやすくする）
@@ -806,38 +808,38 @@ if (!wantsJitter) {
 
                 // 衝撃波: 沿地面左右拡散
                 Vector3 base = position_;
-                base.y -= height_ * 0.50f - 0.25f;
+                base.y -= height_ * kSlamBaseHeightRate_ - kSlamBaseLiftOffset_;
 
-                SpawnBossProjectileRaw(base, { -slamWaveSpeed_, 0.0f, 0.0f }, slamWaveLife_, 0.36f);
-                SpawnBossProjectileRaw(base, {  slamWaveSpeed_, 0.0f, 0.0f }, slamWaveLife_, 0.36f);
+                SpawnBossProjectileRaw(base, { -slamWaveSpeed_, 0.0f, 0.0f }, slamWaveLife_, kSlamWaveRadius_);
+                SpawnBossProjectileRaw(base, {  slamWaveSpeed_, 0.0f, 0.0f }, slamWaveLife_, kSlamWaveRadius_);
 
                 // 破片: 向上扇形噴き出す（より派手）
                 auto emitShard = [&](float x, float y) {
                     float len = std::sqrt(x * x + y * y);
-                    if (len < 0.001f) { len = 1.0f; }
+                    if (len < kSmallEpsilon_) { len = 1.0f; }
                     Vector3 vel{ (x / len) * slamShardSpeed_, (y / len) * slamShardSpeed_, 0.0f };
-                    SpawnBossProjectileRaw(base, vel, slamShardLife_, 0.30f);
+                    SpawnBossProjectileRaw(base, vel, slamShardLife_, kSlamShardRadius_);
                 };
 
-                emitShard(-1.00f, 0.85f);
-                emitShard(-0.55f, 1.00f);
-                emitShard( 0.55f, 1.00f);
-                emitShard( 1.00f, 0.85f);
+                emitShard(-kSlamShardOuterX_, kSlamShardLowY_);
+                emitShard(-kSlamShardInnerX_, kSlamShardHighY_);
+                emitShard( kSlamShardInnerX_, kSlamShardHighY_);
+                emitShard( kSlamShardOuterX_, kSlamShardLowY_);
 
                 // 低HP時はさらに小さな破片を 1 層追加する
                 if (hp_ <= enrageHp_) {
-                    emitShard(-0.30f, 1.20f);
-                    emitShard( 0.30f, 1.20f);
+                    emitShard(-kSlamShardEnrageX_, kSlamShardEnrageY_);
+                    emitShard( kSlamShardEnrageX_, kSlamShardEnrageY_);
                 }
 
                 // 追加: 着地衝撃の「爆発リング」（より派手）
                 {
                     Vector3 c = base;
-                    c.y += 0.45f; // 少し持ち上げて、生成直後に地面ブロックへ当たらないようにする
+                    c.y += kSlamExplosionLiftY_; // 少し持ち上げて、生成直後に地面ブロックへ当たらないようにする
                     float r = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
-                    const int count = (hp_ <= enrageHp_) ? 14 : 12;
-                    const float spd = (hp_ <= enrageHp_) ? 0.22f : 0.20f;
-                    SpawnRadialBurst(c, count, spd, 1.25f, 0.28f, r * 6.283185307179586f);
+                    const int count = (hp_ <= enrageHp_) ? kSlamExplosionCountEnrage_ : kSlamExplosionCountNormal_;
+                    const float spd = (hp_ <= enrageHp_) ? kSlamExplosionSpeedEnrage_ : kSlamExplosionSpeedNormal_;
+                    SpawnRadialBurst(c, count, spd, kSlamExplosionLife_, kBarrageBurstRadius_, r * kTwoPi_);
                 }
             }
 
@@ -850,7 +852,7 @@ if (!wantsJitter) {
 
         case BossState::Shoot:
         {
-            const float pointBlankRange = meleeRange_ + 0.4f;
+            const float pointBlankRange = meleeRange_ + kPointBlankRangeMargin_;
             // プレイヤー密着時は継続射撃を行わず、小ダッシュに切り替える
             if (dist <= pointBlankRange) {
                 bossState_ = BossState::Dash;
@@ -874,8 +876,8 @@ if (!wantsJitter) {
             if (shotsLeft_ > 0 && shotTimer_ <= 0.0f) {
                 // 弾幕の発生位置を計算
                 Vector3 spawn = position_;
-                spawn.x += attackFacing_ * (width_ * 0.5f + 0.25f);
-                spawn.y += height_ * 0.15f;
+                spawn.x += attackFacing_ * (width_ * kHalf_ + kShootSpawnForwardOffset_);
+                spawn.y += height_ * kPlayerAboveHeightRate_;
 
                 // 目標を予測
                 Vector3 aimTarget{ pPos.x + pVel.x * projectileLeadTime_, pPos.y + pVel.y * projectileLeadTime_, 0.0f };
@@ -883,13 +885,13 @@ if (!wantsJitter) {
                 // -------- 弾幕模式: 扇状散布 / 原有3連射 --------
                 // 3連射: 少し縦方向に散らす
                 int shotIndex = shotsTotal_ - shotsLeft_; // 0..shotsTotal_-1
-                if (!fanShot_ && shotsTotal_ >= 3) {
-                    aimTarget.y += (shotIndex - 1) * 0.55f;
+                if (!fanShot_ && shotsTotal_ >= kEnrageShotCount_) {
+                    aimTarget.y += (shotIndex - kNormalShotCount_) * kShootVerticalSpread_;
                 }
 
                 Vector3 dir{ aimTarget.x - spawn.x, aimTarget.y - spawn.y, 0.0f };
                 float len = std::sqrt(dir.x * dir.x + dir.y * dir.y);
-                if (len < 0.001f) {
+                if (len < kSmallEpsilon_) {
                     dir = { static_cast<float>(attackFacing_), 0.0f, 0.0f };
                 }
                 else {
@@ -900,16 +902,16 @@ if (!wantsJitter) {
                 if (fanShot_) {
                     // 基准角
                     // 第二波やや微旋转、見た目がより豊か
-                    float base = std::atan2(dir.y, dir.x) + 0.18f * static_cast<float>(shotIndex);
+                    float base = std::atan2(dir.y, dir.x) + kFanShotBaseRotateStep_ * static_cast<float>(shotIndex);
                     const int nBase = (fanCount_ < 2) ? 2 : fanCount_;
                     const int n = (hp_ <= enrageHp_) ? (nBase + 2) : nBase;
                     const float start = base - fanHalfAngle_;
-                    const float step = (n > 1) ? (2.0f * fanHalfAngle_ / static_cast<float>(n - 1)) : 0.0f;
+                    const float step = (n > 1) ? (kFanAngleWidthRate_ * fanHalfAngle_ / static_cast<float>(n - 1)) : 0.0f;
                     for (int i = 0; i < n; ++i) {
                         float a = start + step * static_cast<float>(i);
                         Vector3 d{ std::cos(a), std::sin(a), 0.0f };
                         Vector3 vel{ d.x * fanProjectileSpd_, d.y * fanProjectileSpd_, 0.0f };
-                        SpawnBossProjectileRaw(spawn, vel, projectileLife_, 0.32f);
+                        SpawnBossProjectileRaw(spawn, vel, projectileLife_, kBarrageShotRadius_);
                     }
                 }
                 else {
@@ -922,7 +924,7 @@ if (!wantsJitter) {
 
             if (stateTimer_ <= 0.0f) {
                 bossState_ = BossState::Recover;
-                stateTimer_ = 0.55f;
+                stateTimer_ = kShootRecoverTime_;
             }
             break;
         }
@@ -932,7 +934,7 @@ if (!wantsJitter) {
             velocity_.x = 0.0f;
             if (stateTimer_ <= 0.0f) {
                 bossState_ = BossState::Chase;
-                decisionTimer_ = 0.12f;
+                decisionTimer_ = kStunnedNextDecisionTime_;
             }
             break;
 
@@ -963,9 +965,9 @@ if (!wantsJitter) {
         }
 
         // Dash: 壁衝突ペナルティ
-        if (bossState_ == BossState::Dash && std::fabs(velocity_.x) < 0.0001f && stateTimer_ > 0.0f) {
+        if (bossState_ == BossState::Dash && std::fabs(velocity_.x) < kTinyValue_ && stateTimer_ > 0.0f) {
             bossState_ = BossState::Recover;
-            stateTimer_ = 0.45f; // 壁衝突ペナルティのウィンドウ
+            stateTimer_ = kDashWallRecoverTime_; // 壁衝突ペナルティのウィンドウ
         }
 
         // Ultimate: 碰到ブロック/トゲそのまま算「反射/トリガー」、来回几次後入る休息
@@ -974,7 +976,7 @@ if (!wantsJitter) {
             {
                 Vector3 foot = position_;
                 // 地形判定用身体サイズ（Dash の hurtbox 縮小の影響を受けないようにする）
-                foot.y -= mapColliderH_ * 0.5f - 0.05f;
+                foot.y -= mapColliderH_ * kHalf_ - kUltimateSpikeFootOffset_;
                 auto idx = map.GetMapChipIndexByPosition(foot);
                 MapChipType t = map.GetMapChipTypeByIndex(idx.xIndex, idx.yIndex);
                 if (t == MapChipType::kSpike) {
@@ -987,17 +989,17 @@ if (!wantsJitter) {
                     // 追加で 1 周分の「締めの爆発リング」を出して、より派手にする
                     {
                         Vector3 c = position_;
-                        c.y += height_ * 0.18f;
+                        c.y += height_ * kBossChestHeightRate_;
                         float r = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
-                        const int count = (hp_ <= enrageHp_) ? 14 : 12;
-                        const float spd = (hp_ <= enrageHp_) ? 0.22f : 0.20f;
-                        SpawnRadialBurst(c, count, spd, 1.10f, 0.28f, r * 6.283185307179586f);
+                        const int count = (hp_ <= enrageHp_) ? kUltimateSpikeBurstCountEnrage_ : kUltimateSpikeBurstCountNormal_;
+                        const float spd = (hp_ <= enrageHp_) ? kUltimateSpikeBurstSpeedEnrage_ : kUltimateSpikeBurstSpeedNormal_;
+                        SpawnRadialBurst(c, count, spd, kUltimateSpikeBurstLife_, kUltimateBurstRadius_, r * kTwoPi_);
                     }
                 }
             }
 
             // ブロック: X 方向で止められた（velocity_.x==0）ら 1 回の反射とみなす
-            if (bossState_ == BossState::Ultimate && std::fabs(velocity_.x) < 0.0001f) {
+            if (bossState_ == BossState::Ultimate && std::fabs(velocity_.x) < kTinyValue_) {
                 ultimateBounces_++;
                 attackFacing_ *= -1;
                 facing_ = attackFacing_;
@@ -1005,11 +1007,11 @@ if (!wantsJitter) {
                 // 反射のたびに 1 周分を放ち、打撃感を強くする
                 {
                     Vector3 c = position_;
-                    c.y += height_ * 0.18f;
+                    c.y += height_ * kBossChestHeightRate_;
                     float r = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
-                    const int count = (hp_ <= enrageHp_) ? 12 : 10;
-                    const float spd = (hp_ <= enrageHp_) ? 0.21f : 0.19f;
-                    SpawnRadialBurst(c, count, spd, 1.05f, 0.28f, r * 6.283185307179586f);
+                    const int count = (hp_ <= enrageHp_) ? kUltimateBounceBurstCountEnrage_ : kUltimateBounceBurstCountNormal_;
+                    const float spd = (hp_ <= enrageHp_) ? kUltimateBounceBurstSpeedEnrage_ : kUltimateBounceBurstSpeedNormal_;
+                    SpawnRadialBurst(c, count, spd, kUltimateBounceBurstLife_, kUltimateBurstRadius_, r * kTwoPi_);
                 }
 
                 if (ultimateBounces_ >= ultimateMaxBounces_) {
@@ -1022,7 +1024,7 @@ if (!wantsJitter) {
         }
     }
     // 必殺技が外部ロジックで中断された場合（たとえばプレイヤー接触で被弾／硬直が発生した場合）でも、CD が 399 のまま固定されないようにする
-    if (ultimateLocked_ && bossState_ != BossState::Ultimate && ultimateCD_ > 100.0f) {
+    if (ultimateLocked_ && bossState_ != BossState::Ultimate && ultimateCD_ > kUltimateCooldownLockThreshold_) {
         FinishUltimateCooldown();
         ultimateLocked_ = false;
     }
@@ -1042,7 +1044,7 @@ if (!wantsJitter) {
     if (obj_) {
         // Boss のモデルは左向き
         if (type_ == EnemyType::Boss) {
-            const float rotY = (facing_ >= 0) ? kPi : 0.0f;
+            const float rotY = (facing_ >= 0) ? kPi_ : 0.0f;
             obj_->SetRotate({ 0.0f, rotY, 0.0f });
         }
         obj_->SetTranslate(GetRenderPosition());
@@ -1079,15 +1081,15 @@ void BossEnemy::OnStomp()
         hp_ -= 1;
 
         // 被弾フィードバック: 点滅より久少し + 短硬直（より容易连续踩）
-        StartHitReaction(0.55f);
+        StartHitReaction(kBossHitReactTime_);
         bossState_ = BossState::Stunned;
-        stateTimer_ = 0.60f;
-        decisionTimer_ = 0.20f;
+        stateTimer_ = kBossStunnedTime_;
+        decisionTimer_ = kMicroDashDecisionDelay_;
 
         // 踏まれた直後にすぐ反撃しないようにする
-        globalAttackCD_ = (std::max)(globalAttackCD_, 0.80f);
+        globalAttackCD_ = (std::max)(globalAttackCD_, kBossHitGlobalCooldown_);
 
-        stompInvuln_ = 0.90f;
+        stompInvuln_ = kBossStompInvulnTime_;
 
         if (hp_ <= 0) {
             isDead_ = true;
@@ -1100,8 +1102,8 @@ void BossEnemy::OnStomp()
     }
     else {
         // 通常敵: 先に保留原挙動（1回だけ点滅）
-        StartHitReaction(0.40f);
-        stompInvuln_ = 0.20f;
+        StartHitReaction(kNormalHitReactTime_);
+        stompInvuln_ = kNormalStompInvulnTime_;
     }
 }
 
@@ -1109,8 +1111,8 @@ void BossEnemy::ResolveMapCollision(const MapChipField& map, float dt)
 {
     const float step = StepScale(dt);
     // マップ衝突には「固定サイズ」だけを使い、Dash の hurtbox 縮小の影響を受けないようにする
-    const float kHalfW = mapColliderW_ * 0.5f;
-    const float kHalfH = mapColliderH_ * 0.5f;
+    const float kHalfW = mapColliderW_ * kHalf_;
+    const float kHalfH = mapColliderH_ * kHalf_;
 
     bool onGround = false;
 
@@ -1201,16 +1203,16 @@ bool BossEnemy::IsPlayerOnGround(const MapChipField& map, const Player& player) 
 {
     // マップセルを使って「足元に実体ブロックがあるか」を判定
     const Vector3 pPos = player.GetPosition();
-    const float halfW = player.GetWidth()  * 0.5f;
-    const float halfH = player.GetHeight() * 0.5f;
+    const float halfW = player.GetWidth()  * kHalf_;
+    const float halfH = player.GetHeight() * kHalf_;
 
     // 少し下へ探って、浮動小数誤差でちょうど境界に乗った場合の判定漏れを避ける
-    const float probeY = 0.06f;
+    const float probeY = kGroundProbeOffsetY_;
 
-    Vector3 probes[3] = {
+    Vector3 probes[kGroundProbeCount_] = {
         { pPos.x,                 pPos.y - halfH - probeY, 0.0f }, // 脚底中点
-        { pPos.x - halfW * 0.80f, pPos.y - halfH - probeY, 0.0f }, // 左脚
-        { pPos.x + halfW * 0.80f, pPos.y - halfH - probeY, 0.0f }, // 右脚
+        { pPos.x - halfW * kFootProbeXScale_, pPos.y - halfH - probeY, 0.0f }, // 左脚
+        { pPos.x + halfW * kFootProbeXScale_, pPos.y - halfH - probeY, 0.0f }, // 右脚
     };
 
     for (const auto& q : probes) {
@@ -1229,11 +1231,11 @@ bool BossEnemy::IsBattleTriggerReady(const Player& player, const MapChipField& m
     if (battleTriggered_) { return false; }
 
     const Vector3 pPos = player.GetPosition();
-    const float halfW = player.GetWidth()  * 0.5f;
-    const float halfH = player.GetHeight() * 0.5f;
+    const float halfW = player.GetWidth()  * kHalf_;
+    const float halfH = player.GetHeight() * kHalf_;
 
     // 横方向
-    const float edgeEps = 0.02f; // 小さな余裕
+    const float edgeEps = kBattleTriggerEdgeEps_; // 小さな余裕
     auto leftIdx = map.GetMapChipIndexByPosition({ pPos.x - halfW + edgeEps, pPos.y, 0.0f });
     const bool passedX = (leftIdx.xIndex >= battleTriggerXIndex_);
 
@@ -1244,11 +1246,11 @@ bool BossEnemy::IsBattleTriggerReady(const Player& player, const MapChipField& m
     // 地面
     bool onGroundInBossArea = true;
     if (requirePlayerOnGroundToTrigger_) {
-        const float probeY = 0.06f;
-        Vector3 probes[3] = {
+        const float probeY = kGroundProbeOffsetY_;
+        Vector3 probes[kGroundProbeCount_] = {
             { pPos.x,                 pPos.y - halfH - probeY, 0.0f },
-            { pPos.x - halfW * 0.80f, pPos.y - halfH - probeY, 0.0f },
-            { pPos.x + halfW * 0.80f, pPos.y - halfH - probeY, 0.0f },
+            { pPos.x - halfW * kFootProbeXScale_, pPos.y - halfH - probeY, 0.0f },
+            { pPos.x + halfW * kFootProbeXScale_, pPos.y - halfH - probeY, 0.0f },
         };
 
         onGroundInBossArea = false;
@@ -1279,8 +1281,8 @@ void BossEnemy::TriggerBattleNow()
     bossState_ = BossState::Idle;
     queuedAttack_ = BossAttack::None;
     stateTimer_ = 0.0f;
-    decisionTimer_ = 0.30f;
-    globalAttackCD_ = (std::max)(globalAttackCD_, 0.60f);
+    decisionTimer_ = kBattleStartDecisionDelay_;
+    globalAttackCD_ = (std::max)(globalAttackCD_, kBattleStartGlobalCooldown_);
 
     // クリアする弾幕
     for (auto& p : projectiles_) {
@@ -1327,7 +1329,7 @@ void BossEnemy::UpdateBossFacing(const Player& player)
 
     const float dx = player.GetPosition().x - position_.x;
 
-    if (std::fabs(dx) <= 0.05f) {
+    if (std::fabs(dx) <= kFacingDeadZone_) {
         return;
     }
 
@@ -1362,7 +1364,7 @@ void BossEnemy::UpdatePreAttackJitter(float dt)
     preAttackJitterTime_ += dt;
 
     // jitter 有効区間: (settle, lead]
-    const float seg = (std::max)(0.0001f, lead - settle);
+    const float seg = (std::max)(kTinyValue_, lead - settle);
     float k = 1.0f - ((stateTimer_ - settle) / seg); // 0 -> 1
     k = std::clamp(k, 0.0f, 1.0f);
 
@@ -1371,8 +1373,8 @@ void BossEnemy::UpdatePreAttackJitter(float dt)
     const float t = preAttackJitterTime_;
 
     // 異なる周波数の正弦波を合成し、単振動ではなく「微振動」にする
-    const float nx = std::sin(t * 97.0f) + 0.35f * std::sin(t * 211.0f + 1.1f);
-    const float ny = std::sin(t * 131.0f + 2.7f) + 0.35f * std::sin(t * 233.0f + 0.2f);
+    const float nx = std::sin(t * kPreJitterFreqX1_) + kPreJitterSubWaveRate_ * std::sin(t * kPreJitterFreqX2_ + kPreJitterPhaseX2_);
+    const float ny = std::sin(t * kPreJitterFreqY1_ + kPreJitterPhaseY1_) + kPreJitterSubWaveRate_ * std::sin(t * kPreJitterFreqY2_ + kPreJitterPhaseY2_);
 
     preAttackJitter_.x = nx * ampX;
     preAttackJitter_.y = ny * ampY;
@@ -1414,7 +1416,7 @@ void BossEnemy::UpdateBossProjectiles(float dt, const MapChipField& map)
 void BossEnemy::SpawnBossProjectile(const Vector3& spawnPos, const Vector3& aimDir)
 {
     Vector3 vel{ aimDir.x * projectileSpeed_, aimDir.y * projectileSpeed_, 0.0f };
-    SpawnBossProjectileRaw(spawnPos, vel, projectileLife_, 0.35f);
+    SpawnBossProjectileRaw(spawnPos, vel, projectileLife_, kProjectileRadius_);
 }
 
 void BossEnemy::SpawnBossProjectileRaw(const Vector3& spawnPos, const Vector3& velocity, float life, float radius)
@@ -1442,8 +1444,7 @@ void BossEnemy::SpawnRadialBurst(const Vector3& center, int count, float speed, 
     if (type_ != EnemyType::Boss) { return; }
     if (count <= 0) { return; }
 
-    const float twoPi = 6.283185307179586f;
-    const float step = twoPi / static_cast<float>(count);
+    const float step = kTwoPi_ / static_cast<float>(count);
 
     for (int i = 0; i < count; ++i) {
         float a = angleOffset + step * static_cast<float>(i);
@@ -1466,8 +1467,8 @@ void BossEnemy::DrawBossProjectiles()
 void BossEnemy::FinishUltimateCooldown()
 {
     float r = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
-    if (hp_ <= enrageHp_) { ultimateCD_ = 2.8f + 1.4f * r; }
-    else                 { ultimateCD_ = 4.0f + 2.0f * r; }
+    if (hp_ <= enrageHp_) { ultimateCD_ = kUltimateCooldownEnrageBase_ + kUltimateCooldownEnrageRandom_ * r; }
+    else                 { ultimateCD_ = kUltimateCooldownNormalBase_ + kUltimateCooldownNormalRandom_ * r; }
 }
 
 bool BossEnemy::CheckBossProjectileHit(const Player& player)
@@ -1476,8 +1477,8 @@ bool BossEnemy::CheckBossProjectileHit(const Player& player)
     if (!battleTriggered_) { return false; }
 
     Vector3 pPos = player.GetPosition();
-    float   pHalfW = player.GetWidth() * 0.5f;
-    float   pHalfH = player.GetHeight() * 0.5f;
+    float   pHalfW = player.GetWidth() * kHalf_;
+    float   pHalfH = player.GetHeight() * kHalf_;
 
     float pLeft   = pPos.x - pHalfW;
     float pRight  = pPos.x + pHalfW;
