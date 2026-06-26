@@ -2274,7 +2274,7 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
         makeUpHint(11, 4);
         makeUpHint(12, 4);
     }
-    // === Hub マップ（map2）: 次の関への門を指す方向矢印だけを表示する ===
+    // === Hub マップ（map2）: 次のステージ入口を指す方向矢印だけを表示する ===
     else if (mapPath == "Resources/map/map2.csv") {
         // チュートリアル用の Space / Shift ヒントは Hub では表示せず、位置だけクリアする
         spaceHint_.worldPos = { 0,0,0 };
@@ -2337,7 +2337,7 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
     playerIndexHistoryInitialized_ = true;
     playerIndexOneSecAgo_ = startIndex;
 
-    // 相机同步
+    // カメラ同期
     if (camera_) {
         camera_->SetTranslate(startPos + Vector3{ 0,0,-40 });
         prevCameraPos_ = camera_->GetTransform().translate;
@@ -2504,7 +2504,7 @@ void GameScene::HandlePlayerOnMovingPlatforms()
 
 
 
-// ================== Boss トリガー演出（カメラ推 Boss + 名字 + 回プレイヤー） ==================
+// ================== Boss トリガー演出（Boss へのカメラ寄せ + 名前表示 + プレイヤーへ戻る） ==================
 BossEnemy* GameScene::FindBossEnemy()
 {
     for (auto& e : enemies_) {

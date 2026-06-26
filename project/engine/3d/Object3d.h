@@ -16,43 +16,43 @@ class Object3d {
 
 public:
 
-	void Initialize(Object3dCommon* object3dCommon);
-	// 更新
-	void Update();
+    void Initialize(Object3dCommon* object3dCommon);
+    // 更新
+    void Update();
 
-	// 描画
-	void Draw();
+    // 描画
+    void Draw();
 
 
-	void SetModel(Model* model) { model_ = model; }
-	void SetModel(const std::string& filepath);
+    void SetModel(Model* model) { model_ = model; }
+    void SetModel(const std::string& filepath);
 
-	//transform
-	void SetTransform(const Transform& transform) { this->transform = transform; }
-	Transform GetTransform() { return transform; }
+    //transform
+    void SetTransform(const Transform& transform) { this->transform = transform; }
+    Transform GetTransform() { return transform; }
 
-	//スケール
-	void SetScale(const Vector3& scale) { transform.scale = scale; }
-	//回転
-	void SetRotate(const Vector3& rotate) { transform.rotate = rotate; }
-	//位置
-	void SetTranslate(const Vector3& translate) { transform.translate = translate; }
-	//setter
-	void SetCamera(Camera* camera) { this->camera = camera; };
+    //スケール
+    void SetScale(const Vector3& scale) { transform.scale = scale; }
+    //回転
+    void SetRotate(const Vector3& rotate) { transform.rotate = rotate; }
+    //位置
+    void SetTranslate(const Vector3& translate) { transform.translate = translate; }
+    //setter
+    void SetCamera(Camera* camera) { this->camera = camera; };
     DirectionalLight* GetDirectionalLightData() const { return directionalLightData; }
-	Model* GetModel() const { return model_; }
-	PointLight* GetPointLightData() const { return pointLightData; }
+    Model* GetModel() const { return model_; }
+    PointLight* GetPointLightData() const { return pointLightData; }
     SpotLight* GetSpotLightData() const { return spotLightData; }
-	const Vector3& GetRotate() const { return transform.rotate; }
+    const Vector3& GetRotate() const { return transform.rotate; }
     const Vector3& GetTranslate() const { return transform.translate; }
-	// 設定平行光强度
+    // 平行光源の強度を設定
     void SetDirectionalLightIntensity(float intensity);
-    // 設定点光源强度
+    // 点光源の強度を設定
     void SetPointLightIntensity(float intensity);
-    // 設定聚光灯强度
+    // スポットライトの強度を設定
     void SetSpotLightIntensity(float intensity);
 
-	void SetColor(const Vector4& color) {
+    void SetColor(const Vector4& color) {
         if (model_) {
             model_->SetColor(color);
         }
@@ -64,41 +64,41 @@ public:
         }
         return {1.0f, 1.0f, 1.0f, 1.0f};
     }
-	void SetEnableLighting(bool enable) {
-		if (model_) {
-			model_->SetEnableLighting(enable);
-		}
-	}
-	 void SetLightingMode(int mode);
+    void SetEnableLighting(bool enable) {
+        if (model_) {
+            model_->SetEnableLighting(enable);
+        }
+    }
+     void SetLightingMode(int mode);
 private:
 
-	Object3dCommon* object3dCommon_ = nullptr;
-	// モデル
-	Model* model_ = nullptr;
+    Object3dCommon* object3dCommon_ = nullptr;
+    // モデル
+    Model* model_ = nullptr;
 
-	// ModelTransform用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
-	Microsoft::WRL::ComPtr<ID3D12Resource> transformationMatrixResource;
-	// データを書き込む
-	TransformationMatrix* transformationMatrixData = nullptr;
+    // ModelTransform用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
+    Microsoft::WRL::ComPtr<ID3D12Resource> transformationMatrixResource;
+    // データを書き込む
+    TransformationMatrix* transformationMatrixData = nullptr;
 
-	// 平行光源用のResourceを作成
-	Microsoft::WRL::ComPtr<ID3D12Resource> directionalLightResource;
-	DirectionalLight* directionalLightData = nullptr;
+    // 平行光源用のResourceを作成
+    Microsoft::WRL::ComPtr<ID3D12Resource> directionalLightResource;
+    DirectionalLight* directionalLightData = nullptr;
 
-	Microsoft::WRL::ComPtr<ID3D12Resource> cameraResource;
-	CameraForGPU* cameraData = nullptr;
+    Microsoft::WRL::ComPtr<ID3D12Resource> cameraResource;
+    CameraForGPU* cameraData = nullptr;
 
-	Microsoft::WRL::ComPtr<ID3D12Resource> pointLightResource;
-	PointLight* pointLightData = nullptr;
+    Microsoft::WRL::ComPtr<ID3D12Resource> pointLightResource;
+    PointLight* pointLightData = nullptr;
 
-	Microsoft::WRL::ComPtr<ID3D12Resource> spotLightResource;
-	SpotLight* spotLightData = nullptr;
-	// SRT
-	Transform transform;
+    Microsoft::WRL::ComPtr<ID3D12Resource> spotLightResource;
+    SpotLight* spotLightData = nullptr;
+    // SRT
+    Transform transform;
     Matrix4x4 worldMatrix;
-	Matrix4x4 worldViewProjectionMatrix;
+    Matrix4x4 worldViewProjectionMatrix;
 
-	Camera* camera = nullptr;
+    Camera* camera = nullptr;
 };
 
 } // namespace MyEngine

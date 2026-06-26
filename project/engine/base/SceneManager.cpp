@@ -3,7 +3,7 @@
 namespace MyEngine {
 
 SceneManager::~SceneManager() {
-    // 最後一个场景的終止和放つ
+    // 前のシーンを終了して解放する
     if (scene_) {
         scene_->Finalize();
     }
@@ -45,7 +45,7 @@ void SceneManager::Update() {
             scene_->Finalize();
         }
 
-        // 切换到新场景
+        // 新しいシーンへ切り替える
         scene_ = std::move(nextScene_);
         if (scene_) {
             scene_->SetSceneManager(this);

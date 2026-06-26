@@ -321,7 +321,7 @@ private:
     float baseHurtW_ = 0.0f;
     float baseHurtH_ = 0.0f;
 
-    // Dash 時縮小判定比例（さらに当てにくくしたいなら 0.60/0.75 などに下げる）
+    // Dash 時の当たり判定縮小率（さらに当てにくくしたい場合は 0.60 / 0.75 などに下げる）
     float dashHurtScaleX_ = kDashHurtScaleX_;
     float dashHurtScaleY_ = kDashHurtScaleY_;
 
@@ -346,7 +346,7 @@ private:
         Shoot,
         Barrage,   // 回転弾幕
         Nova,      // 円形爆発
-        Jump,      // 跳起
+        Jump,      // 跳び上がり
         Slam,      // 着地叩きつけ
         Ultimate,
         Rest,
@@ -360,25 +360,25 @@ private:
 
     float stateTimer_ = 0.0f;   // 予備動作/攻撃
     float decisionTimer_ = 0.0f;
-    int   facing_ = 1;      // 1右 -1左
-    int   attackFacing_ = 1;      // 本次攻撃向きを固定
+    int   facing_ = 1;      // 1: 右 / -1: 左
+    int   attackFacing_ = 1;      // 今回の攻撃向きを固定
 
     // Dash の持続時間
     float queuedDashDuration_ = kBarrageWindupTime_;
     float queuedDashSpeed_ = kDashSpeed_;  // Dash 実際に使う速度
     bool  isShortDash_ = false;
 
-    float dashBackstepDist_      = 0.75f; // 普通ダッシュ: 後退距離（ワールド座標）
+    float dashBackstepDist_      = 0.75f; // 通常ダッシュ: 後退距離（ワールド座標）
     float dashBackstepDistShort_ = kDashSpeed_; // 密着小ダッシュ: 後退距離
     float dashBackstepMaxSpeed_  = 0.11f; // 後退最大速度（60fps 基準の1フレーム移動量）
     float dashBackstepMinSpeed_  = 0.03f; // 後退最小速度（遅すぎて分かりにくくならないようにする）
     float dashWindupTotal_       = 0.0f;  // 今回の Dash Windup 総時間を記録し、時間に応じて均等に後退させる
-    float dashBackstepMoved_     = 0.0f;  // 本次 Windup 後退済み距離（打ち切り用）
+    float dashBackstepMoved_     = 0.0f;  // 今回の Windup で後退済みの距離（打ち切り用）
     float ultimateWindupBackstepDist_      = 2.00f; // 必殺技発動前: 後退距離（通常より長い）
     float ultimateWindupBackstepMaxSpeed_  = 0.14f; // Windup 後退最大速度（60fps 基準の1フレーム移動量）
     float ultimateWindupBackstepMinSpeed_  = 0.04f; // Windup 後退最小速度
     float ultimateWindupTotal_             = 0.0f;  // 今回の必殺技 Windup の総時間を記録
-    float ultimateWindupBackstepMoved_     = 0.0f;  // Windup 已後退距離（打ち切り用）
+    float ultimateWindupBackstepMoved_     = 0.0f;  // Windup で後退済みの距離（打ち切り用）
 
     // 前フレームのプレイヤーとの距離を記録
     float prevDistToPlayer_ = 1e9f;
@@ -387,15 +387,15 @@ private:
     float globalAttackCD_ = 0.0f;
     float meleeCD_ = 0.0f;  // 近接クールダウン
     float dashCD_ = 0.0f;  // ダッシュクールダウン
-    float microDashCD_ = 0.0f;  // 小ダッシュ冷却（dashCD_ を消費しない）
-    float rangedCD_ = 0.0f;  // 远程冷却
+    float microDashCD_ = 0.0f;  // 小ダッシュクールダウン（dashCD_ を消費しない）
+    float rangedCD_ = 0.0f;  // 遠距離攻撃クールダウン
     float barrageCD_ = 0.0f;  // 回転弾幕クールダウン
     float slamCD_ = 0.0f;  // 叩きつけクールダウン
     float novaCD_ = 0.0f;  // 円形爆発クールダウン
     float ultimateCD_ = kSlamCooldownEnrage_;  // 必殺技クールダウン（開幕少し遅延を持たせる）
     int   ultimateBounces_ = 0;    // 必殺技: 反射回数
 
-    // ---------- 调参区 ----------
+    // ---------- 調整用パラメータ ----------
     float moveSpeed_ = kMoveSpeed_;  // 追跡速度（「1フレーム移動量」）
     float dashSpeed_ = kDashSpeed_;  // ダッシュ速度（1フレーム移動量）
     float jumpVel_ = kJumpVelocity_;
@@ -426,8 +426,8 @@ private:
     int   ultimateMaxBounces_ = kUltimateMaxBounces_;    // 反射回数（4=左右往復 2 セット）
     float restDuration_ = kRestDuration_;
 
-    float leadTime_ = kLeadTime_;           // 追跡予判: playerPos + playerVel * leadTime
-    float projectileLeadTime_ = kProjectileLeadTime_; // 弾幕照準予判
+    float leadTime_ = kLeadTime_;           // 追跡予測: playerPos + playerVel * leadTime
+    float projectileLeadTime_ = kProjectileLeadTime_; // 弾幕照準の予測時間
 
     // ---------- Boss 弾幕（オブジェクトプール） ----------
     struct BossProjectile {
@@ -443,11 +443,11 @@ private:
     static constexpr int kMaxBossProjectiles_ = 48;
     std::vector<BossProjectile> projectiles_;
 
-    float projectileSpeed_ = kProjectileSpeed_;  // 1フレーム移動量（跟 dashSpeed_ 同じスケール）
+    float projectileSpeed_ = kProjectileSpeed_;  // 1フレーム移動量（dashSpeed_ と同じスケール）
     float projectileLife_ = kProjectileLife_;  // 秒
 
     // ---------- 追加: 派手な技のパラメータ ----------
-    // 旋转弾幕（Barrage）: Boss を中心に回転しながら発射
+    // 回転弾幕（Barrage）: Boss を中心に回転しながら発射
     float barrageDuration_ = kBarrageDuration_; // 秒
     float barrageFireInterval_ = kBarrageFireInterval_; // 秒
     float barrageFireTimer_ = 0.0f;
@@ -477,7 +477,7 @@ private:
     float novaFireTimer_ = 0.0f;
     int   novaRingsLeft_ = 0;
 
-    // 叩きつけ（Slam）: 跳び上がり後落地生成「左右の衝撃波 + 破片」
+    // 叩きつけ（Slam）: 跳び上がり後の着地時に「左右の衝撃波 + 破片」を生成
     float slamWindup_ = kSlamWindup_;
     float slamJumpVel_ = kSlamJumpVelocity_;
     float slamMaxAirTime_ = kSlamMaxAirTime_; // failsafe

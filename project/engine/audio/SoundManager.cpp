@@ -28,7 +28,7 @@ void SoundManager::Finalize() {
             voice.sourceVoice->Stop();
             voice.sourceVoice->FlushSourceBuffers();
             voice.sourceVoice->DestroyVoice();
-            voice.sourceVoice = nullptr; 
+            voice.sourceVoice = nullptr;
         }
     }
     activeVoices_.clear();
@@ -119,7 +119,7 @@ void SoundManager::LoadMp3(const std::string& name, const std::string& filepath)
     sounds_[name] = std::move(sound);
 }
 
-// ----------------- 播放 / 控制 -------------------
+// ----------------- 再生 / 制御 -------------------
 int SoundManager::Play(const std::string& name, bool loop, float volume) {
     auto it = sounds_.find(name);
     if (it == sounds_.end()) return -1;

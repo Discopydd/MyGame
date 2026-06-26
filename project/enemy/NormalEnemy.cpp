@@ -35,7 +35,7 @@ namespace {
         // 少し下に伸ばして、確実に「ちょうど接地（bottom==tileTop）」も検出できるようにする
         const float probeY = pos.y - halfH - 0.08f;
 
-        // 3 点サンプリング: 中/左脚/右脚（中心だけを見ると足先が端のトゲに触れても見逃すため）
+        // 3 点サンプリング: 中央 / 左足 / 右足（中心だけを見ると足先が端のトゲに触れても見逃すため）
         const float xs[3] = {
             pos.x,
             pos.x - halfW * 0.65f,
@@ -227,7 +227,7 @@ void NormalEnemy::Initialize(Object3dCommon* common, Camera* camera, const Vecto
     deathTimer_ = 0.0f;
     deathSpin_ = 0.0f;
 
-    // 記録「存活時衝突尺寸」（死亡アニメ中のマップ衝突用）
+    // 生存時の衝突サイズを記録する（死亡アニメ中のマップ衝突用）
     aliveWidth_ = width_;
     aliveHeight_ = height_;
 

@@ -62,7 +62,7 @@ public:
     // Boss: 踏みつけ無敵時間が終了したかどうか（GameScene 側で重複ダメージを避けるために使用）
     virtual bool CanTakeStompDamage() const { return stompInvuln_ <= 0.0f; }
 
-    // ====== Boss 远程弾幕命中判定（GameScene 呼び出す）======
+    // ====== Boss 遠距離弾幕の命中判定（GameScene から呼び出す）======
     // 命中すると弾丸を消費し（inactive）、true を返す
     virtual bool CheckBossProjectileHit(const Player& /*player*/) { return false; }
 
@@ -79,7 +79,7 @@ public:
     PlayerContact CheckPlayerContact(const Player& player, float stompMargin = 0.10f) const;
 
 protected:
-    // --- 共有初期化 / より新 / 绘制 ---
+    // --- 共有初期化 / 更新 / 描画 ---
     void InitializeCommon(MyEngine::Object3dCommon* common, MyEngine::Camera* camera, const MyEngine::Vector3& spawnPos, EnemyType type);
     // false を返した場合は死亡済みを示す（元ロジック: 死亡後は即 return）
     bool UpdateCommon(float dt);

@@ -65,7 +65,7 @@ preAttackJitterTime_ = 0.0f;
     hitReactTimer_ = 0.0f;
     damageBlinkTimer_ = 0.0f;
     damageBlinkVisible_ = true;
-    // デフォルトの点滅頻度（Boss で下面覆写成より快少し）
+    // デフォルトの点滅頻度（Boss では下側を少し速く点滅させる）
     damageBlinkInterval_ = kDefaultDamageBlinkInterval_;
 
     velocity_ = kZeroVector_;
@@ -122,7 +122,7 @@ preAttackJitterTime_ = 0.0f;
     width_  = kDefaultEnemyWidth_;
     height_ = kDefaultEnemyHeight_;
 
-    // 敵タイプに応じてモデルを切り替える（パスはプロジェクトのリソースに合わせて変より）
+    // 敵タイプに応じてモデルを切り替える（パスはプロジェクトのリソースに合わせて変更する）
     switch (type_) {
     case EnemyType::Type0:
         obj_->SetModel("enemy0/enemy0.obj");
@@ -139,13 +139,13 @@ preAttackJitterTime_ = 0.0f;
         // Boss 被弾点滅
         damageBlinkInterval_ = kBossDamageBlinkInterval_;
 
-        // ===== 拡大 Boss（モデル）+ 增加当たり判定サイズ =====
+        // ===== 拡大 Boss（モデル）+ 当たり判定サイズの拡大 =====
         const float kBossScale = kBossModelScale_;
 
         // 見た目だけ下げる（モデル原点が足元に無い＆拡大で浮いて見える対策）
         visualOffsetY_ = kBossVisualOffsetY_;
 
-        // 当たり判定サイズ（AABB）跟着拡大
+        // 当たり判定サイズ（AABB）も合わせて拡大
         width_  = kBossBaseWidth_ * kBossScale;
         height_ = kBossBaseHeight_ * kBossScale;
 
@@ -178,7 +178,7 @@ preAttackJitterTime_ = 0.0f;
         break;
     }
 
-    // --- 判定尺寸初期化 ---
+    // --- 判定サイズの初期化 ---
     baseHurtW_ = width_;
     baseHurtH_ = height_;
     mapColliderW_ = width_;
@@ -232,7 +232,7 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
         }
 
 
-        // 先により新弾幕（Boss 本体とプレイヤーの重なりには依存しない）
+        // 先に弾幕を更新する（Boss 本体とプレイヤーの重なりには依存しない）
         UpdateBossProjectiles(dt, map);
 
         // ---- 向き更新（Dash/Melee/Windup/Shoot 中は固定し、急な反転を避ける）----
@@ -251,7 +251,7 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
         const bool playerMovingAway = (pVel.x * facing_ > kPlayerMovingAwayThreshold_);      // プレイヤーが Boss から離れる方向に走っている
         const bool distIncreasing = (dist > prevDistToPlayer_ + kDistanceIncreasingMargin_); // 距離が広がっている（引き撃ち）
         prevDistToPlayer_ = dist;
-        // ---- 计時器 ----
+        // ---- タイマー ----
         decisionTimer_ = (std::max)(0.0f, decisionTimer_ - dt);
         stateTimer_ = (std::max)(0.0f, stateTimer_ - dt);
 
@@ -332,7 +332,7 @@ if (!wantsJitter) {
                 const bool canDashAny = (dashCD_ <= 0.0f);
 
                 // この距離内では遠距離攻撃を禁止し、小ダッシュへ切り替える
-                const float pointBlankRange = meleeRange_ + kPointBlankRangeMargin_; // 约 2.6
+                const float pointBlankRange = meleeRange_ + kPointBlankRangeMargin_; // 約 2.6
                 const bool  tooCloseForRanged = (dist <= pointBlankRange);
 
                 const bool canRanged = (!tooCloseForRanged && dist >= rangedMinRange_ && dist <= rangedMaxRange_ && rangedCD_ <= 0.0f);
@@ -383,7 +383,7 @@ if (!wantsJitter) {
                     globalAttackCD_ = kNovaGlobalCooldown_;
                     decisionTimer_ = kNovaDecisionDelay_;
                 }
-                // 旋转弾幕: 中遠距離制圧（より派手）、プレイヤーずっと後退時より容易トリガー
+                // 回転弾幕: 中遠距離を制圧する派手な攻撃。プレイヤーが後退し続けたときに発動しやすくする
                 else if (canBarrage && (hp_ <= enrageHp_ || playerMovingAway || dist >= farRangedPrefer_)) {
                     queuedAttack_ = BossAttack::Barrage;
                     bossState_ = BossState::Windup;
@@ -395,7 +395,7 @@ if (!wantsJitter) {
                     globalAttackCD_ = kBarrageGlobalCooldown_;
                     decisionTimer_ = kBarrageDecisionDelay_;
                 }
-                // 遠距離: 優先に远程制圧
+                // 遠距離: 遠距離制圧を優先する
                 else if (canRanged && dist >= farRangedPrefer_ && dist > dashMaxRange_) {
                     queuedAttack_ = BossAttack::Ranged;
                     bossState_ = BossState::Windup;
@@ -406,7 +406,7 @@ if (!wantsJitter) {
                     globalAttackCD_ = kRangedGlobalCooldown_;
                     decisionTimer_ = kRangedDecisionDelay_;
                 }
-                // プレイヤー接近: 朝プレイヤーダッシュ（ただし連続では突進せず、dashCD_ で制御する）
+                // プレイヤー接近: プレイヤー方向へダッシュ（ただし連続では突進せず、dashCD_ で制御する）
                 else if (canDashAny && dist <= closeDashRange_) {
                     queuedAttack_ = BossAttack::Dash;
                     bossState_ = BossState::Windup;
@@ -442,7 +442,7 @@ if (!wantsJitter) {
                     decisionTimer_ = kMicroDashDecisionDelay_;
                 }
 
-                // 中距離: 择机ダッシュ（プレイヤーが引き撃ち／距離を取っている時に発動しやすい）
+                // 中距離: 状況を見てダッシュする（プレイヤーが引き撃ち／距離を取っている時に発動しやすい）
                 else if (canDashAny && dist >= dashMinRange_ && dist <= dashMaxRange_
                     && (playerMovingAway || distIncreasing || dist <= kMiddleDashNearRange_)) {
                     queuedAttack_ = BossAttack::Dash;
@@ -460,7 +460,7 @@ if (!wantsJitter) {
                     globalAttackCD_ = kMiddleDashGlobalCooldown_;
                     decisionTimer_ = kMiddleDashDecisionDelay_;
                 }
-                // 保険: まだ远程そのまま远程
+                // 保険: 条件が残っている場合は遠距離攻撃を継続する
                 else if (canRanged) {
                     queuedAttack_ = BossAttack::Ranged;
                     bossState_ = BossState::Windup;
@@ -508,7 +508,7 @@ if (!wantsJitter) {
                     v = remaining / step;
                 }
 
-                // 面向プレイヤー、反方向後退
+                // プレイヤー方向を向き、反対方向へ後退
                 velocity_.x = -static_cast<float>(attackFacing_) * v;
             }
 
@@ -536,7 +536,7 @@ if (!wantsJitter) {
                     v = remaining / step;
                 }
 
-                // 面向ダッシュ方向、反方向後退（初動）
+                // ダッシュ方向を向き、反対方向へ後退（初動）
                 velocity_.x = -static_cast<float>(attackFacing_) * v;
             }
             if (stateTimer_ <= 0.0f) {
@@ -565,30 +565,30 @@ if (!wantsJitter) {
                     else {
                         bossState_ = BossState::Shoot;
 
-                        // -------- 射撃模式选择 --------
+                        // -------- 射撃パターンの選択 --------
                         // 低HP & 中距離では「扇状散布」に切り替えてより派手にする
                         fanShot_ = (hp_ <= enrageHp_) && (dist <= kFanShotMaxDistance_);
 
                         if (fanShot_) {
                             stateTimer_ = kFanShotStateTime_;
-                            shotsTotal_ = kFanShotWaveCount_;           // 2 波の散射
+                            shotsTotal_ = kFanShotWaveCount_;           // 2 波の散布
                             shotInterval_ = kFanShotInterval_;
                         }
                         else {
-                            // 原有: 単発 / 3連射（縦方向の散布）
+                            // 従来パターン: 単発 / 3連射（縦方向の散布）
                             stateTimer_ = (hp_ <= enrageHp_) ? kEnrageShotStateTime_ : kNormalShotStateTime_;
                             shotsTotal_ = (hp_ <= enrageHp_) ? kEnrageShotCount_ : kNormalShotCount_;
                             shotInterval_ = kShotInterval_;
                         }
 
                         shotsLeft_ = shotsTotal_;
-                        shotTimer_ = 0.0f; // 立即発射
+                        shotTimer_ = 0.0f; // 即時発射
                     }
                 }
                 else if (queuedAttack_ == BossAttack::Barrage) {
                     bossState_ = BossState::Barrage;
 
-                    // 低HP時より久、より密集
+                    // 低HP時は持続時間を長くし、密度を高める
                     stateTimer_ = (hp_ <= enrageHp_) ? (barrageDuration_ + kBarrageEnrageDurationBonus_) : barrageDuration_;
                     barrageFireTimer_ = 0.0f;
                     barrageBurstTimer_ = barrageBurstInterval_ * kBarrageBurstStartRate_;
@@ -601,7 +601,7 @@ if (!wantsJitter) {
                 else if (queuedAttack_ == BossAttack::Nova) {
                     bossState_ = BossState::Nova;
 
-                    // 低HP時多1リング、より密集
+                    // 低HP時はリングを 1 つ増やし、密度を高める
                     // すべてのリングを出し切るだけの十分な時間を確保する
                     novaFireTimer_ = 0.0f; // 最初のリングを即時に放つ
                     novaRingsLeft_ = (hp_ <= enrageHp_) ? novaRingsEnrage_ : novaRingsNormal_;
@@ -625,7 +625,7 @@ if (!wantsJitter) {
                     stateTimer_ = ultimateDuration_;
                     ultimateBounces_ = 0;
                     // 必殺技開始時に向きを 1 方向へ固定し、まずプレイヤーのいる方向へ突っ込む
-                    attackFacing_ = (pPos.x - position_.x >= 0.0f) ? -1 : 1; // 朝プレイヤー方向
+                    attackFacing_ = (pPos.x - position_.x >= 0.0f) ? -1 : 1; // プレイヤー方向へ向ける
                     facing_ = attackFacing_;
                 }
                 else {
@@ -646,7 +646,7 @@ if (!wantsJitter) {
 
         case BossState::Ultimate:
 {
-    // 必殺技: 左右来回ダッシュ
+    // 必殺技: 左右往復ダッシュ
     // 要件: 必殺技直前（Windup）で 1 回だけ後退し、必殺技中の往復反射では追加の後退を行わない
     velocity_.x = attackFacing_ * ultimateSpeed_;
 
@@ -662,7 +662,7 @@ if (!wantsJitter) {
 }
 
         case BossState::Rest:
-            // 大招後休息几秒
+            // 必殺技後は数秒間休憩する
             velocity_.x = 0.0f;
             if (stateTimer_ <= 0.0f) {
                 bossState_ = BossState::Chase;
@@ -677,11 +677,11 @@ if (!wantsJitter) {
             preAttackJitterTime_ = 0.0f;
 
 
-            // 旋转弾幕: その場で発射、靠角度持続旋转制造「弾幕地獄」效果
+            // 回転弾幕: その場で発射し、角度を継続的に回転させて「弾幕地獄」の演出にする
             velocity_.x = 0.0f;
             facing_ = attackFacing_;
 
-            // 低HP時より密集/旋转より快
+            // 低HP時は密度を高め、回転速度も上げる
             const float fireInterval = (hp_ <= enrageHp_) ? (barrageFireInterval_ * kBarrageEnrageFireIntervalRate_) : barrageFireInterval_;
             const float angSpeed = (hp_ <= enrageHp_) ? (barrageAngularSpeed_ * kBarrageEnrageSpeedRate_) : barrageAngularSpeed_;
 
@@ -714,7 +714,7 @@ if (!wantsJitter) {
                     SpawnBossProjectileRaw(spawn, vel, barrageProjectileLife_, kBarrageShotRadius_);
                 }
 
-                // 角度推進: 按回転方向旋转
+                // 角度更新: 回転方向に従って回転させる
                 barrageAngle_ += angSpeed * fireInterval * barrageSpinDir_;
             }
 
@@ -785,7 +785,7 @@ if (!wantsJitter) {
             preAttackJitter_ = kZeroVector_;
             preAttackJitterTime_ = 0.0f;
 
-            // 跳び上がり叩きつけ: 空中不做水平移動（予備動作を読みやすくする）
+            // 跳び上がり叩きつけ: 空中では水平移動しない（予備動作を読みやすくする）
             velocity_.x = 0.0f;
             facing_ = attackFacing_;
 
@@ -807,14 +807,14 @@ if (!wantsJitter) {
             if (!slamSpawned_) {
                 slamSpawned_ = true;
 
-                // 衝撃波: 沿地面左右拡散
+                // 衝撃波: 地面に沿って左右へ拡散する
                 Vector3 base = position_;
                 base.y -= height_ * kSlamBaseHeightRate_ - kSlamBaseLiftOffset_;
 
                 SpawnBossProjectileRaw(base, { -slamWaveSpeed_, 0.0f, 0.0f }, slamWaveLife_, kSlamWaveRadius_);
                 SpawnBossProjectileRaw(base, {  slamWaveSpeed_, 0.0f, 0.0f }, slamWaveLife_, kSlamWaveRadius_);
 
-                // 破片: 向上扇形噴き出す（より派手）
+                // 破片: 上方向へ扇状に噴き出す（より派手）
                 auto emitShard = [&](float x, float y) {
                     float len = std::sqrt(x * x + y * y);
                     if (len < kSmallEpsilon_) { len = 1.0f; }
@@ -871,7 +871,7 @@ if (!wantsJitter) {
             velocity_.x = 0.0f;
             facing_ = attackFacing_;
 
-            // 连射计時
+            // 連射タイマー
             shotTimer_ -= dt;
 
             if (shotsLeft_ > 0 && shotTimer_ <= 0.0f) {
@@ -883,7 +883,7 @@ if (!wantsJitter) {
                 // 目標を予測
                 Vector3 aimTarget{ pPos.x + pVel.x * projectileLeadTime_, pPos.y + pVel.y * projectileLeadTime_, 0.0f };
 
-                // -------- 弾幕模式: 扇状散布 / 原有3連射 --------
+                // -------- 弾幕パターン: 扇状散布 / 従来の3連射 --------
                 // 3連射: 少し縦方向に散らす
                 int shotIndex = shotsTotal_ - shotsLeft_; // 0..shotsTotal_-1
                 if (!fanShot_ && shotsTotal_ >= kEnrageShotCount_) {
@@ -901,8 +901,8 @@ if (!wantsJitter) {
                 }
 
                 if (fanShot_) {
-                    // 基准角
-                    // 第二波やや微旋转、見た目がより豊か
+                    // 基準角度
+                    // 第2波は少しだけ回転させ、見た目をより豊かにする
                     float base = std::atan2(dir.y, dir.x) + kFanShotBaseRotateStep_ * static_cast<float>(shotIndex);
                     const int nBase = (fanCount_ < 2) ? 2 : fanCount_;
                     const int n = (hp_ <= enrageHp_) ? (nBase + 2) : nBase;
@@ -948,17 +948,17 @@ if (!wantsJitter) {
         const bool wasOnGround = isOnGround_;
         ResolveMapCollision(map, dt);
 
-        // Dash Windup: 累计後退距離（打ち切り用）
+        // Dash Windup: 後退距離の累計（打ち切り用）
         if (bossState_ == BossState::Windup && queuedAttack_ == BossAttack::Dash) {
             dashBackstepMoved_ += std::fabs(position_.x - prevXBeforeMove);
         }
-        // Ultimate Windup: 累计後退距離（打ち切り用）
+        // Ultimate Windup: 後退距離の累計（打ち切り用）
         if (bossState_ == BossState::Windup && queuedAttack_ == BossAttack::Ultimate) {
             ultimateWindupBackstepMoved_ += std::fabs(position_.x - prevXBeforeMove);
         }
 
 
-        // Jump -> Slam: 检测落地瞬間トリガー叩きつけ
+        // Jump -> Slam: 着地瞬間を検出して叩きつけをトリガーする
         if (bossState_ == BossState::Jump && !wasOnGround && isOnGround_) {
             bossState_ = BossState::Slam;
             stateTimer_ = slamImpactHold_;
@@ -971,7 +971,7 @@ if (!wantsJitter) {
             stateTimer_ = kDashWallRecoverTime_; // 壁衝突ペナルティのウィンドウ
         }
 
-        // Ultimate: 碰到ブロック/トゲそのまま算「反射/トリガー」、来回几次後入る休息
+        // Ultimate: ブロック / トゲへの接触を「反射 / トリガー」として扱い、数回往復した後に休憩へ移行する
         if (bossState_ == BossState::Ultimate) {
             // トゲ判定: 足元のマスがトゲなら、その場で即座に必殺技を終了する
             {
@@ -983,7 +983,7 @@ if (!wantsJitter) {
                 if (t == MapChipType::kSpike) {
                     bossState_ = BossState::Rest;
                     stateTimer_ = restDuration_;
-                    // 終了必殺技: 復帰 CD
+                    // 必殺技終了: 復帰 CD
                     FinishUltimateCooldown();
                     ultimateLocked_ = false;
 
@@ -1041,7 +1041,7 @@ if (!wantsJitter) {
             height_ = baseHurtH_;
         }
     }
-    // ===== 渲染更新 =====
+    // ===== 描画更新 =====
     if (obj_) {
         // Boss のモデルは左向き
         if (type_ == EnemyType::Boss) {
@@ -1078,10 +1078,10 @@ void BossEnemy::OnStomp()
     if (stompInvuln_ > 0.0f) { return; }
 
     if (type_ == EnemyType::Boss) {
-        // Boss: 踏みつけ 30 次死亡（デフォルト）
+        // Boss: 踏みつけ 30 回で死亡（デフォルト）
         hp_ -= 1;
 
-        // 被弾フィードバック: 点滅より久少し + 短硬直（より容易连续踩）
+        // 被弾フィードバック: 点滅を少し長めにし、短い硬直を入れる（連続で踏みやすくする）
         StartHitReaction(kBossHitReactTime_);
         bossState_ = BossState::Stunned;
         stateTimer_ = kBossStunnedTime_;
@@ -1102,7 +1102,7 @@ void BossEnemy::OnStomp()
         }
     }
     else {
-        // 通常敵: 先に保留原挙動（1回だけ点滅）
+        // 通常敵: 従来の挙動を維持する（1回だけ点滅）
         StartHitReaction(kNormalHitReactTime_);
         stompInvuln_ = kNormalStompInvulnTime_;
     }
@@ -1181,7 +1181,7 @@ void BossEnemy::ResolveMapCollision(const MapChipField& map, float dt)
                 bool overlapY = !(top   <= r.bottom || bottom >= r.top);
                 if (overlapX && overlapY) {
                     hitY = true;
-                    if (velocity_.y > 0.0f) {          // 頂头
+                    if (velocity_.y > 0.0f) {          // 頭上衝突
                         fixY = r.bottom - kHalfH;
                         velocity_.y = 0.0f;
                     } else if (velocity_.y < 0.0f) {   // 着地
@@ -1211,9 +1211,9 @@ bool BossEnemy::IsPlayerOnGround(const MapChipField& map, const Player& player) 
     const float probeY = kGroundProbeOffsetY_;
 
     Vector3 probes[kGroundProbeCount_] = {
-        { pPos.x,                 pPos.y - halfH - probeY, 0.0f }, // 脚底中点
-        { pPos.x - halfW * kFootProbeXScale_, pPos.y - halfH - probeY, 0.0f }, // 左脚
-        { pPos.x + halfW * kFootProbeXScale_, pPos.y - halfH - probeY, 0.0f }, // 右脚
+        { pPos.x,                 pPos.y - halfH - probeY, 0.0f }, // 足裏中央
+        { pPos.x - halfW * kFootProbeXScale_, pPos.y - halfH - probeY, 0.0f }, // 左足
+        { pPos.x + halfW * kFootProbeXScale_, pPos.y - halfH - probeY, 0.0f }, // 右足
     };
 
     for (const auto& q : probes) {

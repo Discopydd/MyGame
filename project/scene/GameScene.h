@@ -144,7 +144,7 @@ private:
     std::string pendingPortalMapPath_;
     MyEngine::Vector3     pendingPortalStartPos_;
 
-    // === GameClear / 回タイトル用フラグ ===
+    // === GameClear / タイトルへ戻るためのフラグ ===
     bool pendingGameClear_ = false;  // E でクリアをトリガーした時、黒幕が完全な黒になるのを待ってから勝利演出へ入るために使う
     bool returnToTitle_    = false;  // 勝利画面で Space を押した後、黒幕フェードアウトで Title へ戻る
 
@@ -170,10 +170,10 @@ private:
     int totalCoinCollected_ = 0;
 
     // ==== Hub（map2）解放進捗 ====
-    // 0: 第1関入口だけ解放
-    // 1: 第2関まで解放
-    // 2: 第3関まで解放
-    // 3: 最終関入口まで解放
+    // 0: 第1ステージ入口だけ解放
+    // 1: 第2ステージまで解放
+    // 2: 第3ステージまで解放
+    // 3: 最終ステージ入口まで解放
     // 4: 全ステージクリア
     int  hubProgress_      = 0;
     bool allStagesCleared_ = false;
@@ -216,7 +216,7 @@ private:
     // 踏みつけロック: 同じ敵に対しては、プレイヤーがその当たり判定から離れるまで再判定しない（頭上での棒立ち無限踏みを防ぐ）
     Enemy* stompLockEnemy_ = nullptr;
 
-    
+
     // ================== Boss HP（2D） ==================
     std::unique_ptr<MyEngine::Sprite> bossHpDamageSprite_; // 赤: 遅れて減る HP バー
     std::unique_ptr<MyEngine::Sprite> bossHpSprite_;       // 緑: 即時 HP バー
@@ -230,7 +230,7 @@ private:
     bool  bossHpVisible_    = false;
 
 
-    // ================== Boss トリガー演出（カメラ推 Boss + 名字 + 回プレイヤー） ==================
+    // ================== Boss トリガー演出（Boss へのカメラ寄せ + 名前表示 + プレイヤーへ戻る） ==================
     enum class BossIntroPhase {
         None,
         ToBoss,      // カメラをプレイヤーから Boss へ寄せる
@@ -255,7 +255,7 @@ private:
     // —— 調整可能なパラメータ（より映画的にしたい場合はここをそのまま調整）——
     float bossIntroBossFovY_   = 0.28f;            // Boss へ寄せた時の FOV（小さいほど近い）
     float bossIntroBossZ_      = -25.0f;           // Boss へ寄せた時のカメラ Z（0 に近いほど近い）
-    // ★ 推カメラ/展示名時: カメラ全体を少し下へずらす
+    // ★ カメラ寄せ / 名前表示時: カメラ全体を少し下へずらす
     // 注意: このプロジェクトのワールド座標 Y 軸は「下が正」のようなので、「下へ」は +Y を使う。
     // もしシーンが「上が正」の場合は、この値を負数へ変更すればよい。
     MyEngine::Vector3 bossIntroBossCamOffset_ = {0.0f, 0.0f, 0.0f};

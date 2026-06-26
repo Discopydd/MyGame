@@ -241,7 +241,7 @@ void GameClearManager::Update(float dt) {
 
     t_ += dt;
 
-    // 波动速度对齐 GameOver
+    // 波動速度を GameOver と合わせる
     ringPulseT_ += dt;
     ringRotation_ += dt * 0.45f;
     if (ringRotation_ > kPi * 2.0f) {
@@ -252,14 +252,14 @@ void GameClearManager::Update(float dt) {
 
     switch (state_) {
     case State::SlideTitle: {
-        // ===== 标题保持原来的 Clear 演出：只滑入，不做呼吸缩放 =====
+        // ===== タイトルは従来の Clear 演出を維持する: スライドインのみで呼吸スケールは行わない =====
         float d = Clamp01_(t_ / titleSlideTime_);
         float e = EaseOutBack_(d);
 
         titlePos_.x = titleStartPos_.x + (titleEndPos_.x - titleStartPos_.x) * e;
         titlePos_.y = titleStartPos_.y + (titleEndPos_.y - titleStartPos_.y) * e;
 
-        // ===== 背景 / 圆环波动改成 GameOver 节奏 =====
+        // ===== 背景 / 円環の波動を GameOver と同じテンポに合わせる =====
         const float ringSize = ringBaseSize_.x * (1.0f + 0.04f * std::sin(ringPulseT_ * 3.1f));
         const float backdropAlpha = 0.58f + 0.05f * std::sin(ringPulseT_ * 2.2f);
 
@@ -278,7 +278,7 @@ void GameClearManager::Update(float dt) {
 
         if (titleSprite_) {
             titleSprite_->SetPosition(titlePos_);
-            titleSprite_->SetSize(titleSize_);   // 保持原尺寸
+            titleSprite_->SetSize(titleSize_);   // 元のサイズを維持
             titleSprite_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
             titleSprite_->Update();
         }
@@ -295,7 +295,7 @@ void GameClearManager::Update(float dt) {
     }
 
     case State::PlayerShow: {
-        // ===== 标题保持之前一样：不漂浮、不缩放 =====
+        // ===== タイトルは従来どおり、浮遊も拡縮もしない =====
         const float ringPulse = 1.0f + 0.05f * std::sin(ringPulseT_ * 2.5f);
         const float promptAlpha = 0.35f + 0.65f * (std::sin(ringPulseT_ * 4.2f) * 0.5f + 0.5f);
         const float promptFloat = std::sin(ringPulseT_ * 2.1f) * 6.0f;
@@ -315,8 +315,8 @@ void GameClearManager::Update(float dt) {
         }
 
         if (titleSprite_) {
-            titleSprite_->SetPosition(titleEndPos_);  // 固定，不动
-            titleSprite_->SetSize(titleSize_);        // 固定，不缩放
+            titleSprite_->SetPosition(titleEndPos_);  // 固定し、動かさない
+            titleSprite_->SetSize(titleSize_);        // 固定し、拡縮しない
             titleSprite_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
             titleSprite_->Update();
         }

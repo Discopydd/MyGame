@@ -10,7 +10,7 @@ class WinApp {
 private:
     HWND hwnd = nullptr;
     WNDCLASS wc{};
-    WinApp() = default; // 禁止外部构造
+    WinApp() = default; // 外部からの生成を禁止
     ~WinApp() = default;
 
 public:
@@ -21,9 +21,9 @@ public:
     static constexpr int32_t kClientHeight = 720;
 
     void Initialize();
-    // 
+    //
     bool ProcessMessage();
-    // 
+    //
     void Finalize();
 
     HWND GetHwnd() const { return hwnd; }

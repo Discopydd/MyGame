@@ -28,7 +28,7 @@ private:
     float type0JumpCooldownTime_ = 0.90f;
 
     // ---------- Type1（enemy2）: 追跡 + 跳跃越障 ----------
-    float chaseSpeed_ = 0.10f;           // Type1 横方向速度（比巡回やや快）
+    float chaseSpeed_ = 0.10f;           // Type1 横方向速度（巡回よりやや速い）
     float chaseBoostSpeed_ = 0.14f;      // 離れている時の追跡ブースト
     float smallJumpVelocity_ = 0.36f;    // 低ジャンプ: トゲ/小さな段差
     float highJumpVelocity_ = 0.52f;     // 高ジャンプ: 壁 / 高い段差
@@ -49,9 +49,9 @@ private:
     Type1State type1State_ = Type1State::Patrol;
 
     MyEngine::Vector3 homePos_{};            // スポーン地点（「家」）
-    float aggroRange_ = 12.0f;      // 警戒範囲: プレイヤー入るで初めて追う
+    float aggroRange_ = 12.0f;      // 警戒範囲: プレイヤーが範囲内に入ると追跡を開始する
     float leashRange_ = 20.0f;      // リーシュ範囲: 超えたら追跡をやめて戻る
-    float patrolHalfWidth_ = 0.0f;  // 家付近巡回半幅；0=棒立ち
+    float patrolHalfWidth_ = 0.0f;  // 初期位置付近の巡回半幅。0 の場合はその場で待機する
     float returnStopDist_ = 0.25f;  // 帰還判定距離
 
     // ---------- Type2（enemy3）: 間合い管理 + 飛びかかり ----------
@@ -76,6 +76,6 @@ private:
     bool  isDying_ = false;
     float deathTimer_ = 0.0f;
     float deathDuration_ = 0.45f;
-    float deathSpin_ = 0.0f;             // Z 轴旋转
+    float deathSpin_ = 0.0f;             // Z 軸回転
     float deathSpinSpeed_ = 10.0f;       // rad/s
 };

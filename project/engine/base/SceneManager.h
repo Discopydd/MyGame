@@ -7,10 +7,10 @@ namespace MyEngine {
 class SceneManager {
 public:
 
-    // 析构函数
+    // デストラクタ
     ~SceneManager();
 
-    // 設定（予约）下一个场景
+    // 次のシーンを設定（予約）する
     void SetNextScene(std::unique_ptr<BaseScene> nextScene);
 
 
@@ -27,10 +27,10 @@ public:
     void Draw();
 
 private:
-    // 現在执行中的场景（すべて権あり）
+    // 現在実行中のシーン（所有権あり）
     std::unique_ptr<BaseScene> scene_;
 
-    // 准备切换的下一个场景（まだ Initialize 前）
+    // 切り替え準備中の次シーン（まだ Initialize 前）
     std::unique_ptr<BaseScene> nextScene_;
 
     // オーバーレイシーン（ローディングシーンなど）

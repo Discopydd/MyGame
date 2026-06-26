@@ -425,7 +425,7 @@ namespace Math {
         float s = sinf(half);
         float c = cosf(half);
 
-        // 返す (x, y, z, w) —— 向量部 = 轴 * sin(θ/2)、标量部 = cos(θ/2)
+        // 返す (x, y, z, w) —— ベクトル部 = 軸 * sin(θ/2)、スカラー部 = cos(θ/2)
         return Quaternion{ n.x * s, n.y * s, n.z * s, c };
     }
     // ------------- ツール: 長度与正規化（クォータニオン为 x,y,z,w） -------------
@@ -475,7 +475,7 @@ namespace Math {
             return Lerp(a, bb, t, /*shortestPath=*/false);
         }
 
-        // 标准 Slerp
+        // 標準的な Slerp
         d = std::clamp(d, -1.0f, 1.0f);
         float theta = std::acos(d);
         float s0 = std::sinf((1.0f - t) * theta);
@@ -498,7 +498,7 @@ namespace Math {
     {
         const float x = q.x, y = q.y, z = q.z, w = q.w;
 
-        // q -> 3x3 旋转矩阵（行主序）
+        // q -> 3x3 回転行列（行優先）
         const float xx = x + x, yy = y + y, zz = z + z;
         const float xy = x * yy, xz = x * zz, yz = y * zz;
         const float wx = w * xx, wy = w * yy, wz = w * zz;
@@ -516,7 +516,7 @@ namespace Math {
         float m21 = yz - wx;
         float m22 = 1.0f - (xx2 + yy2);
 
-        // YXZ 分解得到 (yawY, pitchX, rollZ)
+        // YXZ 分解で (yawY, pitchX, rollZ) を求める
         // pitchX = asin(clamp(-m21, -1, 1))
         float sy = Clampf(-m21, -1.0f, 1.0f);
         float pitchX = std::asin(sy);

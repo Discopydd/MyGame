@@ -19,7 +19,7 @@ struct Quaternion {
     // 四元数 q = w + xi + yj + zk
     float w, x, y, z;
 
-    // ===== 构造 =====
+    // ===== 構築 =====
     constexpr Quaternion() : w(1.0f), x(0), y(0), z(0) {}
     constexpr Quaternion(float _w, float _x, float _y, float _z)
         : w(_w), x(_x), y(_y), z(_z) {}
@@ -58,9 +58,9 @@ struct Quaternion {
         return (qz * qx * qy).Normalized();
     }
 
-    // 抽出 Yaw-Pitch-Roll（与上面约定匹配）、返す (yawY, pitchX, rollZ)
+    // Yaw-Pitch-Roll を抽出する（上記の前提と合わせる）。返り値は (yawY, pitchX, rollZ)
     inline void ToYawPitchRoll(float& outYawY, float& outPitchX, float& outRollZ) const {
-        // 先に得到旋转矩阵、再度反推欧拉角（YXZ）
+        // 先に回転行列を求め、そこからオイラー角（YXZ）を逆算する
         float m[3][3];
         ToRotationMatrix3x3(m);
 
@@ -77,7 +77,7 @@ struct Quaternion {
             // rollZ = atan2(m[0][1], m[1][1])
             rollZ = std::atan2f(m[0][1], m[1][1]);
         } else {
-            // 特異点近傍: 将一个角設为 0、合かつ到另外一个
+            // 特異点近傍: 片方の角度を 0 にして、もう片方へまとめる
             yawY  = 0.0f;
             rollZ = std::atan2f(-m[1][0], m[0][0]);
         }
@@ -103,7 +103,7 @@ struct Quaternion {
         return { w/s, x/s, y/s, z/s };
     }
 
-    // クォータニオン乘法（復合旋转、注意非交换）
+    // クォータニオン乗算（複合回転。交換法則は成り立たない）
     constexpr Quaternion operator*(const Quaternion& r) const {
         return {
             w*r.w - x*r.x - y*r.y - z*r.z,
@@ -141,7 +141,7 @@ struct Quaternion {
         return Conjugate() / lsq;
     }
 
-    // 旋转插值
+    // 回転補間
     // Nlerp: 線性後正規化（速度常量近似）
     static Quaternion Nlerp(const Quaternion& a, const Quaternion& b, float t, bool shortestPath=true) {
         Quaternion bb = b;
@@ -168,7 +168,7 @@ struct Quaternion {
         return (a*s0 + bb*s1).Normalized();
     }
 
-    // 将四元数转为 3x3 旋转矩阵（行主序 m[row][col]）
+    // クォータニオンを 3x3 回転行列へ変換する（行優先 m[row][col]）
     void ToRotationMatrix3x3(float m[3][3]) const {
         float xx = x + x, yy = y + y, zz = z + z;
         float xy = x * yy, xz = x * zz, yz = y * zz;
@@ -188,18 +188,18 @@ struct Quaternion {
         m[2][2] = 1.0f - (xx2 + yy2);
     }
 
-    // 填充 4x4 矩阵的旋转部分；其余为单位（列主 or 行主均可用、按照 columnMajor 组织）
+    // 4x4 行列の回転部分を設定し、残りは単位行列にする（columnMajor に従って配置）
     void ToRotationMatrix4x4(float m[16], bool columnMajor = true) const {
         float r[3][3];
         ToRotationMatrix3x3(r);
         if (columnMajor) {
-            // 列優先に（如 DirectXMath デフォルト行主、但很多 API 接受列向量形式；ここでは提供两种）
+            // 列優先として扱う（DirectXMath は行優先が基本だが、列ベクトル形式を受け取る API もあるため両方を用意する）
             m[0] = r[0][0]; m[4] = r[0][1]; m[8]  = r[0][2]; m[12] = 0.0f;
             m[1] = r[1][0]; m[5] = r[1][1]; m[9]  = r[1][2]; m[13] = 0.0f;
             m[2] = r[2][0]; m[6] = r[2][1]; m[10] = r[2][2]; m[14] = 0.0f;
             m[3] = 0.0f;    m[7] = 0.0f;    m[11] = 0.0f;    m[15] = 1.0f;
         } else {
-            // 行主序
+            // 行優先
             m[0] = r[0][0]; m[1] = r[0][1]; m[2]  = r[0][2]; m[3]  = 0.0f;
             m[4] = r[1][0]; m[5] = r[1][1]; m[6]  = r[1][2]; m[7]  = 0.0f;
             m[8] = r[2][0]; m[9] = r[2][1]; m[10] = r[2][2]; m[11] = 0.0f;
@@ -207,7 +207,7 @@ struct Quaternion {
         }
     }
 
-    // 由 3x3 旋转矩阵构造（行主序 m[row][col]）
+    // 3x3 回転行列から構築する（行優先 m[row][col]）
     static Quaternion FromRotationMatrix3x3(const float m[3][3]) {
         float trace = m[0][0] + m[1][1] + m[2][2];
         if (trace > 0.0f) {
@@ -248,7 +248,7 @@ struct Quaternion {
         }
     }
 
-    // 旋转向量 v' = q * v * q^{-1}
+    // ベクトルを回転する: v' = q * v * q^{-1}
 #if __cpp_concepts
     template <Vec3Like V>
 #else
@@ -276,7 +276,7 @@ struct Quaternion {
         return out;
     }
 
-    // 将向量視作「增量旋转」的轴角（長度为角度、方向为轴）→ クォータニオン
+    // ベクトルを「増分回転」の軸角として扱う（長さ = 角度、方向 = 軸）→ クォータニオン
 #if __cpp_concepts
     template <Vec3Like V>
 #else
@@ -291,7 +291,7 @@ struct Quaternion {
 
     // 近等判断（用于避免归一化抖動）
     static bool AlmostEqual(const Quaternion& a, const Quaternion& b, float eps = 1e-5f) {
-        // クォータニオン q 与 -q 表示相同旋转；因此比较時考虑两者
+        // クォータニオン q と -q は同じ回転を表すため、比較時は両方を考慮する
         Quaternion d1 = a - b;
         Quaternion d2 = a + b;
         return (d1.LengthSq() <= eps*eps) || (d2.LengthSq() <= eps*eps);

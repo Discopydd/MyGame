@@ -86,10 +86,10 @@ void Enemy::StartHitReaction(float duration)
 void Enemy::OnStomp()
 {
     if (isDead_) { return; }
-    // 防止同一フレーム / 同じ重なりで反復トリガーしないようにする
+    // 同一フレーム / 同じ重なりで繰り返しトリガーしないようにする
     if (stompInvuln_ > 0.0f) { return; }
 
-    // 通常敵: 先に保留原挙動（1回だけ点滅）
+    // 通常敵: 従来の挙動を維持する（1回だけ点滅）
     StartHitReaction(0.40f);
     stompInvuln_ = 0.20f;
 }
