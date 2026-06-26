@@ -1,5 +1,6 @@
 #include "DashUIManager.h"
 
+using namespace MyEngine;
 void DashUIManager::Initialize(SpriteCommon* spriteCommon, Player* player)
 {
     spriteCommon_ = spriteCommon;

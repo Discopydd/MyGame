@@ -2,6 +2,7 @@
 #include "ModelManager.h"
 #include <cmath>
 
+using namespace MyEngine;
 // GameScene.cpp に既存のグローバル関数を宣言する（リンク時に実装が見つかる）
 Vector3 ScreenToWorld(float screenX, float screenY, float ndcZ, Camera* camera);
 

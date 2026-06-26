@@ -1,6 +1,8 @@
 #pragma once
 
 
+namespace MyEngine {
+
 /// <summary>
 /// 3次元ベクトル
 /// </summary>
@@ -21,3 +23,6 @@ struct Vector3 final {
 	Vector3 operator*(const float scalar) const { return Vector3{x * scalar, y * scalar, z * scalar}; }
 };
 
+
+
+} // namespace MyEngine

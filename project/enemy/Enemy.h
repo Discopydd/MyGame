@@ -30,9 +30,9 @@ public:
     virtual ~Enemy() = default;
 
     virtual void Initialize(
-        Object3dCommon* common,
-        Camera* camera,
-        const Vector3& spawnPos,
+        MyEngine::Object3dCommon* common,
+        MyEngine::Camera* camera,
+        const MyEngine::Vector3& spawnPos,
         EnemyType type
     ) = 0;
 
@@ -42,7 +42,7 @@ public:
     virtual void Draw() = 0;
 
     EnemyType GetType() const { return type_; }
-    const Vector3& GetPosition() const { return position_; }
+    const MyEngine::Vector3& GetPosition() const { return position_; }
 
     float GetWidth()  const { return width_; }
     float GetHeight() const { return height_; }
@@ -80,7 +80,7 @@ public:
 
 protected:
     // --- 共有初期化 / より新 / 绘制 ---
-    void InitializeCommon(Object3dCommon* common, Camera* camera, const Vector3& spawnPos, EnemyType type);
+    void InitializeCommon(MyEngine::Object3dCommon* common, MyEngine::Camera* camera, const MyEngine::Vector3& spawnPos, EnemyType type);
     // false を返した場合は死亡済みを示す（元ロジック: 死亡後は即 return）
     bool UpdateCommon(float dt);
     // 本体のみを描画する（被弾点滅ロジック付き）
@@ -88,8 +88,8 @@ protected:
 
 protected:
     // ---------- 共通 ----------
-    std::unique_ptr<Object3d> obj_;
-    Vector3   position_{};
+    std::unique_ptr<MyEngine::Object3d> obj_;
+    MyEngine::Vector3   position_{};
     EnemyType type_{ EnemyType::Type0 };
 
     // 当たり判定サイズ

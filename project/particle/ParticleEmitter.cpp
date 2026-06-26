@@ -1,6 +1,7 @@
 #include "ParticleEmitter.h"
 #include <cstdlib>
 #include <cmath>
+using namespace MyEngine;
 static float RandRange(float a, float b)
 {
     float t = (float)rand() / RAND_MAX;

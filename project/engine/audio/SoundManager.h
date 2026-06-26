@@ -5,6 +5,8 @@
 #include <vector>
 #include <stdint.h>
 
+namespace MyEngine {
+
 class SoundManager {
 public:
     static SoundManager* GetInstance();
@@ -40,3 +42,6 @@ private:
     std::unordered_map<int, VoiceInstance> activeVoices_;
     int voiceIdCounter_ = 0;
 };
+
+
+} // namespace MyEngine

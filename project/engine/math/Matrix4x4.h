@@ -1,6 +1,8 @@
 #pragma once
 #include"Vector4.h"
 #include <cmath>
+namespace MyEngine {
+
 /// <summary>
 /// 4x4行列
 /// </summary>
@@ -27,3 +29,6 @@ struct Matrix4x4 final {
     return result;
 }
 };
+
+
+} // namespace MyEngine

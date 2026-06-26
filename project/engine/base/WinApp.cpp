@@ -4,6 +4,8 @@
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
 
+namespace MyEngine {
+
 LRESULT WinApp::WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 {
 	  // ImGui 関連のメッセージ処理
@@ -86,3 +88,5 @@ WinApp* WinApp::GetInstance() {
     static WinApp instance;
     return &instance;
 }
+
+} // namespace MyEngine

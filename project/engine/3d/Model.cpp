@@ -5,6 +5,8 @@
 #include <assert.h>
 #include "MyMath.h"
 
+namespace MyEngine {
+
 void Model::Initialize(ModelCommon* modelCommon, const std::string& directorypath, const std::string& filename)
 {
 	modelCommon_ = modelCommon;
@@ -221,3 +223,5 @@ ModelData Model::LoadObjectFile(const std::string& directoryPath, const std::str
 	}
 	return modelData;
 }
+
+} // namespace MyEngine

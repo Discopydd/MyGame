@@ -2,6 +2,8 @@
 
 #include "../base/DirectXCommon.h"
 
+namespace MyEngine {
+
 class ModelCommon
 {
 
@@ -15,3 +17,5 @@ public:
 private:
 	DirectXCommon* dxCommon_;
 };
+
+} // namespace MyEngine

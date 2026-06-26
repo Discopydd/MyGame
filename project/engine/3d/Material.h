@@ -2,6 +2,8 @@
 #include "../math/Vector4.h"
 #include <cstdint>
 #include "../math/Matrix4x4.h"
+namespace MyEngine {
+
 struct Material {
 	Vector4 color;
 	int32_t enableLighting;
@@ -9,3 +11,5 @@ struct Material {
 	Matrix4x4 uvTransform;
 	float shininess;
 };
+
+} // namespace MyEngine

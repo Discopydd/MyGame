@@ -1,6 +1,8 @@
 #pragma once
 #include "../base/DirectXCommon.h"
 
+namespace MyEngine {
+
 class SpriteCommon
 {
 public:
@@ -33,3 +35,5 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> graphicsPipelineState = nullptr;
 };
+
+} // namespace MyEngine

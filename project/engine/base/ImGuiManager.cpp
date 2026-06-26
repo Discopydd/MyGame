@@ -2,6 +2,8 @@
 #include "../externals/imgui/imgui_impl_dx12.h"
 #include "../externals/imgui/imgui_impl_win32.h"
 
+namespace MyEngine {
+
 //終了
 void ImGuiManager::Finalize() {
 #ifdef USE_IMGUI
@@ -68,3 +70,5 @@ void ImGuiManager::Draw() {
 	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList);
 #endif
 }
+
+} // namespace MyEngine

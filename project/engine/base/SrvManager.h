@@ -1,5 +1,7 @@
 #pragma once
 #include <DirectXCommon.h>
+namespace MyEngine {
+
 class SrvManager
 {
 public://初期化
@@ -42,3 +44,6 @@ private:
 	SrvManager() = default;
     ~SrvManager() = default;
 };
+
+
+} // namespace MyEngine

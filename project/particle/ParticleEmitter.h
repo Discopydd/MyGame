@@ -12,12 +12,12 @@ public:
 
     ~ParticleEmitter();
     void Finalize();  
-    void Initialize(Object3dCommon* objCommon, SpriteCommon* sprCommon);
+    void Initialize(MyEngine::Object3dCommon* objCommon, MyEngine::SpriteCommon* sprCommon);
 
     void Emit(int count,
         ParticleType type,
         const char* modelOrTexture,
-        const Vector3& spawnPos,
+        const MyEngine::Vector3& spawnPos,
         float minSpeed,
         float maxSpeed,
         float minLife,
@@ -35,17 +35,17 @@ public:
     void SetFollowCamera(bool follow) { followCamera_ = follow; }
 
     // 毎フレームのカメラ移動量を渡し、粒子位置の補正に使う
-    void ApplyCameraMove(const Vector3& delta);
+    void ApplyCameraMove(const MyEngine::Vector3& delta);
 
 private:
-    Object3dCommon* objCommon_ = nullptr;
-    SpriteCommon* sprCommon_   = nullptr;
+    MyEngine::Object3dCommon* objCommon_ = nullptr;
+    MyEngine::SpriteCommon* sprCommon_   = nullptr;
 
     std::vector<Particle> particles_;
 
     // ★ 所有権を持ち、unique_ptr でプールを管理する
-    std::vector<std::unique_ptr<Object3d>> modelPool_;
-    std::vector<std::unique_ptr<Sprite>>   spritePool_;
+    std::vector<std::unique_ptr<MyEngine::Object3d>> modelPool_;
+    std::vector<std::unique_ptr<MyEngine::Sprite>>   spritePool_;
 
     bool windMode_ = false;
     bool useOriginalSpriteSize_ = false;

@@ -12,11 +12,11 @@ public:
     IntroManager() = default;
     ~IntroManager() = default;
 
-    void Initialize(SpriteCommon* spriteCommon, Input* input);
+    void Initialize(MyEngine::SpriteCommon* spriteCommon, MyEngine::Input* input);
     void Finalize();
 
     // Intro を開始し、playerPos を周回中心として保持する（現状では保持のみで、後からカメラ演出にも使える）
-    void Start(const Vector3& playerPos);
+    void Start(const MyEngine::Vector3& playerPos);
 
     // 毎フレーム更新（GameScene::Update から呼び出す）
     void Update(float dt);
@@ -38,25 +38,25 @@ private:
     bool  skippable_ = true;   // キー入力でスキップ可能か
     bool  started_   = false;  // すでに一度開始したか
 
-    // 各種 Sprite
-    std::unique_ptr<Sprite> letterboxTop_;
-    std::unique_ptr<Sprite> letterboxBottom_;
-    std::unique_ptr<Sprite> vignette_;
-    std::unique_ptr<Sprite> introTitle_;
-    std::unique_ptr<Sprite> skipHint_;
+    // 各種 MyEngine::Sprite
+    std::unique_ptr<MyEngine::Sprite> letterboxTop_;
+    std::unique_ptr<MyEngine::Sprite> letterboxBottom_;
+    std::unique_ptr<MyEngine::Sprite> vignette_;
+    std::unique_ptr<MyEngine::Sprite> introTitle_;
+    std::unique_ptr<MyEngine::Sprite> skipHint_;
 
     // カメラ関連（今は保持のみで、ここでは直接カメラを動かさない）
-    Vector3 camStartPos_{ 0, 12, -85 };
-    Vector3 camTargetPos_{ 0,  8, -38 };
-    Vector3 camPivot_{ 0, 0, 0 };
+    MyEngine::Vector3 camStartPos_{ 0, 12, -85 };
+    MyEngine::Vector3 camTargetPos_{ 0,  8, -38 };
+    MyEngine::Vector3 camPivot_{ 0, 0, 0 };
     float   camOrbitDeg_ = 0.0f;
 
     // 画面揺れ（後で使いたくなったら、ここから camera にオフセットをかけられる）
     float shakeTime_ = 0.0f;
     float shakeAmp_  = 0.0f;
 
-    SpriteCommon* spriteCommon_ = nullptr;
-    Input*        input_        = nullptr;
+    MyEngine::SpriteCommon* spriteCommon_ = nullptr;
+    MyEngine::Input*        input_        = nullptr;
 
     // Easing（GameScene の実装をそのまま使用）
     float EaseOutCubic_(float t) { return 1.0f - powf(1.0f - t, 3.0f); }

@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <type_traits>
 
+namespace MyEngine {
+
 #if __cpp_concepts
 template <class V>
 concept Vec3Like = requires(V v) {
@@ -301,3 +303,6 @@ inline Quaternion Lerp(const Quaternion& a, const Quaternion& b, float t) {
     // 普通 Lerp（不保证单位長度）；通常より推荐 Nlerp
     return a*(1.0f - t) + b*t;
 }
+
+
+} // namespace MyEngine

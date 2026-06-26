@@ -53,13 +53,13 @@ public:
     // ★ 追加: サブIDを取得
     uint8_t     GetMapChipSubIDByIndex(uint32_t xIndex, uint32_t yIndex) const;
 
-    Vector3 GetMapChipPositionByIndex(uint32_t xIndex, uint32_t yIndex) const;
+    MyEngine::Vector3 GetMapChipPositionByIndex(uint32_t xIndex, uint32_t yIndex) const;
 
     struct IndexSet {
         uint32_t xIndex;
         uint32_t yIndex;
     };
-    IndexSet GetMapChipIndexByPosition(const Vector3& position) const;
+    IndexSet GetMapChipIndexByPosition(const MyEngine::Vector3& position) const;
 
     struct Rect {
         float left;
@@ -69,11 +69,11 @@ public:
     };
     Rect GetRectByIndex(uint32_t xIndex, uint32_t yIndex) const;
 
-    Vector3 GetMapMinPosition() const {
-        return Vector3(0, 0, 0);
+    MyEngine::Vector3 GetMapMinPosition() const {
+        return MyEngine::Vector3(0, 0, 0);
     }
-    Vector3 GetMapMaxPosition() const {
-        return Vector3(
+    MyEngine::Vector3 GetMapMaxPosition() const {
+        return MyEngine::Vector3(
             numBlockHorizontal_ * kBlockWidth,
             numBlockVertical_   * kBlockHeight,
             0.0f);

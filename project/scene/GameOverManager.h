@@ -19,7 +19,7 @@ public:
     GameOverManager() = default;
     ~GameOverManager() = default;
 
-    void Initialize(SpriteCommon* spriteCommon);
+    void Initialize(MyEngine::SpriteCommon* spriteCommon);
     void Finalize();
 
     void Start();          // GameOver 演出を開始
@@ -35,7 +35,7 @@ public:
 
 private:
     struct PortalMote {
-        std::unique_ptr<Sprite> sprite;
+        std::unique_ptr<MyEngine::Sprite> sprite;
         float angle = 0.0f;
         float radius = 0.0f;
         float angularSpeed = 0.0f;
@@ -44,36 +44,36 @@ private:
         float life = 0.0f;
         float maxLife = 0.0f;
         float baseSize = 16.0f;
-        Vector4 color = { 1,1,1,1 };
+        MyEngine::Vector4 color = { 1,1,1,1 };
     };
 
 private:
     State  state_ = State::None;
     float  t_     = 0.0f;
 
-    std::unique_ptr<Sprite> backdropSprite_;
-    std::unique_ptr<Sprite> portalRingSprite_;
-    std::unique_ptr<Sprite> titleSprite_;
-    std::unique_ptr<Sprite> promptSprite_;
+    std::unique_ptr<MyEngine::Sprite> backdropSprite_;
+    std::unique_ptr<MyEngine::Sprite> portalRingSprite_;
+    std::unique_ptr<MyEngine::Sprite> titleSprite_;
+    std::unique_ptr<MyEngine::Sprite> promptSprite_;
 
     std::vector<PortalMote> motes_;
     float moteSpawnTimer_ = 0.0f;
 
-    Vector2 titleSize_      = { 520.0f, 312.0f };
-    Vector2 titleCenter_{};
-    Vector2 titleStartPos_{};
-    Vector2 titleEndPos_{};
+    MyEngine::Vector2 titleSize_      = { 520.0f, 312.0f };
+    MyEngine::Vector2 titleCenter_{};
+    MyEngine::Vector2 titleStartPos_{};
+    MyEngine::Vector2 titleEndPos_{};
     float   titleSlideTime_ = 0.65f;
 
-    Vector2 ringCenter_{};
-    Vector2 ringBaseSize_ = { 620.0f, 620.0f };
+    MyEngine::Vector2 ringCenter_{};
+    MyEngine::Vector2 ringBaseSize_ = { 620.0f, 620.0f };
     float   ringRotation_ = 0.0f;
     float   ringPulseT_   = 0.0f;
     float   backdropAlpha_ = 0.0f;
 
-    Vector2 promptBasePos_{};
+    MyEngine::Vector2 promptBasePos_{};
 
-    SpriteCommon* spriteCommon_ = nullptr;
+    MyEngine::SpriteCommon* spriteCommon_ = nullptr;
     bool showTexts_ = true;
     bool drawEnabled_ = true;
 

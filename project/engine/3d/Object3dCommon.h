@@ -2,6 +2,8 @@
 
 #include "../base/DirectXCommon.h"
 #include"Camera.h"
+namespace MyEngine {
+
 class Object3dCommon
 {
 	public:
@@ -31,3 +33,5 @@ class Object3dCommon
 
 	Camera* defaultCamera = nullptr;
 };
+
+} // namespace MyEngine

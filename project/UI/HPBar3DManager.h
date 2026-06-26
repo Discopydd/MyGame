@@ -15,8 +15,8 @@ public:
     ~HPBar3DManager() = default;
 
     // hpNdcZ: HPバーのカメラからの奥行きを制御する値（GameScene の hpNdcZ_ と同じ）
-    void Initialize(Object3dCommon* objCommon,
-                    Camera* camera,
+    void Initialize(MyEngine::Object3dCommon* objCommon,
+                    MyEngine::Camera* camera,
                     Player* player,
                     float hpNdcZ);
 
@@ -32,11 +32,11 @@ public:
     void SetPlayer(Player* player) { player_ = player; }
 
 private:
-    Object3dCommon* object3dCommon_ = nullptr;
-    Camera*         camera_         = nullptr;
+    MyEngine::Object3dCommon* object3dCommon_ = nullptr;
+    MyEngine::Camera*         camera_         = nullptr;
     Player*         player_         = nullptr;
 
-    std::vector<std::unique_ptr<Object3d>> strips_;   // 各HPバーセグメント
+    std::vector<std::unique_ptr<MyEngine::Object3d>> strips_;   // 各HPバーセグメント
 
     int   segments_      = 5;        // 総段数
     int   visibleCount_  = 5;        // 現在可視段数
@@ -47,5 +47,5 @@ private:
     float hpNdcZ_        = 0.08f;     // 奥行き
 
     // 画面座標をワールド座標に変換（GameScene.cpp 内既存の同名関数）
-    Vector3 ScreenToWorld_(float sx, float sy, float ndcZ);
+    MyEngine::Vector3 ScreenToWorld_(float sx, float sy, float ndcZ);
 };

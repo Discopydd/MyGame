@@ -5,6 +5,8 @@
 #include <Windows.h>
 #include <wrl.h>
 #include"../base/WinApp.h"
+namespace MyEngine {
+
 class Input {
 public:
 	template<class T> using ComPtr = Microsoft::WRL::ComPtr<T>;
@@ -32,3 +34,6 @@ private:
 	 Input() = default;
     ~Input() = default;
 };
+
+
+} // namespace MyEngine

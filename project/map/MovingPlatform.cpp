@@ -1,6 +1,7 @@
 #include "map/MovingPlatform.h"
 #include <algorithm>
 #include <cmath>
+using namespace MyEngine;
 namespace {
     bool IsSolidForPlatform(MapChipType t) {
         switch (t) {

@@ -7,6 +7,8 @@
 #include "../base/StringUtility.h"
 
 
+namespace MyEngine {
+
 using namespace Microsoft::WRL;
 using namespace Logger;
 using namespace StringUtility;
@@ -610,3 +612,5 @@ DirectX::ScratchImage DirectXCommon::LoadTexture(const std::string& filePath)
 
     return mipImages;
 }
+
+} // namespace MyEngine

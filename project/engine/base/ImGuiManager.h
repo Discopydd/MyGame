@@ -9,6 +9,8 @@
 #include "../externals/imgui/imgui_impl_win32.h"
 #endif
 
+namespace MyEngine {
+
 class ImGuiManager
 {
 public:
@@ -28,3 +30,5 @@ private:
 	SrvManager* srvmanager_;
 	uint32_t index;
 };
+
+} // namespace MyEngine

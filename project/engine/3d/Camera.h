@@ -1,8 +1,10 @@
 #pragma once
 #include <WinApp.h>
 #include <Matrix4x4.h>
-//カメラ
 #include <Transform.h>
+namespace MyEngine {
+
+//カメラ
 class Camera {
 public:
 	Camera();
@@ -36,3 +38,5 @@ private:
 	float farClip = 100.0f;
 	Matrix4x4 viewProjectionMatrix;
 };
+
+} // namespace MyEngine

@@ -14,26 +14,26 @@ class ItemManager {
 public:
     struct ItemVisual {
         uint32_t x = 0, y = 0;
-        std::unique_ptr<Object3d> obj;
+        std::unique_ptr<MyEngine::Object3d> obj;
     };
     struct PickupEffect {
-        std::unique_ptr<Object3d> obj;
+        std::unique_ptr<MyEngine::Object3d> obj;
         float     elapsed = 0.0f;                 // 再生経過時間（秒）
         float     duration = 0.35f;                // 総時間（秒）
-        Vector3   velocity = { 0.0f, 0.0f, 0.0f }; // 上昇速度（ワールド単位/秒）
+        MyEngine::Vector3   velocity = { 0.0f, 0.0f, 0.0f }; // 上昇速度（ワールド単位/秒）
         float     rotateSpeedY = 0.0f;              // Y 軸まわりの回転速度（ラジアン/秒）
     };
     ItemManager() = default;
     ~ItemManager() = default;
 
-    void Initialize(Object3dCommon* objCommon, Camera* camera);
+    void Initialize(MyEngine::Object3dCommon* objCommon, MyEngine::Camera* camera);
     void Finalize();
 
     // 生成ブロック時用: このマップでそのセルが取得済みかどうか？
     bool CanSpawnItem(const std::string& mapPath, uint32_t x, uint32_t y) const;
 
-    // Object3d 生成後にマネージャへ登録
-    void RegisterItem(const std::string& mapPath, uint32_t x, uint32_t y, std::unique_ptr<Object3d> obj);
+    // MyEngine::Object3d 生成後にマネージャへ登録
+    void RegisterItem(const std::string& mapPath, uint32_t x, uint32_t y, std::unique_ptr<MyEngine::Object3d> obj);
 
     // 毎フレーム更新: 回転して Update
     void Update(float dt);
@@ -54,8 +54,8 @@ public:
     int GetRemainingItemCount() const;
 
 private:
-    Object3dCommon* object3dCommon_ = nullptr;
-    Camera*         camera_         = nullptr;
+    MyEngine::Object3dCommon* object3dCommon_ = nullptr;
+    MyEngine::Camera*         camera_         = nullptr;
 
     std::vector<ItemVisual> items_;
 

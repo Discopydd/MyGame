@@ -1,4 +1,6 @@
 #include "SrvManager.h"
+namespace MyEngine {
+
 const uint32_t SrvManager::kMaxSRVCount = 512;
 
 SrvManager* SrvManager::GetInstance() {
@@ -103,3 +105,5 @@ void SrvManager::Finalize() {
     descriptorSize = 0;
     directXCommon = nullptr;
 }
+
+} // namespace MyEngine

@@ -11,9 +11,9 @@ public:
     CoinUIManager() = default;
     ~CoinUIManager() = default;
 
-    void Initialize(SpriteCommon* spriteCommon,
-                    Object3dCommon* object3dCommon,
-                    Camera* camera,
+    void Initialize(MyEngine::SpriteCommon* spriteCommon,
+                    MyEngine::Object3dCommon* object3dCommon,
+                    MyEngine::Camera* camera,
                     float hpNdcZ);
 
     void Finalize();
@@ -30,15 +30,15 @@ public:
     void Draw2D();  // コロン + 数字
 
 private:
-    SpriteCommon*   spriteCommon_   = nullptr;
-    Object3dCommon* object3dCommon_ = nullptr;
-    Camera*         camera_         = nullptr;
+    MyEngine::SpriteCommon*   spriteCommon_   = nullptr;
+    MyEngine::Object3dCommon* object3dCommon_ = nullptr;
+    MyEngine::Camera*         camera_         = nullptr;
     float           hpNdcZ_         = 0.08f;
 
     // 3D coin モデル
-    std::unique_ptr<Object3d> coinObj_;
-    std::unique_ptr<Sprite>   colonSprite_;
-    std::unique_ptr<Sprite>   digitSprites_[3] = {
+    std::unique_ptr<MyEngine::Object3d> coinObj_;
+    std::unique_ptr<MyEngine::Sprite>   colonSprite_;
+    std::unique_ptr<MyEngine::Sprite>   digitSprites_[3] = {
         nullptr, nullptr, nullptr
     };
 

@@ -1,6 +1,7 @@
 #include "HintUIManager.h"
 #include <cmath>
 
+using namespace MyEngine;
 void HintUIManager::Initialize(SpriteCommon* spriteCommon, Camera* camera)
 {
     spriteCommon_ = spriteCommon;

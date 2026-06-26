@@ -5,6 +5,7 @@
 #include <cstdlib>
 
 
+using namespace MyEngine;
 namespace {
     constexpr float kPi = 3.14159265358979323846f;
 

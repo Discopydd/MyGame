@@ -5,6 +5,8 @@
 #include "Vector4.h"
 #include <cassert>
 #include <Quaternion.h>
+namespace MyEngine {
+
 namespace Math {
 	const float PI = 3.141592654f;
 
@@ -66,3 +68,5 @@ namespace Math {
 
 	Vector3 Cross(const Vector3& a, const Vector3& b);
 }
+
+} // namespace MyEngine

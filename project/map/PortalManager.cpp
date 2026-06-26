@@ -1,5 +1,6 @@
 #include "PortalManager.h"
 
+using namespace MyEngine;
 void PortalManager::Initialize(SpriteCommon* spriteCommon, Camera* camera)
 {
     spriteCommon_ = spriteCommon;

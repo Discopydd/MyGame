@@ -17,7 +17,7 @@
 #include "BaseScene.h"
 #include "../particle/ParticleManager.h"
 
-class TitleScene : public BaseScene {
+class TitleScene : public MyEngine::BaseScene {
 public:
     void Initialize() override;
     void Update() override;
@@ -32,7 +32,7 @@ private:
 
     // Title portal motes (custom 2D particles for the title screen)
     struct PortalMote {
-        std::unique_ptr<Sprite> sprite;
+        std::unique_ptr<MyEngine::Sprite> sprite;
         float angle = 0.0f;         // rad
         float radius = 0.0f;        // px
         float angularSpeed = 0.0f;  // rad/s
@@ -42,24 +42,24 @@ private:
         float life = 0.0f;          // s
         float maxLife = 0.0f;       // s
         float baseSize = 16.0f;     // px
-        Vector4 color = { 1,1,1,1 };
+        MyEngine::Vector4 color = { 1,1,1,1 };
     };
 
     // Non-owning pointers
-    WinApp*        winApp_       = nullptr;
-    DirectXCommon* dxCommon_     = nullptr;
-    Input*         input_        = nullptr;
-    SrvManager*    srvManager_   = nullptr;
-    SpriteCommon*  spriteCommon_ = nullptr;
+    MyEngine::WinApp*        winApp_       = nullptr;
+    MyEngine::DirectXCommon* dxCommon_     = nullptr;
+    MyEngine::Input*         input_        = nullptr;
+    MyEngine::SrvManager*    srvManager_   = nullptr;
+    MyEngine::SpriteCommon*  spriteCommon_ = nullptr;
 
     // Sprites (owned)
-    std::unique_ptr<Sprite> backgroundSprite_;
-    std::unique_ptr<Sprite> portalRingSprite_;
-    std::unique_ptr<Sprite> titlePanelSprite_;
-    std::unique_ptr<Sprite> titleLogoSprite_;
-    std::unique_ptr<Sprite> startSprite_;
-    std::unique_ptr<Sprite> fadeSprite_;
-    std::unique_ptr<Sprite> transitionRingSprite_;
+    std::unique_ptr<MyEngine::Sprite> backgroundSprite_;
+    std::unique_ptr<MyEngine::Sprite> portalRingSprite_;
+    std::unique_ptr<MyEngine::Sprite> titlePanelSprite_;
+    std::unique_ptr<MyEngine::Sprite> titleLogoSprite_;
+    std::unique_ptr<MyEngine::Sprite> startSprite_;
+    std::unique_ptr<MyEngine::Sprite> fadeSprite_;
+    std::unique_ptr<MyEngine::Sprite> transitionRingSprite_;
 
     // Title screen particles
     std::vector<PortalMote> portalMotes_;

@@ -2,6 +2,8 @@
 #include "StringUtility.h"
 #include <algorithm>
 #include <wincodec.h>
+namespace MyEngine {
+
 TextureManager* TextureManager::instance = nullptr;
 
 //ImGuiで0盤を使用するため、1番から使用
@@ -282,3 +284,5 @@ D3D12_GPU_DESCRIPTOR_HANDLE TextureManager::GetGifSrvHandleGPU(const std::string
 
     return anim.frames[anim.current].srvHandleGPU;
 }
+
+} // namespace MyEngine

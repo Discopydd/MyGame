@@ -6,6 +6,8 @@
 #pragma comment(lib,"dinput8.lib")
 #pragma comment(lib,"dxguid.lib")
 
+namespace MyEngine {
+
 Input* Input::GetInstance() {
     static Input instance;
     return &instance;
@@ -69,3 +71,6 @@ void Input::Finalize() {
 void Input::ResetAllKeys() {
     memcpy(keyPre, key, sizeof(key));
 }
+
+
+} // namespace MyEngine

@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cmath>
 
+using namespace MyEngine;
 void LoadingScene::Initialize() {
     winApp_    = WinApp::GetInstance();
     dxCommon_  = DirectXCommon::GetInstance();

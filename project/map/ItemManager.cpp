@@ -1,6 +1,8 @@
 // ItemManager.cpp
 #include "ItemManager.h"
 
+using namespace MyEngine;
+
 void ItemManager::Initialize(Object3dCommon* objCommon, Camera* camera)
 {
     object3dCommon_ = objCommon;

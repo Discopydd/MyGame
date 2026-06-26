@@ -1,4 +1,6 @@
 #include "StringUtility.h"
+namespace MyEngine {
+
 namespace StringUtility {
 	std::wstring ConvertString(const std::string& str) {
     if (str.empty()) {
@@ -29,3 +31,6 @@ std::string ConvertString(const std::wstring& str) {
 }
 }
 
+
+
+} // namespace MyEngine

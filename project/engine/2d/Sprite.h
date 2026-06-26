@@ -16,6 +16,8 @@
 
 #include <string>
 #include <algorithm>
+namespace MyEngine {
+
 class SpriteCommon;
 class Sprite
 {
@@ -143,3 +145,5 @@ private:
 
 	bool isVisible_ = true;
 };
+
+} // namespace MyEngine

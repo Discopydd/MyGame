@@ -1,4 +1,5 @@
 #include "MyGame.h"
+using namespace MyEngine;
 void MyGame::Initialize() {
     Framework::Initialize();
     sceneManager_->SetNextScene(std::make_unique<TitleScene>());

@@ -14,7 +14,7 @@
 #include <atomic>
 #include <memory>  // ★ std::unique_ptr を使用
 
-class LoadingScene : public BaseScene {
+class LoadingScene : public MyEngine::BaseScene {
 public:
     void Initialize() override;
     void Update() override;
@@ -26,23 +26,23 @@ public:
 
 private:
     // 非所有: 外部シングルトンなので生ポインタのままでよい
-    WinApp*        winApp_    = nullptr;
-    DirectXCommon* dxCommon_  = nullptr;
-    Input*         input_     = nullptr;
-    SrvManager*    srvManager_ = nullptr;
-    SpriteCommon* spriteCommon_ = nullptr;
+    MyEngine::WinApp*        winApp_    = nullptr;
+    MyEngine::DirectXCommon* dxCommon_  = nullptr;
+    MyEngine::Input*         input_     = nullptr;
+    MyEngine::SrvManager*    srvManager_ = nullptr;
+    MyEngine::SpriteCommon* spriteCommon_ = nullptr;
 
     // プログレスバー関連
     float progress_ = 0.0f;
-    std::unique_ptr<Sprite> progressBar_;
-    std::unique_ptr<Sprite> progressBackground_;
+    std::unique_ptr<MyEngine::Sprite> progressBar_;
+    std::unique_ptr<MyEngine::Sprite> progressBackground_;
 
-    std::unique_ptr<Sprite> blackSprite_;
-    std::unique_ptr<Sprite> portalRingSprite_;
+    std::unique_ptr<MyEngine::Sprite> blackSprite_;
+    std::unique_ptr<MyEngine::Sprite> portalRingSprite_;
     float portalRingRotation_ = 0.0f;
 
     // ===== Spinner（白い点が回転する表示） =====
-    std::vector<std::unique_ptr<Sprite>> spinnerDots_;
+    std::vector<std::unique_ptr<MyEngine::Sprite>> spinnerDots_;
     int   spinnerCount_     = 12;      // 点の数
     float spinnerRadius_    = 20.0f;   // 半径（ピクセル）
     float spinnerSize_      = 7.0f;    // 各点の正方形サイズ（ピクセル）

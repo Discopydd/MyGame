@@ -3,6 +3,8 @@
 #include "ModelManager.h"
 #include <numbers>
 
+namespace MyEngine {
+
 void Object3d::Initialize(Object3dCommon* object3dCommon)
 {
 	this->object3dCommon_ = object3dCommon;
@@ -111,3 +113,6 @@ void Object3d::SetLightingMode(int mode)
     if (!model_) { return; }
     model_->SetEnableLighting(mode);
 }
+
+
+} // namespace MyEngine

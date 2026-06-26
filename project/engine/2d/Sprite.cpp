@@ -5,6 +5,8 @@
 #include "../base/TextureManager.h"
 #include <numbers>
 
+namespace MyEngine {
+
 //初期化
 void Sprite::Initialize(SpriteCommon* spriteCommon, std::string textureFilePath) {
 	this->spriteCommon = spriteCommon;
@@ -215,3 +217,5 @@ void Sprite::AdjustTextureSize()
 	//画像サイズをテクスチャサイズに合わせる
 	size = textureSize_;
 }
+
+} // namespace MyEngine

@@ -2,6 +2,7 @@
 #include <cmath>
 #include <algorithm>
 
+using namespace MyEngine;
 PlayerCamera::PlayerCamera() : Camera() {}
 
 void PlayerCamera::Initialize(Camera* camera, const Player* player, const MapChipField* map)

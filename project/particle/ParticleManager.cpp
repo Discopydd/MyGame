@@ -1,5 +1,6 @@
 #include "ParticleManager.h"
 
+using namespace MyEngine;
 ParticleManager::~ParticleManager()
 {
     Finalize();

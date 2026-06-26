@@ -2,6 +2,8 @@
 #include "BaseScene.h"
 #include <memory>
 
+namespace MyEngine {
+
 class SceneManager {
 public:
 
@@ -34,3 +36,6 @@ private:
     // オーバーレイシーン（ローディングシーンなど）
     std::unique_ptr<BaseScene> overlayScene_;
 };
+
+
+} // namespace MyEngine

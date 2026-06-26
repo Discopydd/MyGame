@@ -11,7 +11,7 @@ public:
     FadeManager() = default;
     ~FadeManager() = default;
 
-    void Initialize(SpriteCommon* spriteCommon);
+    void Initialize(MyEngine::SpriteCommon* spriteCommon);
     void Finalize();
 
     void Update(float dt);
@@ -32,7 +32,7 @@ public:
     float GetSpeed() const { return speed_; }
     void  SetSpeed(float s) { speed_ = s; }
 
-    Sprite* GetSprite() { return sprite_.get(); }
+    MyEngine::Sprite* GetSprite() { return sprite_.get(); }
 
     // 簡易操作
     void StartFadeOut();   // 0 から 1 へフェード
@@ -53,9 +53,9 @@ public:
 private:
     void SyncVisual_();
 
-    SpriteCommon* spriteCommon_ = nullptr;
-    std::unique_ptr<Sprite> sprite_;
-    std::unique_ptr<Sprite> portalRingSprite_;
+    MyEngine::SpriteCommon* spriteCommon_ = nullptr;
+    std::unique_ptr<MyEngine::Sprite> sprite_;
+    std::unique_ptr<MyEngine::Sprite> portalRingSprite_;
 
     float ringRotation_  = 0.0f;
     float ringPulseTime_ = 0.0f;

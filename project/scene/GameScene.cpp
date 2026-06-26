@@ -5,6 +5,7 @@
 #include <scene/LoadingScene.h>
 #include "SceneManager.h"
 #include <cstdlib>
+using namespace MyEngine;
 namespace {
     // 0.0f = ダメージ高さなし、1.0f = セル全体をトゲとして扱う
     constexpr float kSpikeHeightRatio = 0.5f;

@@ -2,6 +2,7 @@
 #include "TextureManager.h"
 #include "ModelManager.h"
 #include "SoundManager.h"
+using namespace MyEngine;
 void Framework::Initialize() {
     sceneManager_ = std::make_unique<SceneManager>();
      WinApp::GetInstance()->Initialize();

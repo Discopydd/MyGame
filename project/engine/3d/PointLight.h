@@ -2,6 +2,8 @@
 #include <Vector4.h>
 #include <cstdint>
 #include <Vector3.h>
+namespace MyEngine {
+
 struct alignas(16) PointLight {
     Vector3 position;     // 12 bytes
     float intensity;      // 4 bytes (→ 对齐16)
@@ -13,3 +15,5 @@ struct alignas(16) PointLight {
 
     // 合計: 16 + 16 + 16 = 48 bytes
 };
+
+} // namespace MyEngine

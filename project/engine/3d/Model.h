@@ -4,6 +4,8 @@
 #include"ModelData.h"
 #include"Material.h"
 #include"VertexData.h"
+namespace MyEngine {
+
 class Model
 {
 public:
@@ -58,3 +60,5 @@ private:
 	// マテリアルにデータを書き込む	
 	Material* materialData = nullptr;
 };
+
+} // namespace MyEngine

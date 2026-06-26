@@ -1,5 +1,7 @@
 #include "ModelManager.h"
 
+namespace MyEngine {
+
 ModelManager& ModelManager::Instance()
 {
 	static ModelManager instance;
@@ -55,3 +57,5 @@ Model* ModelManager::FindModel(const std::string& filePath)
 	//ファイル名一致なし
 	return nullptr;
 }
+
+} // namespace MyEngine

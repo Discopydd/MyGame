@@ -9,18 +9,18 @@ public:
     DashUIManager() = default;
     ~DashUIManager() = default;
 
-    void Initialize(SpriteCommon* spriteCommon, Player* player);
+    void Initialize(MyEngine::SpriteCommon* spriteCommon, Player* player);
     void Finalize();
 
     void Update(float dt);
     void Draw();
 
 private:
-    SpriteCommon* spriteCommon_ = nullptr;
+    MyEngine::SpriteCommon* spriteCommon_ = nullptr;
     Player*       player_       = nullptr;
 
-    std::unique_ptr<Sprite> icon_;    // スキルアイコン
-    std::unique_ptr<Sprite> overlay_; // クールダウンのグレーオーバーレイ
+    std::unique_ptr<MyEngine::Sprite> icon_;    // スキルアイコン
+    std::unique_ptr<MyEngine::Sprite> overlay_; // クールダウンのグレーオーバーレイ
 
-    Vector2 overlayFullTexSize_{ 0.0f, 0.0f };
+    MyEngine::Vector2 overlayFullTexSize_{ 0.0f, 0.0f };
 };

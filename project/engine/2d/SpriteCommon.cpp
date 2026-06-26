@@ -1,6 +1,8 @@
 #include "SpriteCommon.h"
 #include "logger/Logger.h"
 
+namespace MyEngine {
+
 void SpriteCommon::Initialize(DirectXCommon* dxCommon)
 {
 	if (dxCommon_ != nullptr) {
@@ -179,3 +181,5 @@ void SpriteCommon::GraphicsPipelineInitialize()
 		IID_PPV_ARGS(&graphicsPipelineState));
 	assert(SUCCEEDED(hr));
 }
+
+} // namespace MyEngine

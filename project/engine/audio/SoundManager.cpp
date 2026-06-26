@@ -6,6 +6,8 @@
 #define DR_MP3_IMPLEMENTATION
 #include "dr_mp3.h"
 
+namespace MyEngine {
+
 // ----------------- Singleton -------------------
 SoundManager* SoundManager::GetInstance() {
     static SoundManager instance;
@@ -174,3 +176,6 @@ void SoundManager::SetVolume(int voiceId, float volume) {
         it->second.volume = volume;
     }
 }
+
+
+} // namespace MyEngine

@@ -7,9 +7,9 @@ struct Particle
     ParticleType type = ParticleType::Model3D;
 
     // 基本属性
-    Vector3 position{};
-    Vector3 velocity{};
-    Vector3 accel{};
+    MyEngine::Vector3 position{};
+    MyEngine::Vector3 velocity{};
+    MyEngine::Vector3 accel{};
 
     float scale = 1.0f;
     float rotation = 0.0f;
@@ -18,8 +18,8 @@ struct Particle
     float life = 1.0f;      // 残り寿命
     float maxLife = 1.0f;   // 初期寿命
 
-    // Sprite 粒子で使用する色
-    Vector4 color = {1,1,1,1};
+    // MyEngine::Sprite 粒子で使用する色
+    MyEngine::Vector4 color = {1,1,1,1};
 
     bool IsAlive() const { return life > 0; }
 };

@@ -8,19 +8,19 @@
 
 // GameScene 内にすでにある構造体。ここでも同じ定義を使う
 struct HintSprite {
-    std::unique_ptr<Sprite> sprite;
-    Vector3 worldPos{};
+    std::unique_ptr<MyEngine::Sprite> sprite;
+    MyEngine::Vector3 worldPos{};
 };
 
 // GameScene 内で実装されている WorldToScreen。ここでは宣言のみ行う
-Vector3 WorldToScreen(const Vector3& worldPos, Camera* camera);
+MyEngine::Vector3 WorldToScreen(const MyEngine::Vector3& worldPos, MyEngine::Camera* camera);
 
 class HintUIManager {
 public:
     HintUIManager() = default;
     ~HintUIManager() = default;
 
-    void Initialize(SpriteCommon* spriteCommon, Camera* camera);
+    void Initialize(MyEngine::SpriteCommon* spriteCommon, MyEngine::Camera* camera);
     void Finalize();
 
     // このマネージャに GameScene 内の HintSprite / コンテナを渡す
@@ -32,12 +32,12 @@ public:
     // 毎フレーム更新：上下の揺れを計算し、ワールド座標から画面座標へ変換する
     void Update(float dt);
 
-    // GameScene::Draw() の「中間レイヤー Sprite」内で呼び出す
+    // GameScene::Draw() の「中間レイヤー MyEngine::Sprite」内で呼び出す
     void Draw();
 
 private:
-    SpriteCommon* spriteCommon_ = nullptr;
-    Camera*       camera_       = nullptr;
+    MyEngine::SpriteCommon* spriteCommon_ = nullptr;
+    MyEngine::Camera*       camera_       = nullptr;
 
     HintSprite* spaceHint_  = nullptr;
     HintSprite* shiftHint_  = nullptr;
@@ -50,8 +50,8 @@ private:
     float bobSpeed_     = 3.0f;   // 周波数（大きいほど速く揺れる）
 
     // Move hint icons (key_A / arrow_left / key_D / arrow_right)
-    std::unique_ptr<Sprite> moveKeyA_;
-    std::unique_ptr<Sprite> moveArrowL_;
-    std::unique_ptr<Sprite> moveKeyD_;
-    std::unique_ptr<Sprite> moveArrowR_;
+    std::unique_ptr<MyEngine::Sprite> moveKeyA_;
+    std::unique_ptr<MyEngine::Sprite> moveArrowL_;
+    std::unique_ptr<MyEngine::Sprite> moveKeyD_;
+    std::unique_ptr<MyEngine::Sprite> moveArrowR_;
 };

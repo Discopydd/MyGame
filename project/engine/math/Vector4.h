@@ -1,5 +1,7 @@
 #pragma once
 
+namespace MyEngine {
+
 /// <summary>
 /// 4次元ベクトル
 /// </summary>
@@ -9,3 +11,6 @@ struct Vector4 final {
 	float z;
 	float w;
 };
+
+
+} // namespace MyEngine

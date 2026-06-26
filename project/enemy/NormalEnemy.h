@@ -5,7 +5,7 @@
 // ------------------ 通常敵 ------------------
 class NormalEnemy final : public Enemy {
 public:
-    void Initialize(Object3dCommon* common, Camera* camera, const Vector3& spawnPos, EnemyType type) override;
+    void Initialize(MyEngine::Object3dCommon* common, MyEngine::Camera* camera, const MyEngine::Vector3& spawnPos, EnemyType type) override;
     void Update(float deltaTime, const MapChipField& map, const Player& player) override;
     void Draw() override;
 
@@ -14,7 +14,7 @@ public:
 
 private:
     // ---------- 移動/重力/地面判定 ----------
-    Vector3 velocity_{ 0.0f, 0.0f, 0.0f };
+    MyEngine::Vector3 velocity_{ 0.0f, 0.0f, 0.0f };
     bool    isOnGround_ = false;
     int     facing_ = 1;                 // 1 右 / -1 左
     float   gravity_ = -2.20f;           // Boss と同じスケール（毎秒）
@@ -48,7 +48,7 @@ private:
     enum class Type1State { Patrol, Chase, Return };
     Type1State type1State_ = Type1State::Patrol;
 
-    Vector3 homePos_{};            // スポーン地点（「家」）
+    MyEngine::Vector3 homePos_{};            // スポーン地点（「家」）
     float aggroRange_ = 12.0f;      // 警戒範囲: プレイヤー入るで初めて追う
     float leashRange_ = 20.0f;      // リーシュ範囲: 超えたら追跡をやめて戻る
     float patrolHalfWidth_ = 0.0f;  // 家付近巡回半幅；0=棒立ち

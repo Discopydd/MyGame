@@ -7,6 +7,8 @@
 #include <unordered_map>
 #include <SrvManager.h>
 
+namespace MyEngine {
+
 class TextureManager
 {
 private:
@@ -82,3 +84,5 @@ private:
 	// GIF アニメーションデータ
     std::unordered_map<std::string, AnimatedTexture> gifDatas_;
 };
+
+} // namespace MyEngine

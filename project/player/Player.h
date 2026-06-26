@@ -8,20 +8,20 @@ public:
     Player();
     ~Player();
 
-    void Initialize(Object3dCommon* object3dCommon, Camera* camera);
-    void Update(Input* input, const MapChipField& mapChipField, bool snowWindActive = false);
+    void Initialize(MyEngine::Object3dCommon* object3dCommon, MyEngine::Camera* camera);
+    void Update(MyEngine::Input* input, const MapChipField& mapChipField, bool snowWindActive = false);
     void Draw();
 
     void HandleMapCollision(const MapChipField& mapChipField);
 
-    void SetPosition(const Vector3& pos) {
+    void SetPosition(const MyEngine::Vector3& pos) {
         position_ = pos;
         if (model_) {
             model_->SetTranslate(position_);
             model_->Update();
         }
     }
-    const Vector3& GetPosition() const { return position_; }
+    const MyEngine::Vector3& GetPosition() const { return position_; }
 
     bool IsDashing() const { return isDashing_; }
     float GetDashCooldown() const { return dashCooldownTimer_; }
@@ -30,9 +30,9 @@ public:
     float GetHeight() const { return height_; }
 
     float GetWidth()  const { return width_; }
-    const Vector3& GetVelocity() const { return velocity_; }
+    const MyEngine::Vector3& GetVelocity() const { return velocity_; }
 
-    void SetVelocity(const Vector3& v) { velocity_ = v; }
+    void SetVelocity(const MyEngine::Vector3& v) { velocity_ = v; }
 
     // 外部用（移動床など）の「特定の高さに着地させる」処理
     void LandOnExternalGround(float groundTopY);
@@ -41,7 +41,7 @@ public:
     void SnapOnGround(float groundTopY);
 
     // 外部からの強制移動量（たとえば移動床に運ばれるとき）
-    void ApplyExternalDisplacement(const Vector3& delta);
+    void ApplyExternalDisplacement(const MyEngine::Vector3& delta);
 
 
     void ResetForMapTransition(bool keepFacing = true);
@@ -83,14 +83,14 @@ public:
     // プレイヤーが右を向いているかどうか
     bool IsFacingRight() const { return lrDirection_ == LRDirection::kRight; }
 
-    const Vector3& GetDashDirection() const { return dashDirection_; }
+    const MyEngine::Vector3& GetDashDirection() const { return dashDirection_; }
 private:
-    std::unique_ptr<Object3d> model_;
-    Object3dCommon* object3dCommon_ = nullptr;
-    Camera* camera_ = nullptr;
+    std::unique_ptr<MyEngine::Object3d> model_;
+    MyEngine::Object3dCommon* object3dCommon_ = nullptr;
+    MyEngine::Camera* camera_ = nullptr;
 
-    Vector3 position_ = { 0, 0, 0 };
-    Vector3 velocity_ = { 0, 0, 0 };
+    MyEngine::Vector3 position_ = { 0, 0, 0 };
+    MyEngine::Vector3 velocity_ = { 0, 0, 0 };
 
     // ===== Movement =====
     float moveSpeed_ = 0.25f;
@@ -135,7 +135,7 @@ private:
     float dashCooldownTimer_ = 0.0f;
     bool  canDash_ = true;
     const float dashCooldownThreshold_ = 0.1f;
-    Vector3 dashDirection_ = { 1, 0, 0 };
+    MyEngine::Vector3 dashDirection_ = { 1, 0, 0 };
 
     bool  isDashJumping_ = false;       // 空中ダッシュ: 無重力で移動する
     float dashGravity_ = 0.0f;          // 互換性維持用のみ（Update 内では isDashJumping_ で g=0 を制御）

@@ -19,5 +19,5 @@ public:
 
 protected:
     bool endRequest_ = false;
-    std::unique_ptr<SceneManager> sceneManager_;
+    std::unique_ptr<MyEngine::SceneManager> sceneManager_;
 };

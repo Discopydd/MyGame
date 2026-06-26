@@ -1,6 +1,7 @@
 #include "CoinUIManager.h"
 #include <cmath>
 
+using namespace MyEngine;
 Vector3 ScreenToWorld(float screenX, float screenY, float ndcZ, Camera* camera);
 
 void CoinUIManager::Initialize(SpriteCommon* spriteCommon,

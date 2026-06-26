@@ -4,6 +4,8 @@
 #include <map>
 #include <string>
 #include "../base/DirectXCommon.h"
+namespace MyEngine {
+
 class ModelManager
 {
 public:
@@ -35,3 +37,5 @@ private:
 	std::unique_ptr<ModelCommon> modelCommon;
 
 };
+
+} // namespace MyEngine

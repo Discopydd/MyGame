@@ -1,5 +1,7 @@
 #include "SceneManager.h"
 
+namespace MyEngine {
+
 SceneManager::~SceneManager() {
     // 最後一个场景的終止和放つ
     if (scene_) {
@@ -73,3 +75,5 @@ void SceneManager::Draw() {
         scene_->Draw();
     }
 }
+
+} // namespace MyEngine

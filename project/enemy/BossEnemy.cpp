@@ -8,6 +8,7 @@
 #include <cmath>
 #include <cstdlib>
 
+using namespace MyEngine;
 namespace {
     inline bool IsSolid(MapChipType t) {
         return t == MapChipType::kBlock

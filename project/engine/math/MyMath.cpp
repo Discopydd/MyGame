@@ -1,4 +1,6 @@
 #include "MyMath.h"
+namespace MyEngine {
+
 namespace Math {
     Matrix4x4 Math::MakeScaleMatrix(const Vector3& scale) {
         Matrix4x4 result;
@@ -549,3 +551,6 @@ namespace Math {
         };
     }
 }
+
+
+} // namespace MyEngine

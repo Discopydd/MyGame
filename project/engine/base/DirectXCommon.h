@@ -18,6 +18,8 @@
 
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+namespace MyEngine {
+
 class DirectXCommon {
 public: // メンバ関数
 	void DeviceInitialize();
@@ -164,3 +166,5 @@ private: // メンバ関数
 	//FPS固定更新
 	void UpdateFixFPS();
 };
+
+} // namespace MyEngine

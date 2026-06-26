@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cmath>
 
+using namespace MyEngine;
 void IntroManager::Initialize(SpriteCommon* spriteCommon, Input* input)
 {
     spriteCommon_ = spriteCommon;

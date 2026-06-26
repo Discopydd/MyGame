@@ -9,6 +9,8 @@
 #include"../math/Transform.h"
 #include "Model.h"
 #include"Camera.h"
+namespace MyEngine {
+
 class Object3dCommon;
 class Object3d {
 
@@ -98,3 +100,5 @@ private:
 
 	Camera* camera = nullptr;
 };
+
+} // namespace MyEngine

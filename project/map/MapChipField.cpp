@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cmath>
 
+using namespace MyEngine;
 namespace {
 
 enum MapChipCharIndex {

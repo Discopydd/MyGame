@@ -1,6 +1,8 @@
 #include "Object3dCommon.h"
 #include "logger/Logger.h"
 
+namespace MyEngine {
+
 void Object3dCommon::Initialize(DirectXCommon* dxCommon)
 {
 	dxCommon_ = dxCommon;
@@ -176,3 +178,6 @@ void Object3dCommon::GraphicsPipelineInitialize()
 		IID_PPV_ARGS(&graphicsPipelineState));
 	assert(SUCCEEDED(hr));
 }
+
+
+} // namespace MyEngine

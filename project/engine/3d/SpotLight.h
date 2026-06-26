@@ -1,6 +1,8 @@
 #pragma once
 #include "Vector3.h"
 #include "Vector4.h"
+namespace MyEngine {
+
 struct SpotLight {
     Vector4 color;
     Vector3 position;
@@ -11,3 +13,5 @@ struct SpotLight {
     float cosAngle;
     float padding[2];  
 };
+
+} // namespace MyEngine

@@ -3,8 +3,12 @@
 #include "Vector2.h"
 #include "Vector3.h"
 
+namespace MyEngine {
+
 struct VertexData {
 	Vector4 position;
 	Vector2 texcoord;
 	Vector3 normal;
 };
+
+} // namespace MyEngine

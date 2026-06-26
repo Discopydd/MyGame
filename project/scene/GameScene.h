@@ -42,7 +42,7 @@
 
 #include <memory>
 
-class GameScene : public BaseScene {
+class GameScene : public MyEngine::BaseScene {
 public:
     void Initialize() override;
     void Update() override;
@@ -51,31 +51,31 @@ public:
     void UpdateInitialization() override;
     bool IsInitializationComplete() const override;
 
-    void StartLoadingMap(const std::string& mapPath, const Vector3& startPos, bool isPortal);
+    void StartLoadingMap(const std::string& mapPath, const MyEngine::Vector3& startPos, bool isPortal);
 
 private:
-    WinApp*         winApp_         = nullptr;
-    DirectXCommon*  dxCommon_       = nullptr;
-    Input*          input_          = nullptr;
-    SpriteCommon*   spriteCommon_   = nullptr;
-    SrvManager*     srvManager_     = nullptr;
+    MyEngine::WinApp*         winApp_         = nullptr;
+    MyEngine::DirectXCommon*  dxCommon_       = nullptr;
+    MyEngine::Input*          input_          = nullptr;
+    MyEngine::SpriteCommon*   spriteCommon_   = nullptr;
+    MyEngine::SrvManager*     srvManager_     = nullptr;
 
     // ===== GameScene 所有するオブジェクト群: unique_ptr で管理 =====
-    std::unique_ptr<Sprite>       backgroundSprite_;
-    std::unique_ptr<ImGuiManager> imguiManager_;
-    std::unique_ptr<Object3dCommon> object3dCommon_;
-    std::unique_ptr<Camera>       camera_;
+    std::unique_ptr<MyEngine::Sprite>       backgroundSprite_;
+    std::unique_ptr<MyEngine::ImGuiManager> imguiManager_;
+    std::unique_ptr<MyEngine::Object3dCommon> object3dCommon_;
+    std::unique_ptr<MyEngine::Camera>       camera_;
     std::unique_ptr<PlayerCamera> playerCamera_;
     std::unique_ptr<Player>       player_;
 
-    Vector2 rotation_{};
+    MyEngine::Vector2 rotation_{};
 
     // --- Map ---
     MapChipField mapChipField_;  // 地図データ本体（値セマンティクス）
 
     // マップブロック / 水ブロックの 3D モデル: GameScene が所有
-    std::vector<std::unique_ptr<Object3d>> mapBlocks_;
-    std::vector<std::unique_ptr<Object3d>> waterBlocks_;
+    std::vector<std::unique_ptr<MyEngine::Object3d>> mapBlocks_;
+    std::vector<std::unique_ptr<MyEngine::Object3d>> waterBlocks_;
 
     enum class PendingSpawnKind {
         Block,
@@ -91,7 +91,7 @@ private:
 
     struct PendingSpawn {
         PendingSpawnKind kind = PendingSpawnKind::Block;
-        Vector3 position{};
+        MyEngine::Vector3 position{};
         uint32_t x = 0;
         uint32_t y = 0;
         uint8_t subID = 0;
@@ -102,8 +102,8 @@ private:
     void BuildPendingMapSpawns();
     void ProcessPendingMapSpawns(size_t spawnBudget);
     bool IsMapBuildComplete() const;
-    void FinishMapLoading(const Vector3& startPos);
-    void LoadMap(const std::string& mapPath, const Vector3& startPos);
+    void FinishMapLoading(const MyEngine::Vector3& startPos);
+    void LoadMap(const std::string& mapPath, const MyEngine::Vector3& startPos);
     void HandlePlayerOnMovingPlatforms();
     void SyncLoadedSceneForReveal();
     bool CanUsePortalOnCurrentMap_() const;
@@ -126,7 +126,7 @@ private:
     bool isPortalLoading_    = false;  // 転送門ロードフラグ
 
     std::string portalMapPath_;        // 転送門目標マップ
-    Vector3     portalStartPos_;       // 転送門開始位置
+    MyEngine::Vector3     portalStartPos_;       // 転送門開始位置
     float       portalLoadingTimer_ = 0.0f;  // 転送門タイマー
     float       loadingTimer_       = 0.0f;  // 初期ロードタイマー
     std::deque<PendingSpawn> pendingMapSpawns_;
@@ -142,7 +142,7 @@ private:
     // 転送門トリガー: 黒くなってからロードを開始するのを待つ
     bool        pendingPortalLoad_ = false;
     std::string pendingPortalMapPath_;
-    Vector3     pendingPortalStartPos_;
+    MyEngine::Vector3     pendingPortalStartPos_;
 
     // === GameClear / 回タイトル用フラグ ===
     bool pendingGameClear_ = false;  // E でクリアをトリガーした時、黒幕が完全な黒になるのを待ってから勝利演出へ入るために使う
@@ -154,7 +154,7 @@ private:
     // ===== HP 3D バー =====
     float hpNdcZ_ = 0.08f;  // カメラに近づけ、遮蔽されるのを防ぐ
 
-    // ===== ヒントアイコン（HintSprite 自身は「ビュー」だけであり、Sprite の所有権はすべて GameScene 側にある）=====
+    // ===== ヒントアイコン（HintSprite 自身は「ビュー」だけであり、MyEngine::Sprite の所有権はすべて GameScene 側にある）=====
     HintSprite spaceHint_;
     HintSprite shiftHint_;
     HintSprite sprintHint_;
@@ -186,8 +186,8 @@ private:
     std::unique_ptr<ParticleManager> particleMgr_;
 
     // エミッタは ParticleManager が生成・所有し、ここでは「借用」した生ポインタを保持するだけで delete しない
-    ParticleEmitter* emitter2D_        = nullptr;   // 2D（Sprite）粒子エミッタ
-    ParticleEmitter* emitter3D_        = nullptr;   // 3D（Model）粒子エミッタ
+    ParticleEmitter* emitter2D_        = nullptr;   // 2D（MyEngine::Sprite）粒子エミッタ
+    ParticleEmitter* emitter3D_        = nullptr;   // 3D（MyEngine::Model）粒子エミッタ
     ParticleEmitter* dashStarEmitter_  = nullptr;
     ParticleEmitter* windEmitter_      = nullptr;   // 風エフェクト用のパーティクルエミッタ
     float            windSpawnTimer_   = 0.0f;
@@ -201,7 +201,7 @@ private:
     bool playerIndexHistoryInitialized_    = false;
     MapChipField::IndexSet playerIndexOneSecAgo_{};
 
-    Vector3 prevCameraPos_{};
+    MyEngine::Vector3 prevCameraPos_{};
 
     // 移動床
     std::vector<std::unique_ptr<MovingPlatform>> movingPlatforms_;
@@ -218,11 +218,11 @@ private:
 
     
     // ================== Boss HP（2D） ==================
-    std::unique_ptr<Sprite> bossHpDamageSprite_; // 赤: 遅れて減る HP バー
-    std::unique_ptr<Sprite> bossHpSprite_;       // 緑: 即時 HP バー
+    std::unique_ptr<MyEngine::Sprite> bossHpDamageSprite_; // 赤: 遅れて減る HP バー
+    std::unique_ptr<MyEngine::Sprite> bossHpSprite_;       // 緑: 即時 HP バー
 
-    Vector2 bossHpBarPos_{};   // 左上座標（画面ピクセル）
-    Vector2 bossHpBarSize_{};  // 満タン時のサイズ（画面ピクセル）
+    MyEngine::Vector2 bossHpBarPos_{};   // 左上座標（画面ピクセル）
+    MyEngine::Vector2 bossHpBarSize_{};  // 満タン時のサイズ（画面ピクセル）
 
     float bossHpRatio_      = 1.0f; // 緑バーの割合
     float bossDamageRatio_  = 1.0f; // 赤バーの割合（ゆっくり緑へ追従）
@@ -242,11 +242,11 @@ private:
     float   bossIntroTimer_ = 0.0f;
 
     // トリガー瞬間: プレイヤー追従カメラの開始位置を記録
-    Vector3 bossIntroStartCamPos_{};
+    MyEngine::Vector3 bossIntroStartCamPos_{};
     float   bossIntroStartFovY_ = 0.45f;
 
     // プレイヤーへ戻る段階: 戻り開始位置を記録
-    Vector3 bossIntroBackStartCamPos_{};
+    MyEngine::Vector3 bossIntroBackStartCamPos_{};
     float   bossIntroBackStartFovY_ = 0.45f;
 
     // 対象 Boss（借用ポインタ。ライフサイクルは enemies_ 側で管理）
@@ -258,14 +258,14 @@ private:
     // ★ 推カメラ/展示名時: カメラ全体を少し下へずらす
     // 注意: このプロジェクトのワールド座標 Y 軸は「下が正」のようなので、「下へ」は +Y を使う。
     // もしシーンが「上が正」の場合は、この値を負数へ変更すればよい。
-    Vector3 bossIntroBossCamOffset_ = {0.0f, 0.0f, 0.0f};
+    MyEngine::Vector3 bossIntroBossCamOffset_ = {0.0f, 0.0f, 0.0f};
 
     float bossIntroToBossDur_  = 0.85f;            // カメラ寄せ時間
     float bossIntroShowDur_    = 1.10f;            // 名前表示の停止時間
     float bossIntroBackDur_    = 0.85f;            // プレイヤーへ戻る時間
 
-    // Boss 名称（Sprite テクスチャ）
-    std::unique_ptr<Sprite> bossNameSprite_;
+    // Boss 名称（MyEngine::Sprite テクスチャ）
+    std::unique_ptr<MyEngine::Sprite> bossNameSprite_;
     bool bossNameVisible_ = false;
 
     void StartBossIntro(BossEnemy* boss);
@@ -274,18 +274,18 @@ private:
     BossEnemy* FindBossEnemy();
 
     // カメラ目標点をマップ境界内に制限する（★ 先に目標を制約してから補間することで、境界沿いの滑りが滑らかになる）
-    Vector3 ConstrainCameraToMap(const Vector3& desiredPos, float fovY, float cameraZ) const;
+    MyEngine::Vector3 ConstrainCameraToMap(const MyEngine::Vector3& desiredPos, float fovY, float cameraZ) const;
 
     // ================== Pause Menu（ESC） ==================
     bool isPaused_ = false;
     int  pauseCursor_ = 0; // 0: Continue, 1: Back to Title
     // 継続 / タイトルへ戻るボタン（通常 / 選択中）
-    std::unique_ptr<Sprite> pauseContinueNormal_;
-    std::unique_ptr<Sprite> pauseContinueSelected_;
-    std::unique_ptr<Sprite> pauseBackNormal_;
-    std::unique_ptr<Sprite> pauseBackSelected_;
+    std::unique_ptr<MyEngine::Sprite> pauseContinueNormal_;
+    std::unique_ptr<MyEngine::Sprite> pauseContinueSelected_;
+    std::unique_ptr<MyEngine::Sprite> pauseBackNormal_;
+    std::unique_ptr<MyEngine::Sprite> pauseBackSelected_;
     // 一時停止時の暗色オーバーレイ（FadeManager を流用せず、状態干渉を避ける）
-    std::unique_ptr<Sprite> pauseDimSprite_;
+    std::unique_ptr<MyEngine::Sprite> pauseDimSprite_;
 
     enum class DeferredInitPhase {
         None,

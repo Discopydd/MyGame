@@ -8,7 +8,7 @@
 // ------------------ Boss ------------------
 class BossEnemy final : public Enemy {
 public:
-    void Initialize(Object3dCommon* common, Camera* camera, const Vector3& spawnPos, EnemyType type) override;
+    void Initialize(MyEngine::Object3dCommon* common, MyEngine::Camera* camera, const MyEngine::Vector3& spawnPos, EnemyType type) override;
     void Update(float deltaTime, const MapChipField& map, const Player& player) override;
     void Draw() override;
 
@@ -28,7 +28,7 @@ public:
 private:
     // ================== 定数定義（マジックナンバー対策） ==================
     // BossEnemy.cpp で直接数値を書かず、調整値をここに集約する。
-    inline static constexpr Vector3 kZeroVector_{ 0.0f, 0.0f, 0.0f };
+    inline static constexpr MyEngine::Vector3 kZeroVector_{ 0.0f, 0.0f, 0.0f };
 
     static constexpr float kPi_ = 3.14159265358979323846f;
     static constexpr float kTwoPi_ = kPi_ * 2.0f;
@@ -286,7 +286,7 @@ private:
 
 
     // ----- 微振動予備動作
-    Vector3 preAttackJitter_{ kZeroVector_ };
+    MyEngine::Vector3 preAttackJitter_{ kZeroVector_ };
     float   preAttackJitterTime_ = 0.0f;
 
     // 最後の X 秒に入ったら揺れを開始する（秒）
@@ -300,8 +300,8 @@ private:
     float preJitterAmpY_ = kPreJitterAmpY_;
 
 
-    Vector3 GetRenderPosition() const {
-        Vector3 p = position_;
+    MyEngine::Vector3 GetRenderPosition() const {
+        MyEngine::Vector3 p = position_;
         p.x += preAttackJitter_.x;
         p.y += visualOffsetY_ + preAttackJitter_.y;
         p.z += preAttackJitter_.z;
@@ -309,7 +309,7 @@ private:
     }
 
     // ---------- 移動/衝突（Boss 用: position += velocity） ----------
-    Vector3 velocity_{ kZeroVector_ };
+    MyEngine::Vector3 velocity_{ kZeroVector_ };
     bool    isOnGround_ = false;
     float   gravityBase_ = kGravityBase_;
 
@@ -431,9 +431,9 @@ private:
 
     // ---------- Boss 弾幕（オブジェクトプール） ----------
     struct BossProjectile {
-        std::unique_ptr<Object3d> obj;
-        Vector3 pos{ kZeroVector_ };
-        Vector3 vel{ kZeroVector_ };
+        std::unique_ptr<MyEngine::Object3d> obj;
+        MyEngine::Vector3 pos{ kZeroVector_ };
+        MyEngine::Vector3 vel{ kZeroVector_ };
         float   life = 0.0f;
         float   radius = kProjectileRadius_;
         bool    active = false;
@@ -505,7 +505,7 @@ private:
 
     float battleTriggerVerticalRange_ = kBattleTriggerVerticalRange_;
     // 汎用: リング弾幕用ツール（オブジェクトプールを再利用）
-    void SpawnRadialBurst(const Vector3& center, int count, float speed, float life, float radius, float angleOffset = 0.0f);
+    void SpawnRadialBurst(const MyEngine::Vector3& center, int count, float speed, float life, float radius, float angleOffset = 0.0f);
 
 private:
     void UpdatePreAttackJitter(float dt);
@@ -514,8 +514,8 @@ private:
     void UpdateBossFacing(const Player& player);
 
     void UpdateBossProjectiles(float dt, const MapChipField& map);
-    void SpawnBossProjectile(const Vector3& spawnPos, const Vector3& aimDir);
-    void SpawnBossProjectileRaw(const Vector3& spawnPos, const Vector3& velocity, float life, float radius);
+    void SpawnBossProjectile(const MyEngine::Vector3& spawnPos, const MyEngine::Vector3& aimDir);
+    void SpawnBossProjectileRaw(const MyEngine::Vector3& spawnPos, const MyEngine::Vector3& velocity, float life, float radius);
     void DrawBossProjectiles();
 
     void FinishUltimateCooldown();

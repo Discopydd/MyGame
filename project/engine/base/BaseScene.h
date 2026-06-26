@@ -1,4 +1,6 @@
 #pragma once
+namespace MyEngine {
+
 class SceneManager;
 // シーンの基底クラス
 class BaseScene {
@@ -18,3 +20,6 @@ public:
 protected:
     SceneManager* sceneManager_ = nullptr;
 };
+
+
+} // namespace MyEngine

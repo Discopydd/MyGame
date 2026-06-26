@@ -4,6 +4,8 @@
 #include <numbers>
 #include <cmath>
 
+using namespace MyEngine;
+
 Player::Player() {}
 
 Player::~Player() {

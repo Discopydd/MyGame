@@ -4,6 +4,8 @@
 #include <dxgi1_6.h>
 #include <d3d12sdklayers.h>
 
+namespace MyEngine {
+
 class DebugReporter {
 public:
     DebugReporter() {
@@ -25,3 +27,5 @@ public:
 private:
     Microsoft::WRL::ComPtr<IDXGIDebug1> debug_;
 };
+
+} // namespace MyEngine
