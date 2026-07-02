@@ -1774,6 +1774,7 @@ void GameScene::Update() {
     const PortalInfo* currentPortal = nullptr;
     if (portalMgr_) {
         portalMgr_->UpdateHint(playerIndex, player_->GetPosition(), canControl && canUsePortalOnCurrentMap);
+        portalMgr_->SetLockVisible(!canUsePortalOnCurrentMap);
         currentPortal = portalMgr_->GetPortalAt(playerIndex);
     }
 
@@ -1967,6 +1968,7 @@ void GameScene::Draw() {
 
         // 転送門提示
         if (portalMgr_) {
+            portalMgr_->DrawLockIcons();
             portalMgr_->DrawHint();
         }
     }
@@ -2369,7 +2371,8 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
             portalMgr_->AddPortal(
                 { 26, 11 },
                 "Resources/map/map2.csv",
-                mapChipField_.GetMapChipPositionByIndex(2, 1)
+                mapChipField_.GetMapChipPositionByIndex(2, 1),
+                mapChipField_.GetMapChipPositionByIndex(26, 11)
             );
         }
     }
@@ -2380,34 +2383,40 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
             portalMgr_->AddPortal(
                 { 2, 1 },
                 "Resources/map/map.csv",
-                mapChipField_.GetMapChipPositionByIndex(26, 11)
+                mapChipField_.GetMapChipPositionByIndex(26, 11),
+                mapChipField_.GetMapChipPositionByIndex(2, 1)
             );
 
             if (hubProgress_ >= 0) {
                 portalMgr_->AddPortal(
                     { 11, 5 },
                     "Resources/map/map3.csv",
-                    mapChipField_.GetMapChipPositionByIndex(2, 1)
+                    mapChipField_.GetMapChipPositionByIndex(2, 1),
+                    mapChipField_.GetMapChipPositionByIndex(11, 5)
                 );
             }
             if (hubProgress_ >= 1) {
                 portalMgr_->AddPortal(
                     { 14, 5 },
                     "Resources/map/map4.csv",
-                    mapChipField_.GetMapChipPositionByIndex(2, 1)
+                    mapChipField_.GetMapChipPositionByIndex(2, 1),
+                    mapChipField_.GetMapChipPositionByIndex(14, 5)
                 );
             }
             if (hubProgress_ >= 2) {
                 portalMgr_->AddPortal(
                     { 23, 1 },
                     "Resources/map/map5.csv",
-                    mapChipField_.GetMapChipPositionByIndex(2, 1)
+                    mapChipField_.GetMapChipPositionByIndex(2, 1),
+                    mapChipField_.GetMapChipPositionByIndex(23, 1)
                 );
             }
             if (hubProgress_ >= 3) {
                 Vector3 finalStart = mapChipField_.GetMapChipPositionByIndex(2, 1);
-                portalMgr_->AddPortal({ 12, 14 }, "Resources/map/map6.csv", finalStart);
-                portalMgr_->AddPortal({ 13, 14 }, "Resources/map/map6.csv", finalStart);
+                portalMgr_->AddPortal({ 12, 14 }, "Resources/map/map6.csv", finalStart,
+                    mapChipField_.GetMapChipPositionByIndex(12, 14));
+                portalMgr_->AddPortal({ 13, 14 }, "Resources/map/map6.csv", finalStart,
+                    mapChipField_.GetMapChipPositionByIndex(13, 14));
             }
         }
     }
@@ -2416,15 +2425,18 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
         if (portalMgr_) {
             if (mapPath == "Resources/map/map3.csv") {
                 portalMgr_->AddPortal({ 61, 1 }, "Resources/map/map2.csv",
-                    mapChipField_.GetMapChipPositionByIndex(11, 5));
+                    mapChipField_.GetMapChipPositionByIndex(11, 5),
+                    mapChipField_.GetMapChipPositionByIndex(61, 1));
             }
             else if (mapPath == "Resources/map/map4.csv") {
                 portalMgr_->AddPortal({ 69, 1 }, "Resources/map/map2.csv",
-                    mapChipField_.GetMapChipPositionByIndex(14, 5));
+                    mapChipField_.GetMapChipPositionByIndex(14, 5),
+                    mapChipField_.GetMapChipPositionByIndex(69, 1));
             }
             else if (mapPath == "Resources/map/map5.csv") {
                 portalMgr_->AddPortal({ 81, 1 }, "Resources/map/map2.csv",
-                    mapChipField_.GetMapChipPositionByIndex(23, 1));
+                    mapChipField_.GetMapChipPositionByIndex(23, 1),
+                    mapChipField_.GetMapChipPositionByIndex(81, 1));
             }
             // map6 は Boss 専用ステージなので、戻り転送門は生成しない
         }

@@ -9,9 +9,10 @@
 #include <memory>
 // もともと GameScene にあった PortalInfo をここへ移動
 struct PortalInfo {
-    MapChipField::IndexSet index;  // 転送ポータルのマス座標
-    std::string targetMap;         // 遷移先マップのパス
-    MyEngine::Vector3 targetStartPos;        // 遷移先マップでのプレイヤー開始位置
+    MapChipField::IndexSet index;      // 転送ポータルのマス座標
+    std::string targetMap;             // 遷移先マップのパス
+    MyEngine::Vector3 targetStartPos;  // 遷移先マップでのプレイヤー開始位置
+    MyEngine::Vector3 worldPos;        // 現在マップ上のポータル表示位置
 };
 
 // GameScene.cpp にある補助関数の宣言（実装は GameScene.cpp 側）
@@ -28,7 +29,8 @@ public:
     void ClearPortals();
     void AddPortal(const MapChipField::IndexSet& idx,
                    const std::string& targetMap,
-                   const MyEngine::Vector3& startPos);
+                   const MyEngine::Vector3& startPos,
+                   const MyEngine::Vector3& worldPos);
 
     // 現在登録されている全ポータルを返す（GameScene 側で配置に使用）
     const std::vector<PortalInfo>& GetPortals() const { return portals_; }
@@ -44,10 +46,19 @@ public:
     // 描画ヒントアイコン（GameScene::Draw 内呼び出す）
     void DrawHint();
 
+    // コイン未回収で使用不可の間、ポータル上に鍵アイコンを表示する
+    void SetLockVisible(bool visible);
+    void DrawLockIcons();
+
 private:
     MyEngine::SpriteCommon* spriteCommon_ = nullptr;
     MyEngine::Camera*       camera_       = nullptr;
 
     std::unique_ptr<MyEngine::Sprite> hintSprite_;  // 「E を押す」アイコン
+    std::unique_ptr<MyEngine::Sprite> lockSprite_;  // ポータルのロックアイコン
     std::vector<PortalInfo> portals_;
+    bool showLockIcons_ = false;
+    float lockPulseTimer_ = 0.0f;
+    bool unlockBurstActive_ = false;
+    float unlockBurstTimer_ = 0.0f;
 };
