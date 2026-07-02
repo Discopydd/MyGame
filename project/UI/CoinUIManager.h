@@ -18,9 +18,9 @@ public:
 
     void Finalize();
 
-    // 現在の総コイン数を設定する（0～999）。UI は自動で更新される
-    void SetTotalCoin(int total);
-    int  GetTotalCoin() const { return totalCoin_; }
+    // 現在のマップに残っているコイン数を設定する（0～999）。UI は自動で更新される
+    void SetRemainingCoin(int remaining);
+    int  GetRemainingCoin() const { return remainingCoin_; }
 
     // 毎フレーム更新（ライト点滅用のタイマー）
     void Update(float dt);
@@ -42,8 +42,8 @@ private:
         nullptr, nullptr, nullptr
     };
 
-    int   totalCoin_ = 0;
-    int   lastCoin_  = -1;
+    int   remainingCoin_ = 0;
+    int   lastCoin_      = -1;
     float lightTime_ = 0.0f;
 
     // 右上の数字 UI を更新する（旧 UpdateCoinCountUI_）

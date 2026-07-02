@@ -34,8 +34,8 @@ void CoinUIManager::Initialize(SpriteCommon* spriteCommon,
         digitSprites_[i]->SetSize({ 24.0f, 24.0f });
     }
 
-    totalCoin_ = 0;
-    lastCoin_  = -1;
+    remainingCoin_ = 0;
+    lastCoin_      = -1;
     UpdateDigits_();
 }
 
@@ -48,12 +48,12 @@ void CoinUIManager::Finalize()
     coinObj_.reset();
 }
 
-void CoinUIManager::SetTotalCoin(int total)
+void CoinUIManager::SetRemainingCoin(int remaining)
 {
-    if (total < 0)   total = 0;
-    if (total > 999) total = 999;
-    totalCoin_ = total;
-    if (totalCoin_ != lastCoin_) {
+    if (remaining < 0)   remaining = 0;
+    if (remaining > 999) remaining = 999;
+    remainingCoin_ = remaining;
+    if (remainingCoin_ != lastCoin_) {
         UpdateDigits_();
     }
 }
@@ -128,7 +128,7 @@ void CoinUIManager::UpdateDigits_()
     colonSprite_->Update();
 
     // 数字（整数値は 0～999 に制限）
-    int c = totalCoin_;
+    int c = remainingCoin_;
     if (c < 0)   c = 0;
     if (c > 999) c = 999;
 

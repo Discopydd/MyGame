@@ -107,6 +107,7 @@ private:
     void HandlePlayerOnMovingPlatforms();
     void SyncLoadedSceneForReveal();
     bool CanUsePortalOnCurrentMap_() const;
+    void UpdateCoinUIRemaining_();
 
     // UI / マネージャ
     std::unique_ptr<DashUIManager>   dashUI_;

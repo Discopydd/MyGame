@@ -256,7 +256,7 @@ void GameScene::InitializeGameplayManagers_()
 
     coinUI_ = std::make_unique<CoinUIManager>();
     coinUI_->Initialize(spriteCommon_, object3dCommon_.get(), camera_.get(), hpNdcZ_);
-    coinUI_->SetTotalCoin(totalCoinCollected_);
+    UpdateCoinUIRemaining_();
 
     hintUI_ = std::make_unique<HintUIManager>();
     hintUI_->Initialize(spriteCommon_, camera_.get());
@@ -608,6 +608,7 @@ void GameScene::ProcessPendingMapSpawns(size_t spawnBudget)
             item->SetPointLightIntensity(2.0f);
             item->Update();
             itemMgr_->RegisterItem(currentMapPath_, spawn.x, spawn.y, std::move(item));
+            UpdateCoinUIRemaining_();
             break;
         }
         case PendingSpawnKind::Spike:
@@ -706,6 +707,7 @@ void GameScene::FinishMapLoading(const Vector3& startPos)
     }
 
     SyncLoadedSceneForReveal();
+    UpdateCoinUIRemaining_();
     postLoadSettleFrames_ = kPostLoadSettleFrames;
     pendingRevealAfterLoad_ = true;
 
@@ -726,6 +728,16 @@ bool GameScene::CanUsePortalOnCurrentMap_() const
         return true;
     }
     return itemMgr_->GetRemainingItemCount() <= 0;
+}
+
+void GameScene::UpdateCoinUIRemaining_()
+{
+    if (!coinUI_) {
+        return;
+    }
+
+    const int remainingCoin = itemMgr_ ? itemMgr_->GetRemainingItemCount() : 0;
+    coinUI_->SetRemainingCoin(remainingCoin);
 }
 
 void GameScene::Initialize() {
@@ -1753,9 +1765,7 @@ void GameScene::Update() {
         bool picked = itemMgr_->OnPlayerStepOnTile(currentMapPath_, playerIndex, mapChipField_, player_.get());
         if (picked) {
             ++totalCoinCollected_;
-            if (coinUI_) {
-                coinUI_->SetTotalCoin(totalCoinCollected_);
-            }
+            UpdateCoinUIRemaining_();
         }
     }
 
@@ -2227,10 +2237,8 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
     BuildPendingMapSpawns();
     loadPrepared_ = true;
 
-    // ==== 右上 Coin UI を更新: 「合計で取得した coin 数」を表示 ====
-    if (coinUI_) {
-        coinUI_->SetTotalCoin(totalCoinCollected_);
-    }
+    // ==== 右上 Coin UI を更新: 現在のマップに残っている coin 数を表示 ====
+    UpdateCoinUIRemaining_();
 
     // === map1 のみ Space / Shift / Sprint / Up のヒントを生成 ===
     if (mapPath == "Resources/map/map.csv") {
