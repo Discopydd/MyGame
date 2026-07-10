@@ -108,6 +108,9 @@ private:
     void SyncLoadedSceneForReveal();
     bool CanUsePortalOnCurrentMap_() const;
     void UpdateCoinUIRemaining_();
+    void RegisterHubStageMaps_();
+    void SetupMapHints_(const std::string& mapPath);
+    void SetupPortalsForCurrentMap_(const std::string& mapPath);
 
     // UI / マネージャ
     std::unique_ptr<DashUIManager>   dashUI_;

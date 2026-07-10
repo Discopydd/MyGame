@@ -88,25 +88,118 @@ Vector3 ScreenToWorld(float screenX, float screenY, float ndcZ, Camera* camera)
 
 
 namespace {
+    namespace GameSceneConfig {
+        // ==== Resource / map paths ====
+        constexpr const char* kMapStart  = "Resources/map/map.csv";
+        constexpr const char* kMapHub    = "Resources/map/map2.csv";
+        constexpr const char* kMapStage1 = "Resources/map/map3.csv";
+        constexpr const char* kMapStage2 = "Resources/map/map4.csv";
+        constexpr const char* kMapSnow   = "Resources/map/map5.csv";
+        constexpr const char* kMapBoss   = "Resources/map/map6.csv";
+
+        constexpr Vector3 kStartMapEntry = { 2.0f, 1.0f, 0.0f };
+        constexpr Vector3 kInitialPlayerPosition = { 3.0f, 3.0f, 0.0f };
+        constexpr Vector3 kDefaultCameraOffset = { 0.0f, 0.0f, -40.0f };
+
+        constexpr const char* kModelBlock  = "cube/cube.obj";
+        constexpr const char* kModelBlock2 = "cube2/cube2.obj";
+        constexpr const char* kModelPortal = "door/Door.obj";
+        constexpr const char* kModelCoin   = "coin/coin.obj";
+        constexpr const char* kModelSpike  = "strip/strip.obj";
+        constexpr const char* kModelWater  = "water/water.obj";
+        constexpr const char* kModelJumpParticle = "jump/jump.obj";
+        constexpr const char* kModelDashStar     = "star/star.obj";
+        constexpr const char* kModelSnowParticle = "snow/snow.obj";
+        constexpr const char* kTexWindParticle   = "Resources/wind.dds";
+
+        // ==== Gameplay tuning ====
+        constexpr float kItemYOffset = 0.4f;
+        constexpr float kSpikeYOffset = -0.1f;
+        constexpr float kWaterAlpha = 0.5f;
+        constexpr float kItemLightIntensity = 2.0f;
+        constexpr float kEnemyDamageRate = 0.2f;
+
+        constexpr float kStompTolerance = 0.15f;
+        constexpr float kStompFallSpeed = -0.05f;
+        constexpr float kStompNormalBounce = 0.70f;
+        constexpr float kStompBlockedBounce = 0.55f;
+        constexpr float kBossStompKick = 0.32f;
+        constexpr float kBossBlockedKick = 0.40f;
+        constexpr float kBossStompInvincibleTime = 0.12f;
+        constexpr float kBossBlockedInvincibleTime = 0.08f;
+        constexpr float kNormalStompCooldown = 0.25f;
+        constexpr float kBossStompCooldown = 0.45f;
+
+        // ==== Tutorial / hub hint setup ====
+        struct HintIconConfig {
+            const char* texturePath;
+            MapChipField::IndexSet index;
+            Vector2 size;
+            Vector2 offset;
+            float rotation = 0.0f;
+        };
+
+        constexpr HintIconConfig kSpaceHint  = { "Resources/space2.png", { 5, 2 },  { 48.0f, 32.0f }, { 0.0f, 0.4f } };
+        constexpr HintIconConfig kShiftHint  = { "Resources/shift.png",  { 19, 6 }, { 48.0f, 32.0f }, { -0.2f, 0.5f } };
+        constexpr HintIconConfig kSprintHint = { "Resources/sprint.png", { 20, 6 }, { 48.0f, 48.0f }, { -0.3f, 0.5f } };
+        constexpr MapChipField::IndexSet kUpHintIndices[] = { { 6, 2 }, { 11, 4 }, { 12, 4 } };
+        constexpr Vector2 kUpHintSize = { 32.0f, 32.0f };
+        constexpr Vector2 kHubArrowOffset = { 0.4f, 2.0f };
+
+        // ==== Portal / stage progression setup ====
+        struct StageConfig {
+            const char* mapPath;
+            int stageIndex;
+            MapChipField::IndexSet hubPortalIndex;
+            MapChipField::IndexSet stageReturnPortalIndex;
+        };
+
+        constexpr StageConfig kStages[] = {
+            { kMapStage1, 0, { 11, 5 },  { 61, 1 } },
+            { kMapStage2, 1, { 14, 5 },  { 69, 1 } },
+            { kMapSnow,   2, { 23, 1 },  { 81, 1 } },
+            { kMapBoss,   3, { 12, 14 }, { 0, 0 } },
+        };
+
+        constexpr MapChipField::IndexSet kStartToHubPortal = { 26, 11 };
+        constexpr MapChipField::IndexSet kHubToStartPortal = { 2, 1 };
+        constexpr MapChipField::IndexSet kBossHubPortalSecondTile = { 13, 14 };
+    }
+
     const char* kDeferredInitModelPaths[] = {
-        "cube/cube.obj",
+        GameSceneConfig::kModelBlock,
         "player/player.obj",
-        "door/Door.obj",
-        "strip/strip.obj",
-        "coin/coin.obj",
+        GameSceneConfig::kModelPortal,
+        GameSceneConfig::kModelSpike,
+        GameSceneConfig::kModelCoin,
         "coin_ui/coin_ui.obj",
-        "snow/snow.obj",
-        "jump/jump.obj",
-        "star/star.obj",
+        GameSceneConfig::kModelSnowParticle,
+        GameSceneConfig::kModelJumpParticle,
+        GameSceneConfig::kModelDashStar,
         "hurd/hurd.obj",
-        "cube2/cube2.obj",
-        "water/water.obj",
+        GameSceneConfig::kModelBlock2,
+        GameSceneConfig::kModelWater,
         "enemy0/enemy0.obj",
         "enemy1/enemy1.obj",
         "enemy2/enemy2.obj",
         "enemy3/enemy3.obj",
         "enemyBullet/enemyBullet.obj",
     };
+
+    std::unique_ptr<Object3d> CreateMapObject(
+        Object3dCommon* object3dCommon,
+        Camera* camera,
+        const char* modelPath,
+        const Vector3& position)
+    {
+        auto object = std::make_unique<Object3d>();
+        object->Initialize(object3dCommon);
+        object->SetModel(modelPath);
+        object->SetCamera(camera);
+        object->SetTranslate(position);
+        object->Update();
+        return object;
+    }
 }
 
 bool GameScene::IsInitializationComplete() const
@@ -245,7 +338,7 @@ void GameScene::InitializeGameplayManagers_()
 
     playerCamera_ = std::make_unique<PlayerCamera>();
     playerCamera_->Initialize(camera_.get(), player_.get(), &mapChipField_);
-    playerCamera_->SetOffset({ 0, 0.0f, -40.0f });
+    playerCamera_->SetOffset(GameSceneConfig::kDefaultCameraOffset);
     playerCamera_->SetFollowSpeed(0.1f);
     playerCamera_->SetConstrainToMap(true);
 
@@ -315,11 +408,7 @@ void GameScene::InitializeGameplayManagers_()
         dashStarEmitter_->SetFollowCamera(false);
     }
 
-    hubStageByMap_.clear();
-    hubStageByMap_["Resources/map/map3.csv"] = 0;
-    hubStageByMap_["Resources/map/map4.csv"] = 1;
-    hubStageByMap_["Resources/map/map5.csv"] = 2;
-    hubStageByMap_["Resources/map/map6.csv"] = 3;
+    RegisterHubStageMaps_();
     hubProgress_      = 0;
     allStagesCleared_ = false;
 
@@ -364,7 +453,7 @@ void GameScene::UpdateInitialization()
 
     case DeferredInitPhase::InitialMapPrepare:
         shouldStartLoading_ = false;
-        LoadMap("Resources/map/map.csv", { 2, 1, 0 });
+        LoadMap(GameSceneConfig::kMapStart, GameSceneConfig::kStartMapEntry);
         isIncrementalMapLoading_ = true;
         deferredInitPhase_ = DeferredInitPhase::InitialMapBuild;
         break;
@@ -372,7 +461,7 @@ void GameScene::UpdateInitialization()
     case DeferredInitPhase::InitialMapBuild:
         ProcessPendingMapSpawns(kMapSpawnBudgetPerFrame);
         if (IsMapBuildComplete()) {
-            FinishMapLoading(Vector3{ 3, 3, 0 });
+            FinishMapLoading(GameSceneConfig::kInitialPlayerPosition);
             if (player_) {
                 player_->ResetForMapTransition(true);
             }
@@ -562,80 +651,85 @@ void GameScene::ProcessPendingMapSpawns(size_t spawnBudget)
         switch (spawn.kind) {
         case PendingSpawnKind::Block:
         {
-            auto block = std::make_unique<Object3d>();
-            block->Initialize(object3dCommon_.get());
-            block->SetModel("cube/cube.obj");
-            block->SetCamera(camera_.get());
-            block->SetTranslate(spawn.position);
-            block->Update();
-            mapBlocks_.push_back(std::move(block));
+            mapBlocks_.push_back(CreateMapObject(
+                object3dCommon_.get(),
+                camera_.get(),
+                GameSceneConfig::kModelBlock,
+                spawn.position
+            ));
             break;
         }
         case PendingSpawnKind::Block2:
         {
-            auto block2 = std::make_unique<Object3d>();
-            block2->Initialize(object3dCommon_.get());
-            block2->SetModel("cube2/cube2.obj");
-            block2->SetCamera(camera_.get());
-            block2->SetTranslate(spawn.position);
-            block2->Update();
-            mapBlocks_.push_back(std::move(block2));
+            mapBlocks_.push_back(CreateMapObject(
+                object3dCommon_.get(),
+                camera_.get(),
+                GameSceneConfig::kModelBlock2,
+                spawn.position
+            ));
             break;
         }
         case PendingSpawnKind::Portal:
         {
-            auto portal = std::make_unique<Object3d>();
-            portal->Initialize(object3dCommon_.get());
-            portal->SetModel("door/Door.obj");
-            portal->SetCamera(camera_.get());
-            portal->SetTranslate(spawn.position);
-            portal->Update();
-            mapBlocks_.push_back(std::move(portal));
+            mapBlocks_.push_back(CreateMapObject(
+                object3dCommon_.get(),
+                camera_.get(),
+                GameSceneConfig::kModelPortal,
+                spawn.position
+            ));
             break;
         }
         case PendingSpawnKind::Item:
         {
             if (!itemMgr_) { break; }
-            auto item = std::make_unique<Object3d>();
-            item->Initialize(object3dCommon_.get());
-            item->SetModel("coin/coin.obj");
-            item->SetCamera(camera_.get());
             Vector3 itemPos = spawn.position;
-            itemPos.y += 0.4f;
-            item->SetTranslate(itemPos);
+            itemPos.y += GameSceneConfig::kItemYOffset;
+
+            auto item = CreateMapObject(
+                object3dCommon_.get(),
+                camera_.get(),
+                GameSceneConfig::kModelCoin,
+                itemPos
+            );
             item->SetEnableLighting(true);
-            item->SetDirectionalLightIntensity(2.0f);
-            item->SetPointLightIntensity(2.0f);
+            item->SetDirectionalLightIntensity(GameSceneConfig::kItemLightIntensity);
+            item->SetPointLightIntensity(GameSceneConfig::kItemLightIntensity);
             item->Update();
+
             itemMgr_->RegisterItem(currentMapPath_, spawn.x, spawn.y, std::move(item));
             UpdateCoinUIRemaining_();
             break;
         }
         case PendingSpawnKind::Spike:
         {
-            auto spike = std::make_unique<Object3d>();
-            spike->Initialize(object3dCommon_.get());
-            spike->SetModel("strip/strip.obj");
-            spike->SetCamera(camera_.get());
             Vector3 spikePos = spawn.position;
-            spikePos.y -= 0.1f;
-            spike->SetTranslate(spikePos);
+            spikePos.y += GameSceneConfig::kSpikeYOffset;
+
+            auto spike = CreateMapObject(
+                object3dCommon_.get(),
+                camera_.get(),
+                GameSceneConfig::kModelSpike,
+                spikePos
+            );
             spike->SetLightingMode(2);
             spike->Update();
+
             mapBlocks_.push_back(std::move(spike));
             break;
         }
         case PendingSpawnKind::Water:
         {
-            auto water = std::make_unique<Object3d>();
-            water->Initialize(object3dCommon_.get());
-            water->SetModel("water/water.obj");
-            water->SetCamera(camera_.get());
-            water->SetTranslate(spawn.position);
+            auto water = CreateMapObject(
+                object3dCommon_.get(),
+                camera_.get(),
+                GameSceneConfig::kModelWater,
+                spawn.position
+            );
             Vector4 color = water->GetColor();
-            color.w = 0.5f;
+            color.w = GameSceneConfig::kWaterAlpha;
             water->SetColor(color);
             water->Update();
+
             waterBlocks_.push_back(std::move(water));
             break;
         }
@@ -719,7 +813,7 @@ void GameScene::FinishMapLoading(const Vector3& startPos)
 bool GameScene::CanUsePortalOnCurrentMap_() const
 {
     // map2 は Hub なので例外: コイン条件なしで各ステージへ入れる
-    if (currentMapPath_ == "Resources/map/map2.csv") {
+    if (currentMapPath_ == GameSceneConfig::kMapHub) {
         return true;
     }
 
@@ -738,6 +832,149 @@ void GameScene::UpdateCoinUIRemaining_()
 
     const int remainingCoin = itemMgr_ ? itemMgr_->GetRemainingItemCount() : 0;
     coinUI_->SetRemainingCoin(remainingCoin);
+}
+
+void GameScene::RegisterHubStageMaps_()
+{
+    hubStageByMap_.clear();
+    for (const auto& stage : GameSceneConfig::kStages) {
+        hubStageByMap_[stage.mapPath] = stage.stageIndex;
+    }
+}
+
+void GameScene::SetupMapHints_(const std::string& mapPath)
+{
+    // ヒントの Sprite は map ごとに完全に作り直す。位置や画像は上部の Config 表だけを見れば確認できる。
+    spaceHint_.sprite.reset();
+    shiftHint_.sprite.reset();
+    sprintHint_.sprite.reset();
+    upHints_.clear();
+
+    spaceHint_.worldPos = { 0.0f, 0.0f, 0.0f };
+    shiftHint_.worldPos = { 0.0f, 0.0f, 0.0f };
+    sprintHint_.worldPos = { 0.0f, 0.0f, 0.0f };
+
+    auto applyHintIcon = [&](HintSprite& hint, const GameSceneConfig::HintIconConfig& config) {
+        hint.sprite = std::make_unique<Sprite>();
+        hint.sprite->Initialize(spriteCommon_, config.texturePath);
+        hint.sprite->SetSize(config.size);
+        if (config.rotation != 0.0f) {
+            hint.sprite->SetRotation(config.rotation);
+        }
+
+        hint.worldPos = mapChipField_.GetMapChipPositionByIndex(
+            config.index.xIndex,
+            config.index.yIndex
+        );
+        hint.worldPos.x += config.offset.x;
+        hint.worldPos.y += config.offset.y;
+    };
+
+    auto addUpHint = [&](const MapChipField::IndexSet& index, const char* texturePath, float rotation, Vector2 offset) {
+        HintSprite hint;
+        hint.sprite = std::make_unique<Sprite>();
+        hint.sprite->Initialize(spriteCommon_, texturePath);
+        hint.sprite->SetSize(GameSceneConfig::kUpHintSize);
+        if (rotation != 0.0f) {
+            hint.sprite->SetRotation(rotation);
+        }
+        hint.worldPos = mapChipField_.GetMapChipPositionByIndex(index.xIndex, index.yIndex);
+        hint.worldPos.x += offset.x;
+        hint.worldPos.y += offset.y;
+        upHints_.push_back(std::move(hint));
+    };
+
+    if (mapPath == GameSceneConfig::kMapStart) {
+        applyHintIcon(spaceHint_, GameSceneConfig::kSpaceHint);
+        applyHintIcon(shiftHint_, GameSceneConfig::kShiftHint);
+        applyHintIcon(sprintHint_, GameSceneConfig::kSprintHint);
+
+        for (const auto& index : GameSceneConfig::kUpHintIndices) {
+            addUpHint(index, "Resources/up.dds", 0.0f, { 0.0f, 0.0f });
+        }
+        return;
+    }
+
+    if (mapPath == GameSceneConfig::kMapHub) {
+        // Hub では「次に進むべきステージ入口」だけを矢印で示す。
+        constexpr int kStageCount = static_cast<int>(sizeof(GameSceneConfig::kStages) / sizeof(GameSceneConfig::kStages[0]));
+        if (hubProgress_ >= 0 && hubProgress_ < kStageCount) {
+            const auto& nextStage = GameSceneConfig::kStages[hubProgress_];
+            addUpHint(
+                nextStage.hubPortalIndex,
+                "Resources/up.png",
+                std::numbers::pi_v<float>,
+                GameSceneConfig::kHubArrowOffset
+            );
+        }
+    }
+}
+
+void GameScene::SetupPortalsForCurrentMap_(const std::string& mapPath)
+{
+    if (!portalMgr_) {
+        return;
+    }
+
+    portalMgr_->ClearPortals();
+
+    auto addPortalByIndex = [&](const MapChipField::IndexSet& portalIndex,
+                                const char* targetMap,
+                                const MapChipField::IndexSet& targetStartIndex) {
+        portalMgr_->AddPortal(
+            portalIndex,
+            targetMap,
+            mapChipField_.GetMapChipPositionByIndex(targetStartIndex.xIndex, targetStartIndex.yIndex),
+            mapChipField_.GetMapChipPositionByIndex(portalIndex.xIndex, portalIndex.yIndex)
+        );
+    };
+
+    if (mapPath == GameSceneConfig::kMapStart) {
+        addPortalByIndex(
+            GameSceneConfig::kStartToHubPortal,
+            GameSceneConfig::kMapHub,
+            GameSceneConfig::kHubToStartPortal
+        );
+        return;
+    }
+
+    if (mapPath == GameSceneConfig::kMapHub) {
+        addPortalByIndex(
+            GameSceneConfig::kHubToStartPortal,
+            GameSceneConfig::kMapStart,
+            GameSceneConfig::kStartToHubPortal
+        );
+
+        for (const auto& stage : GameSceneConfig::kStages) {
+            if (hubProgress_ < stage.stageIndex) {
+                continue;
+            }
+
+            MapChipField::IndexSet startIndex = GameSceneConfig::kHubToStartPortal;
+            addPortalByIndex(stage.hubPortalIndex, stage.mapPath, startIndex);
+
+            // Boss ステージ入口だけ 2 マス幅にしているため、2 つ目の入口も同じ設定で登録する。
+            if (std::string(stage.mapPath) == GameSceneConfig::kMapBoss) {
+                addPortalByIndex(GameSceneConfig::kBossHubPortalSecondTile, stage.mapPath, startIndex);
+            }
+        }
+        return;
+    }
+
+    // 各サブステージから Hub へ戻る。Boss ステージはクリア専用なので戻り転送門は生成しない。
+    for (const auto& stage : GameSceneConfig::kStages) {
+        if (std::string(stage.mapPath) != mapPath ||
+            std::string(stage.mapPath) == GameSceneConfig::kMapBoss) {
+            continue;
+        }
+
+        addPortalByIndex(
+            stage.stageReturnPortalIndex,
+            GameSceneConfig::kMapHub,
+            stage.hubPortalIndex
+        );
+        return;
+    }
 }
 
 void GameScene::Initialize() {
@@ -942,7 +1179,7 @@ void GameScene::Update() {
     // このフレーム後半で FadingIn を処理する（以下参照）
     if (shouldStartLoading_) {
         shouldStartLoading_ = false;
-        StartLoadingMap("Resources/map/map.csv", { 2,1,0 }, false);
+        StartLoadingMap(GameSceneConfig::kMapStart, GameSceneConfig::kStartMapEntry, false);
         return; // このフレーム先に表示 LoadingScene
     }
     // 2️⃣ 初期ロードのタイマー
@@ -950,7 +1187,7 @@ void GameScene::Update() {
         loadingTimer_ += deltaTime;
         if (loadingTimer_ >= LOADING_DURATION) {
             isMapLoading_ = false;
-            LoadMap("Resources/map/map.csv", { 2,1,0 });
+            LoadMap(GameSceneConfig::kMapStart, GameSceneConfig::kStartMapEntry);
             isIncrementalMapLoading_ = true;
         }
         else {
@@ -1062,7 +1299,7 @@ void GameScene::Update() {
         // map5 は雪ステージ: 右から左へ吹く風をプレイヤー物理へ反映する。
         // canControl が false の演出中 / ロード中は勝手に流されないようにする。
         const bool snowWindActive =
-            canControl && (currentMapPath_ == "Resources/map/map5.csv");
+            canControl && (currentMapPath_ == GameSceneConfig::kMapSnow);
         player_->Update(canControl ? input_ : nullptr, mapChipField_, snowWindActive);
     }
 
@@ -1175,7 +1412,7 @@ void GameScene::Update() {
             }
 
             // ====== 「上から踏んだ」敵かどうかを判定 ======
-            const float stompTolerance = 0.15f;
+            const float stompTolerance = GameSceneConfig::kStompTolerance;
 
             float stompMinCenterY = ePos.y; // 通常の敵: 中心以上からなら踏みつけ扱い
             if (enemy->GetType() == EnemyType::Boss) {
@@ -1183,7 +1420,7 @@ void GameScene::Update() {
                 stompMinCenterY = ePos.y - eHalfH * 0.20f;
             }
 
-           const float kStompFallSpeed = -0.05f;
+           const float kStompFallSpeed = GameSceneConfig::kStompFallSpeed;
 
            bool isStomp =
                (pVel.y < kStompFallSpeed) &&
@@ -1225,21 +1462,21 @@ void GameScene::Update() {
                 // ★ Boss: Boss の踏みつけ無敵中、またはプレイヤーの踏みつけクールダウン中
                 // 跳ね返りは可能だが、横方向へ強制的に蹴り出して「頭上で棒立ちして無限踏み / 無限安全」になるのを防ぐ
                 if (isBoss && (!enemy->CanTakeStompDamage() || player_->IsStompCooldown())) {
-                    BounceAndLift(0.55f, 0.40f);
-                    player_->StartStompInvincible(0.08f);
+                    BounceAndLift(GameSceneConfig::kStompBlockedBounce, GameSceneConfig::kBossBlockedKick);
+                    player_->StartStompInvincible(GameSceneConfig::kBossBlockedInvincibleTime);
                     break;
                 }
 
                 // ☆ 正常踏みつけ: 敵ダメージを与える/硬直/死亡判定
                 enemy->OnStomp();
 
-                BounceAndLift(0.70f, isBoss ? 0.32f : 0.0f);
+                BounceAndLift(GameSceneConfig::kStompNormalBounce, isBoss ? GameSceneConfig::kBossStompKick : 0.0f);
 
                 // 踏みつけ後少し無敵時間を与える（点滅なし）: 主な目的は「踏んだ直後の軽い誤ダメージ」を防ぐこと
-                player_->StartStompInvincible(0.12f);
+                player_->StartStompInvincible(GameSceneConfig::kBossStompInvincibleTime);
 
                 // 連続踏みが簡単すぎないよう、クールダウン中は Boss への再度の踏みつけダメージを発生させない
-                player_->StartStompCooldown(isBoss ? 0.45f : 0.25f);
+                player_->StartStompCooldown(isBoss ? GameSceneConfig::kBossStompCooldown : GameSceneConfig::kNormalStompCooldown);
 
                 break;
             }
@@ -1440,7 +1677,7 @@ void GameScene::Update() {
         emitter3D_->Emit(
             14,                        // 粒子数。好みに応じて 12〜24 へ調整可
             ParticleType::Model3D,     // 3D 粒子
-            "jump/jump.obj",           // 仮に cube モデルを使用
+            GameSceneConfig::kModelJumpParticle,           // 仮に cube モデルを使用
             spawnPos,
             4.0f, 8.0f,                // 速度範囲: 四方へ弾ける感覚
             0.25f, 0.45f, horizontalBias                 // ライフサイクル: やや短めで、キビキビ見せる
@@ -1463,7 +1700,7 @@ void GameScene::Update() {
         dashStarEmitter_->Emit(
             1,                      // 毎フレーム数個の星
             ParticleType::Model3D,
-            "star/star.obj",
+            GameSceneConfig::kModelDashStar,
             pos,
             2.0f, 4.0f,             // 速度
             0.08f, 0.16f,            // 寿命
@@ -1500,7 +1737,7 @@ void GameScene::Update() {
         gameClear_->Update(deltaTime);
     }
     // ==== 風パーティクル効果（画面全体 & map のみ）====
-    if (windEmitter_ && currentMapPath_ == "Resources/map/map5.csv") {
+    if (windEmitter_ && currentMapPath_ == GameSceneConfig::kMapSnow) {
 
         windSpawnTimer_ -= deltaTime;
         if (windSpawnTimer_ <= 0.0f) {
@@ -1528,14 +1765,14 @@ void GameScene::Update() {
             windEmitter_->Emit(
                 1,
                 ParticleType::Sprite2D,
-                "Resources/wind.dds",
+                GameSceneConfig::kTexWindParticle,
                 spawnPos,
                 700.0f, 1200.0f,   // 速度 (px/s)
                 1.0f, 1.5f         // ライフサイクル (秒)
             );
         }
     }
-    if (snowEmitter_ && currentMapPath_ == "Resources/map/map5.csv") {
+    if (snowEmitter_ && currentMapPath_ == GameSceneConfig::kMapSnow) {
 
         // 想定する平均発生間隔（秒）
         const float snowInterval = 0.1f;   // 約 25 回 / 秒。自分で調整可
@@ -1563,7 +1800,7 @@ void GameScene::Update() {
             snowEmitter_->Emit(
                 1,                          // 少なめに変更: 1〜2 枚
                 ParticleType::Model3D,
-                "snow/snow.obj",
+                GameSceneConfig::kModelSnowParticle,
                 worldPos,
                 0.10f, 0.15f,
                 5.0f, 9.0f
@@ -1688,7 +1925,7 @@ void GameScene::Update() {
             // ✅ 敵がプレイヤーに当たった場合: 「跳ね上げ / 1 秒前へ戻す」は行わず、ダメージ + 無敵のみ与え、軽く分離して敵の中に埋まるのを防ぐ
             const bool enemyHitOnly = (damagedByEnemyThisFrame_ && !onSpike && !crushedByPlatformThisFrame_);
             if (enemyHitOnly) {
-                player_->TakeDamage(static_cast<float>(player_->GetMaxHp() * 0.2f));
+                player_->TakeDamage(static_cast<float>(player_->GetMaxHp() * GameSceneConfig::kEnemyDamageRate));
                 player_->StartInvincible(1.0f);
 
                 // 「上へ飛ばされる」挙動を打ち消す（TakeDamage 内で上向き速度が与えられていても、ここで強制的に抑える）
@@ -1756,7 +1993,7 @@ void GameScene::Update() {
                 player_->SetPosition(targetPos);
                 player_->ResetForMapTransition(true);
 
-                player_->TakeDamage(static_cast<float>(player_->GetMaxHp() * 0.2f));
+                player_->TakeDamage(static_cast<float>(player_->GetMaxHp() * GameSceneConfig::kEnemyDamageRate));
                 player_->StartInvincible(1.0f);
             }
         }
@@ -1783,7 +2020,7 @@ void GameScene::Update() {
         if (canControl && canUsePortalOnCurrentMap && input_->TriggerKey(DIK_E)) {
                         // ==== 子ステージから Hub(map2) に戻る場合は解放進捗を更新する（解放専用であり、以後クリア条件には使わない）====
             auto itStage = hubStageByMap_.find(currentMapPath_);
-            if (currentPortal->targetMap == "Resources/map/map2.csv" && itStage != hubStageByMap_.end()) {
+            if (currentPortal->targetMap == GameSceneConfig::kMapHub && itStage != hubStageByMap_.end()) {
                 int stageIndex = itStage->second;   // これは第何関か (0〜3)
                 if (hubProgress_ < stageIndex + 1) {
                     hubProgress_ = stageIndex + 1;
@@ -2242,97 +2479,8 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
     // ==== 右上 Coin UI を更新: 現在のマップに残っている coin 数を表示 ====
     UpdateCoinUIRemaining_();
 
-    // === map1 のみ Space / Shift / Sprint / Up のヒントを生成 ===
-    if (mapPath == "Resources/map/map.csv") {
-
-        // (5,2)space.png
-        spaceHint_.sprite = std::make_unique<Sprite>();
-        spaceHint_.sprite->Initialize(spriteCommon_, "Resources/space2.png");
-        spaceHint_.sprite->SetSize({ 48.0f, 32.0f });
-        spaceHint_.worldPos = mapChipField_.GetMapChipPositionByIndex(5, 2);
-        spaceHint_.worldPos.y += 0.4f;
-
-        // (19,6)shift.png
-        shiftHint_.sprite = std::make_unique<Sprite>();
-        shiftHint_.sprite->Initialize(spriteCommon_, "Resources/shift.png");
-        shiftHint_.sprite->SetSize({ 48.0f, 32.0f });
-        shiftHint_.worldPos = mapChipField_.GetMapChipPositionByIndex(19, 6);
-        shiftHint_.worldPos.x -= 0.2f;
-        shiftHint_.worldPos.y += 0.5f;
-
-        // (20,6)sprint.png
-        sprintHint_.sprite = std::make_unique<Sprite>();
-        sprintHint_.sprite->Initialize(spriteCommon_, "Resources/sprint.png");
-        sprintHint_.sprite->SetSize({ 48.0f, 48.0f });
-        sprintHint_.worldPos = mapChipField_.GetMapChipPositionByIndex(20, 6);
-        sprintHint_.worldPos.x -= 0.3f;
-        sprintHint_.worldPos.y += 0.5f;
-
-        // Up ヒント一式
-        auto makeUpHint = [&](int x, int y) {
-            HintSprite h;
-            h.sprite = std::make_unique<Sprite>();
-            h.sprite->Initialize(spriteCommon_, "Resources/up.dds");
-            h.sprite->SetSize({ 32.0f, 32.0f });
-            h.worldPos = mapChipField_.GetMapChipPositionByIndex(x, y);
-            // vector 内は unique_ptr なので、必ず move する
-            upHints_.push_back(std::move(h));
-            };
-
-        // (6,2), (11,4), (12,4)
-        makeUpHint(6, 2);
-        makeUpHint(11, 4);
-        makeUpHint(12, 4);
-    }
-    // === Hub マップ（map2）: 次のステージ入口を指す方向矢印だけを表示する ===
-    else if (mapPath == "Resources/map/map2.csv") {
-        // チュートリアル用の Space / Shift ヒントは Hub では表示せず、位置だけクリアする
-        spaceHint_.worldPos = { 0,0,0 };
-        shiftHint_.worldPos = { 0,0,0 };
-        sprintHint_.worldPos = { 0,0,0 };
-
-        int nextX = -1;
-        int nextY = -1;
-
-        // 門インデックス（map2 内）:
-        //   map3: (11,5)
-        //   map4: (14,5)
-        //   map5: (23,1)
-        //   map6: (12,14)
-        if (hubProgress_ <= 0) {
-            nextX = 11; nextY = 5;
-        }
-        else if (hubProgress_ == 1) {
-            nextX = 14; nextY = 5;
-        }
-        else if (hubProgress_ == 2) {
-            nextX = 23; nextY = 1;
-        }
-        else if (hubProgress_ == 3) {
-            nextX = 12; nextY = 14;
-        }
-        else {
-            // hubProgress_ >= 4 なら全ステージクリア済みなので、以後は方向を表示しない
-        }
-
-        if (nextX >= 0) {
-            HintSprite h;
-            h.sprite = std::make_unique<Sprite>();
-            h.sprite->Initialize(spriteCommon_, "Resources/up.png");
-            h.sprite->SetSize({ 32.0f, 32.0f });
-            h.sprite->SetRotation(std::numbers::pi_v<float>);
-            h.worldPos = mapChipField_.GetMapChipPositionByIndex(nextX, nextY);
-            h.worldPos.x += 0.4f;
-            h.worldPos.y += 2.0f;   // 少し持ち上げて、門の上に浮かせる
-            upHints_.push_back(std::move(h));
-        }
-    }
-    else {
-        // map1 / map2 以外では、チュートリアルヒントを確実に描画しない
-        spaceHint_.worldPos = { 0,0,0 };
-        shiftHint_.worldPos = { 0,0,0 };
-        sprintHint_.worldPos = { 0,0,0 };
-    }
+    // ==== マップ別ヒント生成（配置・画像は GameSceneConfig 側の表で管理）====
+    SetupMapHints_(mapPath);
 
     // ==== プレイヤー開始位置を設定 ====
     if (player_) {
@@ -2349,7 +2497,7 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
 
     // カメラ同期
     if (camera_) {
-        camera_->SetTranslate(startPos + Vector3{ 0,0,-40 });
+        camera_->SetTranslate(startPos + GameSceneConfig::kDefaultCameraOffset);
         prevCameraPos_ = camera_->GetTransform().translate;
     }
 
@@ -2360,87 +2508,9 @@ void GameScene::LoadMap(const std::string& mapPath, const Vector3& startPos)
         );
     }
 
-    // 現在のマップに応じて転送門リストを更新
-    if (portalMgr_) {
-        portalMgr_->ClearPortals();
-    }
+    // ==== マップ別転送門生成（入口・遷移先は GameSceneConfig 側の表で管理）====
+    SetupPortalsForCurrentMap_(mapPath);
 
-    // ========== map1（開始マップ） ==========
-    if (mapPath == "Resources/map/map.csv") {
-        if (portalMgr_) {
-            portalMgr_->AddPortal(
-                { 26, 11 },
-                "Resources/map/map2.csv",
-                mapChipField_.GetMapChipPositionByIndex(2, 1),
-                mapChipField_.GetMapChipPositionByIndex(26, 11)
-            );
-        }
-    }
-    // ========== map2（中央マップ / Hub） ==========
-    else if (mapPath == "Resources/map/map2.csv") {
-        if (portalMgr_) {
-            // Hub → map1 に戻る門
-            portalMgr_->AddPortal(
-                { 2, 1 },
-                "Resources/map/map.csv",
-                mapChipField_.GetMapChipPositionByIndex(26, 11),
-                mapChipField_.GetMapChipPositionByIndex(2, 1)
-            );
-
-            if (hubProgress_ >= 0) {
-                portalMgr_->AddPortal(
-                    { 11, 5 },
-                    "Resources/map/map3.csv",
-                    mapChipField_.GetMapChipPositionByIndex(2, 1),
-                    mapChipField_.GetMapChipPositionByIndex(11, 5)
-                );
-            }
-            if (hubProgress_ >= 1) {
-                portalMgr_->AddPortal(
-                    { 14, 5 },
-                    "Resources/map/map4.csv",
-                    mapChipField_.GetMapChipPositionByIndex(2, 1),
-                    mapChipField_.GetMapChipPositionByIndex(14, 5)
-                );
-            }
-            if (hubProgress_ >= 2) {
-                portalMgr_->AddPortal(
-                    { 23, 1 },
-                    "Resources/map/map5.csv",
-                    mapChipField_.GetMapChipPositionByIndex(2, 1),
-                    mapChipField_.GetMapChipPositionByIndex(23, 1)
-                );
-            }
-            if (hubProgress_ >= 3) {
-                Vector3 finalStart = mapChipField_.GetMapChipPositionByIndex(2, 1);
-                portalMgr_->AddPortal({ 12, 14 }, "Resources/map/map6.csv", finalStart,
-                    mapChipField_.GetMapChipPositionByIndex(12, 14));
-                portalMgr_->AddPortal({ 13, 14 }, "Resources/map/map6.csv", finalStart,
-                    mapChipField_.GetMapChipPositionByIndex(13, 14));
-            }
-        }
-    }
-    // ========== 各子ステージ内部: Hub へ戻す ==========
-    else {
-        if (portalMgr_) {
-            if (mapPath == "Resources/map/map3.csv") {
-                portalMgr_->AddPortal({ 61, 1 }, "Resources/map/map2.csv",
-                    mapChipField_.GetMapChipPositionByIndex(11, 5),
-                    mapChipField_.GetMapChipPositionByIndex(61, 1));
-            }
-            else if (mapPath == "Resources/map/map4.csv") {
-                portalMgr_->AddPortal({ 69, 1 }, "Resources/map/map2.csv",
-                    mapChipField_.GetMapChipPositionByIndex(14, 5),
-                    mapChipField_.GetMapChipPositionByIndex(69, 1));
-            }
-            else if (mapPath == "Resources/map/map5.csv") {
-                portalMgr_->AddPortal({ 81, 1 }, "Resources/map/map2.csv",
-                    mapChipField_.GetMapChipPositionByIndex(23, 1),
-                    mapChipField_.GetMapChipPositionByIndex(81, 1));
-            }
-            // map6 は Boss 専用ステージなので、戻り転送門は生成しない
-        }
-    }
 }
 
 void GameScene::HandlePlayerOnMovingPlatforms()

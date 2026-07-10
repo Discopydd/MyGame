@@ -42,17 +42,18 @@ void BossEnemy::Initialize(
     visualOffsetY_ = 0.0f;
 
 
-preAttackJitter_ = kZeroVector_;
-preAttackJitterTime_ = 0.0f;
+    preAttackJitter_ = kZeroVector_;
+    preAttackJitterTime_ = 0.0f;
 
     battleTriggered_ = (type != EnemyType::Boss);
+    battleElapsedTime_ = 0.0f;
 
     // ===== HP =====
     isDead_ = false;
     stompInvuln_ = 0.0f;
     if (type == EnemyType::Boss) {
         maxHp_ = kBossMaxHp_;
-        // 低HP閾値: 20%（30 -> 6）
+        // 低HP閾値: 最大HPの約半分から第2段階へ移行する
         enrageHp_ = (std::max)(kNormalEnemyMaxHp_, maxHp_ / kEnrageHpDivisor_);
         hp_ = maxHp_;
     } else {
@@ -234,6 +235,7 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
 
         // 先に弾幕を更新する（Boss 本体とプレイヤーの重なりには依存しない）
         UpdateBossProjectiles(dt, map);
+        battleElapsedTime_ += dt;
 
         // ---- 向き更新（Dash/Melee/Windup/Shoot 中は固定し、急な反転を避ける）----
         UpdateBossFacing(player);
@@ -265,12 +267,12 @@ void BossEnemy::Update(float dt, const MapChipField& map, const Player& player)
         globalAttackCD_ = (std::max)(0.0f, globalAttackCD_ - dt);
         ultimateCD_ = (std::max)(0.0f, ultimateCD_ - dt);
 
-preAttackJitter_ = kZeroVector_;
-const bool wantsJitter = (bossState_ == BossState::Windup) &&
-    (queuedAttack_ == BossAttack::Barrage || queuedAttack_ == BossAttack::Nova || queuedAttack_ == BossAttack::Slam);
-if (!wantsJitter) {
-    preAttackJitterTime_ = 0.0f;
-}
+        preAttackJitter_ = kZeroVector_;
+        const bool wantsJitter = (bossState_ == BossState::Windup) &&
+            (queuedAttack_ == BossAttack::Barrage || queuedAttack_ == BossAttack::Nova || queuedAttack_ == BossAttack::Slam);
+        if (!wantsJitter) {
+            preAttackJitterTime_ = 0.0f;
+        }
 
         switch (bossState_) {
 
@@ -305,8 +307,9 @@ if (!wantsJitter) {
             if (absDx2 > idealRange_ + deadZone) {
                 velocity_.x = dirToTarget * moveSpeed_;
             }
-            else if (absDx2 < idealRange_ - deadZone) {
-                velocity_.x = 0.0f;
+            else if (absDx2 < retreatRange_) {
+                // 近すぎる時は少しだけ距離を取り、密着したまま攻撃を連発しないようにする
+                velocity_.x = -dirToTarget * retreatSpeed_;
             }
             else {
                 velocity_.x = 0.0f;
@@ -330,15 +333,20 @@ if (!wantsJitter) {
             // 攻撃選択
             if (decisionTimer_ <= 0.0f && globalAttackCD_ <= 0.0f) {
                 const bool canDashAny = (dashCD_ <= 0.0f);
+                const bool isEnraged = (hp_ <= enrageHp_);
 
                 // この距離内では遠距離攻撃を禁止し、小ダッシュへ切り替える
                 const float pointBlankRange = meleeRange_ + kPointBlankRangeMargin_; // 約 2.6
                 const bool  tooCloseForRanged = (dist <= pointBlankRange);
 
-                const bool canRanged = (!tooCloseForRanged && dist >= rangedMinRange_ && dist <= rangedMaxRange_ && rangedCD_ <= 0.0f);
-                const bool canUltimate = (ultimateCD_ <= 0.0f);
-                const bool canBarrage = (!tooCloseForRanged && dist >= kBarrageMinRange_ && dist <= kBarrageMaxRange_ && barrageCD_ <= 0.0f);
                 const bool playerAbove = (pPos.y > position_.y + height_ * kPlayerAboveHeightRate_);
+                const bool canRanged = (!tooCloseForRanged && dist >= rangedMinRange_ && dist <= rangedMaxRange_ && rangedCD_ <= 0.0f);
+                const bool canUltimate = (ultimateCD_ <= 0.0f) &&
+                    !tooCloseForRanged &&
+                    battleElapsedTime_ >= kUltimateFirstUseDelay_ &&
+                    (isEnraged || battleElapsedTime_ >= kUltimateLateBattleTime_) &&
+                    !playerAbove;
+                const bool canBarrage = (!tooCloseForRanged && dist >= kBarrageMinRange_ && dist <= kBarrageMaxRange_ && barrageCD_ <= 0.0f);
                 const bool canSlam = (isOnGround_ && slamCD_ <= 0.0f && dist <= kSlamEnableRange_);
                 const bool canNova = (!tooCloseForRanged && dist >= kNovaMinRange_ && dist <= kNovaMaxRange_ && novaCD_ <= 0.0f);
 
@@ -625,7 +633,7 @@ if (!wantsJitter) {
                     stateTimer_ = ultimateDuration_;
                     ultimateBounces_ = 0;
                     // 必殺技開始時に向きを 1 方向へ固定し、まずプレイヤーのいる方向へ突っ込む
-                    attackFacing_ = (pPos.x - position_.x >= 0.0f) ? -1 : 1; // プレイヤー方向へ向ける
+                    attackFacing_ = (pPos.x - position_.x >= 0.0f) ? 1 : -1; // プレイヤー方向へ向ける
                     facing_ = attackFacing_;
                 }
                 else {
@@ -1078,7 +1086,7 @@ void BossEnemy::OnStomp()
     if (stompInvuln_ > 0.0f) { return; }
 
     if (type_ == EnemyType::Boss) {
-        // Boss: 踏みつけ 30 回で死亡（デフォルト）
+        // Boss: HP を 1 ずつ減らす。最大HPは kBossMaxHp_ で調整する
         hp_ -= 1;
 
         // 被弾フィードバック: 点滅を少し長めにし、短い硬直を入れる（連続で踏みやすくする）

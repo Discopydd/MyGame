@@ -40,9 +40,9 @@ private:
     static constexpr int   kFacingLeft_ = -1;
 
     // HP / 基本挙動
-    static constexpr int   kBossMaxHp_ = 3;
+    static constexpr int   kBossMaxHp_ = 8;
     static constexpr int   kNormalEnemyMaxHp_ = 1;
-    static constexpr int   kEnrageHpDivisor_ = 5;
+    static constexpr int   kEnrageHpDivisor_ = 2;
     static constexpr float kGravityBase_ = -2.20f;
     static constexpr float kMinFallVelocity_ = -2.5f;
     static constexpr float kDefaultVisualOffsetY_ = 0.0f;
@@ -62,7 +62,7 @@ private:
 
     // AI / 移動調整値
     static constexpr float kMoveSpeed_ = 0.18f;
-    static constexpr float kDashSpeed_ = 0.45f;
+    static constexpr float kDashSpeed_ = 0.38f;
     static constexpr float kJumpVelocity_ = 0.62f;
     static constexpr float kDetectRange_ = 18.0f;
     static constexpr float kIdealRange_ = 4.0f;
@@ -79,9 +79,9 @@ private:
     static constexpr float kFarRangedPrefer_ = 9.0f;
     static constexpr float kUltimateSpeed_ = 0.35f;
     static constexpr float kUltimateDuration_ = 5.0f;
-    static constexpr float kUltimateInitialCooldown_ = 2.0f;
+    static constexpr float kUltimateInitialCooldown_ = 6.0f;
     static constexpr int   kUltimateMaxBounces_ = 4;
-    static constexpr float kRestDuration_ = 1.8f;
+    static constexpr float kRestDuration_ = 2.2f;
     static constexpr float kLeadTime_ = 0.25f;
     static constexpr float kProjectileLeadTime_ = 0.35f;
 
@@ -89,6 +89,10 @@ private:
     static constexpr float kPlayerMovingAwayThreshold_ = 0.05f;
     static constexpr float kDistanceIncreasingMargin_ = 0.08f;
     static constexpr float kChaseDeadZone_ = 0.35f;
+    static constexpr float kRetreatRange_ = 3.0f;
+    static constexpr float kRetreatSpeed_ = 0.10f;
+    static constexpr float kUltimateFirstUseDelay_ = 6.0f;
+    static constexpr float kUltimateLateBattleTime_ = 18.0f;
     static constexpr float kMoveEpsilon_ = 0.01f;
     static constexpr float kObstacleCheckXMargin_ = 0.15f;
     static constexpr float kObstacleCheckYMargin_ = 0.10f;
@@ -99,7 +103,7 @@ private:
     static constexpr float kSlamEnableRange_ = 6.5f;
     static constexpr float kNovaMinRange_ = 4.8f;
     static constexpr float kNovaMaxRange_ = 12.8f;
-    static constexpr float kUltimateMinRange_ = 2.0f;
+    static constexpr float kUltimateMinRange_ = 3.0f;
     static constexpr float kUltimateMaxRange_ = 14.0f;
     static constexpr float kUltimateWindupTime_ = 0.40f;
     static constexpr float kUltimateCooldownLock_ = 399.0f;
@@ -119,9 +123,9 @@ private:
     static constexpr float kBarrageCooldownNormalBase_ = 4.0f;
     static constexpr float kBarrageCooldownNormalRandom_ = 1.2f;
     static constexpr float kRangedCooldownEnrage_ = 1.25f;
-    static constexpr float kRangedCooldownNormal_ = 1.75f;
-    static constexpr float kCloseDashCooldown_ = 2.70f;
-    static constexpr float kMiddleDashCooldown_ = 2.10f;
+    static constexpr float kRangedCooldownNormal_ = 2.00f;
+    static constexpr float kCloseDashCooldown_ = 3.10f;
+    static constexpr float kMiddleDashCooldown_ = 2.80f;
 
     // 状態タイマー
     static constexpr float kStunnedNextDecisionTime_ = 0.12f;
@@ -246,9 +250,9 @@ private:
     static constexpr float kUltimateBounceBurstSpeedNormal_ = 0.19f;
     static constexpr float kUltimateBounceBurstSpeedEnrage_ = 0.21f;
     static constexpr float kUltimateBurstRadius_ = 0.28f;
-    static constexpr float kUltimateCooldownEnrageBase_ = 2.8f;
+    static constexpr float kUltimateCooldownEnrageBase_ = 5.0f;
     static constexpr float kUltimateCooldownEnrageRandom_ = 1.4f;
-    static constexpr float kUltimateCooldownNormalBase_ = 4.0f;
+    static constexpr float kUltimateCooldownNormalBase_ = 8.0f;
     static constexpr float kUltimateCooldownNormalRandom_ = 2.0f;
 
     // 当たり判定 / トリガー
@@ -329,6 +333,7 @@ private:
     bool     battleTriggered_ = false;
     uint32_t battleTriggerXIndex_ = kDefaultBattleTriggerXIndex_;
     bool     requirePlayerOnGroundToTrigger_ = true;
+    float    battleElapsedTime_ = 0.0f;
 
     bool  requirePlayerOnGroundToEngage_ = true; // 接近判定でもプレイヤーが地面上にいること
     float engageVerticalRange_ = 6.0f;
@@ -402,6 +407,8 @@ private:
 
     float detectRange_ = kDetectRange_;
     float idealRange_ = kIdealRange_;
+    float retreatRange_ = kRetreatRange_;
+    float retreatSpeed_ = kRetreatSpeed_;
     float meleeRange_ = kMeleeRange_;
     float dashMinRange_ = kDashMinRange_;
     float dashMaxRange_ = kDashMaxRange_;
