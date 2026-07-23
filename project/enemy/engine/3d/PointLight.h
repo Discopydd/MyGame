@@ -1,0 +1,22 @@
+#pragma once
+#include <Vector4.h>
+#include <cstdint>
+#include <Vector3.h>
+namespace MyEngine {
+
+/// <summary>
+/// 点光源の色、位置、明るさ、減衰範囲をGPUへ渡すための構造体。
+/// </summary>
+struct alignas(16) PointLight {
+    Vector3 position;     // 12 bytes
+    float intensity;      // 4 bytes（16 バイト境界へそろえる）
+
+    Vector4 color;        // 16 bytes
+
+    int32_t pointLighting; // 4 bytes
+    float padding[3];      // 16 バイト境界にそろえるためのパディング
+
+    // 合計: 16 + 16 + 16 = 48 bytes
+};
+
+} // namespace MyEngine
