@@ -6,22 +6,72 @@
 #include <memory>
 
 // ------------------ Boss ------------------
+/// <summary>
+/// ボス敵のAI、攻撃、弾幕、戦闘開始状態を管理するクラスです。
+/// </summary>
 class BossEnemy final : public Enemy {
 public:
+    /// <summary>
+    /// 動作に必要な参照とリソースを設定し、初期状態を構築します。
+    /// </summary>
+    /// <param name="common">3Dオブジェクト生成に使用する共通描画処理。</param>
+    /// <param name="camera">描画および座標変換に使用するカメラ。</param>
+    /// <param name="spawnPos">生成時のワールド座標。</param>
+    /// <param name="type">生成または設定する種類。</param>
     void Initialize(MyEngine::Object3dCommon* common, MyEngine::Camera* camera, const MyEngine::Vector3& spawnPos, EnemyType type) override;
+    /// <summary>
+    /// 入力や経過時間に応じて、状態を1フレーム分更新します。
+    /// </summary>
+    /// <param name="deltaTime">前フレームからの経過時間（秒）。</param>
+    /// <param name="map">地形情報と衝突判定に使用するマップデータ。</param>
+    /// <param name="player">判定または更新対象のプレイヤー。</param>
     void Update(float deltaTime, const MapChipField& map, const Player& player) override;
+    /// <summary>
+    /// 現在の状態を画面へ描画します。
+    /// </summary>
     void Draw() override;
 
+    /// <summary>
+    /// プレイヤーに踏まれた際のダメージと状態変化を処理します。
+    /// </summary>
     void OnStomp() override;
+    /// <summary>
+    /// ボスの弾とプレイヤーの衝突を判定し、命中時の処理を行います。
+    /// </summary>
+    /// <param name="player">判定または更新対象のプレイヤー。</param>
+    /// <returns>条件を満たす場合は true、それ以外は false。</returns>
     bool CheckBossProjectileHit(const Player& player) override;
 
     // ================== Boss battle トリガー / HPバー表示 ==================
+    /// <summary>
+    /// ボス戦が開始済みかを取得します。
+    /// </summary>
+    /// <returns>条件を満たす場合は true、それ以外は false。</returns>
     bool IsBattleTriggered() const { return battleTriggered_; }
+    /// <summary>
+    /// プレイヤーとマップの状態から、ボス戦を開始できるかを判定します。
+    /// </summary>
+    /// <param name="player">判定または更新対象のプレイヤー。</param>
+    /// <param name="map">地形情報と衝突判定に使用するマップデータ。</param>
+    /// <returns>条件を満たす場合は true、それ以外は false。</returns>
     bool IsBattleTriggerReady(const Player& player, const MapChipField& map) const;
+    /// <summary>
+    /// ボス戦を即座に開始状態へ移行します。
+    /// </summary>
     void TriggerBattleNow();
 
     // GameScene 用: Boss HPバーを表示するかどうかを決める
+    /// <summary>
+    /// 現在の状況でボスHPバーを表示する必要があるかを判定します。
+    /// </summary>
+    /// <param name="player">判定または更新対象のプレイヤー。</param>
+    /// <param name="map">地形情報と衝突判定に使用するマップデータ。</param>
+    /// <returns>条件を満たす場合は true、それ以外は false。</returns>
     bool ShouldShowBossHp(const Player& player, const MapChipField& map) const;
+    /// <summary>
+    /// ボス戦を開始するマップ上のXインデックスを設定します。
+    /// </summary>
+    /// <param name="xIndex">マップ上のXインデックス。</param>
     void SetBattleTriggerXIndex(uint32_t xIndex) { battleTriggerXIndex_ = xIndex; }
 
 
@@ -304,6 +354,10 @@ private:
     float preJitterAmpY_ = kPreJitterAmpY_;
 
 
+    /// <summary>
+    /// ボスモデルの描画に使用する補正済みワールド座標を取得します。
+    /// </summary>
+    /// <returns>計算または取得した結果。</returns>
     MyEngine::Vector3 GetRenderPosition() const {
         MyEngine::Vector3 p = position_;
         p.x += preAttackJitter_.x;
@@ -338,7 +392,19 @@ private:
     bool  requirePlayerOnGroundToEngage_ = true; // 接近判定でもプレイヤーが地面上にいること
     float engageVerticalRange_ = 6.0f;
 
+    /// <summary>
+    /// プレイヤーが地面上にいるかをマップ情報から判定します。
+    /// </summary>
+    /// <param name="map">地形情報と衝突判定に使用するマップデータ。</param>
+    /// <param name="player">判定または更新対象のプレイヤー。</param>
+    /// <returns>条件を満たす場合は true、それ以外は false。</returns>
     bool IsPlayerOnGround(const MapChipField& map, const Player& player) const;
+    /// <summary>
+    /// プレイヤーがボスの戦闘範囲内にいるかを判定します。
+    /// </summary>
+    /// <param name="map">地形情報と衝突判定に使用するマップデータ。</param>
+    /// <param name="player">判定または更新対象のプレイヤー。</param>
+    /// <returns>条件を満たす場合は true、それ以外は false。</returns>
     bool IsInEngageRange(const MapChipField& map, const Player& player) const;
 
 
@@ -437,6 +503,9 @@ private:
     float projectileLeadTime_ = kProjectileLeadTime_; // 弾幕照準の予測時間
 
     // ---------- Boss 弾幕（オブジェクトプール） ----------
+    /// <summary>
+    /// ボス弾の描画オブジェクト、位置、速度、寿命、当たり判定状態を保持する構造体です。
+    /// </summary>
     struct BossProjectile {
         std::unique_ptr<MyEngine::Object3d> obj;
         MyEngine::Vector3 pos{ kZeroVector_ };
@@ -512,18 +581,63 @@ private:
 
     float battleTriggerVerticalRange_ = kBattleTriggerVerticalRange_;
     // 汎用: リング弾幕用ツール（オブジェクトプールを再利用）
+    /// <summary>
+    /// 指定位置を中心に放射状の弾を生成します。
+    /// </summary>
+    /// <param name="center">放射状生成の中心座標。</param>
+    /// <param name="count">生成数。</param>
+    /// <param name="speed">移動速度。</param>
+    /// <param name="life">生存時間（秒）。</param>
+    /// <param name="radius">当たり判定または生成範囲の半径。</param>
+    /// <param name="angleOffset">放射方向へ加える角度オフセット。</param>
     void SpawnRadialBurst(const MyEngine::Vector3& center, int count, float speed, float life, float radius, float angleOffset = 0.0f);
 
 private:
+    /// <summary>
+    /// 攻撃前の予備動作としてモデルの揺れ演出を更新します。
+    /// </summary>
+    /// <param name="dt">前フレームからの経過時間（秒）。</param>
     void UpdatePreAttackJitter(float dt);
 
+    /// <summary>
+    /// ボスとマップの衝突を解決し、位置と速度を補正します。
+    /// </summary>
+    /// <param name="map">地形情報と衝突判定に使用するマップデータ。</param>
+    /// <param name="dt">前フレームからの経過時間（秒）。</param>
     void ResolveMapCollision(const MapChipField& map, float dt);
+    /// <summary>
+    /// プレイヤーの位置に応じてボスの向きを更新します。
+    /// </summary>
+    /// <param name="player">判定または更新対象のプレイヤー。</param>
     void UpdateBossFacing(const Player& player);
 
+    /// <summary>
+    /// ボス弾の移動、寿命、マップ衝突を更新します。
+    /// </summary>
+    /// <param name="dt">前フレームからの経過時間（秒）。</param>
+    /// <param name="map">地形情報と衝突判定に使用するマップデータ。</param>
     void UpdateBossProjectiles(float dt, const MapChipField& map);
+    /// <summary>
+    /// 指定方向へ進むボス弾を生成します。
+    /// </summary>
+    /// <param name="spawnPos">生成時のワールド座標。</param>
+    /// <param name="aimDir">弾を発射する方向。</param>
     void SpawnBossProjectile(const MyEngine::Vector3& spawnPos, const MyEngine::Vector3& aimDir);
+    /// <summary>
+    /// 速度、寿命、半径を直接指定してボス弾を生成します。
+    /// </summary>
+    /// <param name="spawnPos">生成時のワールド座標。</param>
+    /// <param name="velocity">設定する移動速度。</param>
+    /// <param name="life">生存時間（秒）。</param>
+    /// <param name="radius">当たり判定または生成範囲の半径。</param>
     void SpawnBossProjectileRaw(const MyEngine::Vector3& spawnPos, const MyEngine::Vector3& velocity, float life, float radius);
+    /// <summary>
+    /// 有効なボス弾を描画します。
+    /// </summary>
     void DrawBossProjectiles();
 
+    /// <summary>
+    /// 必殺技終了後のクールダウンと行動状態を確定します。
+    /// </summary>
     void FinishUltimateCooldown();
 };

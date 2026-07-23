@@ -17,11 +17,26 @@
 #include "BaseScene.h"
 #include "../particle/ParticleManager.h"
 
+/// <summary>
+/// TitleSceneに関する処理と状態を管理するクラスです。
+/// </summary>
 class TitleScene : public MyEngine::BaseScene {
 public:
+    /// <summary>
+    /// 動作に必要な参照とリソースを設定し、初期状態を構築します。
+    /// </summary>
     void Initialize() override;
+    /// <summary>
+    /// 入力や経過時間に応じて、状態を1フレーム分更新します。
+    /// </summary>
     void Update() override;
+    /// <summary>
+    /// 現在の状態を画面へ描画します。
+    /// </summary>
     void Draw() override;
+    /// <summary>
+    /// 使用しているリソースを解放し、終了処理を行います。
+    /// </summary>
     void Finalize() override;
 
 private:
@@ -31,6 +46,9 @@ private:
     };
 
     // Title portal motes (custom 2D particles for the title screen)
+    /// <summary>
+    /// PortalMoteで使用する関連データをまとめて保持する構造体です。
+    /// </summary>
     struct PortalMote {
         std::unique_ptr<MyEngine::Sprite> sprite;
         float angle = 0.0f;         // rad

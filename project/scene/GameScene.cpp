@@ -1457,9 +1457,9 @@ void GameScene::Update() {
                     }
                 };
 
-                // ✅ 被ダメージ無敵中でも、踏みつけによる撃破 / ダメージは許可する（無敵は「プレイヤーがダメージを受ける側」にのみ影響し、「敵を攻撃する側」には影響しない）
+                // 被ダメージ無敵中でも、踏みつけによる撃破 / ダメージは許可する（無敵は「プレイヤーがダメージを受ける側」にのみ影響し、「敵を攻撃する側」には影響しない）
 
-                // ★ Boss: Boss の踏みつけ無敵中、またはプレイヤーの踏みつけクールダウン中
+                // Boss: Boss の踏みつけ無敵中、またはプレイヤーの踏みつけクールダウン中
                 // 跳ね返りは可能だが、横方向へ強制的に蹴り出して「頭上で棒立ちして無限踏み / 無限安全」になるのを防ぐ
                 if (isBoss && (!enemy->CanTakeStompDamage() || player_->IsStompCooldown())) {
                     BounceAndLift(GameSceneConfig::kStompBlockedBounce, GameSceneConfig::kBossBlockedKick);
@@ -1467,7 +1467,7 @@ void GameScene::Update() {
                     break;
                 }
 
-                // ☆ 正常踏みつけ: 敵ダメージを与える/硬直/死亡判定
+                // 正常踏みつけ: 敵ダメージを与える/硬直/死亡判定
                 enemy->OnStomp();
 
                 BounceAndLift(GameSceneConfig::kStompNormalBounce, isBoss ? GameSceneConfig::kBossStompKick : 0.0f);
@@ -1922,7 +1922,7 @@ void GameScene::Update() {
         if (!inBossIntro && (onSpike || crushedByPlatformThisFrame_ || damagedByEnemyThisFrame_) &&
             !player_->IsDead() && !player_->IsInvincible()) {
 
-            // ✅ 敵がプレイヤーに当たった場合: 「跳ね上げ / 1 秒前へ戻す」は行わず、ダメージ + 無敵のみ与え、軽く分離して敵の中に埋まるのを防ぐ
+            // 敵がプレイヤーに当たった場合: 「跳ね上げ / 1 秒前へ戻す」は行わず、ダメージ + 無敵のみ与え、軽く分離して敵の中に埋まるのを防ぐ
             const bool enemyHitOnly = (damagedByEnemyThisFrame_ && !onSpike && !crushedByPlatformThisFrame_);
             if (enemyHitOnly) {
                 player_->TakeDamage(static_cast<float>(player_->GetMaxHp() * GameSceneConfig::kEnemyDamageRate));

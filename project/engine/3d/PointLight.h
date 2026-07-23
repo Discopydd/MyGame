@@ -4,6 +4,10 @@
 #include <Vector3.h>
 namespace MyEngine {
 
+/// <summary>
+/// alignas処理を実行します。
+/// </summary>
+/// <returns>計算または取得した結果。</returns>
 struct alignas(16) PointLight {
     Vector3 position;     // 12 bytes
     float intensity;      // 4 bytes（16 バイト境界へそろえる）

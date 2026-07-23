@@ -42,15 +42,43 @@
 
 #include <memory>
 
+/// <summary>
+/// ゲーム中のマップ、プレイヤー、敵、UI、演出、シーン遷移を統括するクラスです。
+/// </summary>
 class GameScene : public MyEngine::BaseScene {
 public:
+    /// <summary>
+    /// 動作に必要な参照とリソースを設定し、初期状態を構築します。
+    /// </summary>
     void Initialize() override;
+    /// <summary>
+    /// 入力や経過時間に応じて、状態を1フレーム分更新します。
+    /// </summary>
     void Update() override;
+    /// <summary>
+    /// 現在の状態を画面へ描画します。
+    /// </summary>
     void Draw() override;
+    /// <summary>
+    /// 使用しているリソースを解放し、終了処理を行います。
+    /// </summary>
     void Finalize() override;
+    /// <summary>
+    /// 負荷を分散するための遅延初期化処理を1段階進めます。
+    /// </summary>
     void UpdateInitialization() override;
+    /// <summary>
+    /// シーンの遅延初期化が完了しているかを判定します。
+    /// </summary>
+    /// <returns>条件を満たす場合は true、それ以外は false。</returns>
     bool IsInitializationComplete() const override;
 
+    /// <summary>
+    /// 指定されたマップのロードを開始し、ロード後の開始位置と遷移方法を設定します。
+    /// </summary>
+    /// <param name="mapPath">読み込みまたは識別に使用するマップファイルのパス。</param>
+    /// <param name="startPos">開始時のワールド座標。</param>
+    /// <param name="isPortal">ポータル遷移によるロードの場合は true。</param>
     void StartLoadingMap(const std::string& mapPath, const MyEngine::Vector3& startPos, bool isPortal);
 
 private:
@@ -89,6 +117,9 @@ private:
         MoveVertical,
     };
 
+    /// <summary>
+    /// 段階的なマップ生成で使用するオブジェクト種別と配置情報を保持する構造体です。
+    /// </summary>
     struct PendingSpawn {
         PendingSpawnKind kind = PendingSpawnKind::Block;
         MyEngine::Vector3 position{};
@@ -98,18 +129,65 @@ private:
         uint32_t length = 1;
     };
 
+    /// <summary>
+    /// 読み込んだマップ情報から、ステージを構成するオブジェクトを生成します。
+    /// </summary>
     void GenerateBlocks();
+    /// <summary>
+    /// マップデータを解析し、段階生成するオブジェクト情報を待機キューへ登録します。
+    /// </summary>
     void BuildPendingMapSpawns();
+    /// <summary>
+    /// 指定された生成数を上限として、待機中のマップオブジェクトを生成します。
+    /// </summary>
+    /// <param name="spawnBudget">1フレームで生成するオブジェクト数の上限。</param>
     void ProcessPendingMapSpawns(size_t spawnBudget);
+    /// <summary>
+    /// マップオブジェクトの段階生成が完了しているかを判定します。
+    /// </summary>
+    /// <returns>条件を満たす場合は true、それ以外は false。</returns>
     bool IsMapBuildComplete() const;
+    /// <summary>
+    /// マップ生成完了後のプレイヤー配置と表示準備を行います。
+    /// </summary>
+    /// <param name="startPos">開始時のワールド座標。</param>
     void FinishMapLoading(const MyEngine::Vector3& startPos);
+    /// <summary>
+    /// 指定されたCSVマップを読み込み、ステージ生成処理を準備します。
+    /// </summary>
+    /// <param name="mapPath">読み込みまたは識別に使用するマップファイルのパス。</param>
+    /// <param name="startPos">開始時のワールド座標。</param>
     void LoadMap(const std::string& mapPath, const MyEngine::Vector3& startPos);
+    /// <summary>
+    /// 移動床とプレイヤーの接触を処理し、床の移動量をプレイヤーへ反映します。
+    /// </summary>
     void HandlePlayerOnMovingPlatforms();
+    /// <summary>
+    /// ロード完了後、画面表示を再開できる状態へシーン内オブジェクトを同期します。
+    /// </summary>
     void SyncLoadedSceneForReveal();
+    /// <summary>
+    /// 現在のマップでポータルを利用できるかを判定します。
+    /// </summary>
+    /// <returns>条件を満たす場合は true、それ以外は false。</returns>
     bool CanUsePortalOnCurrentMap_() const;
+    /// <summary>
+    /// 現在のマップに残っているコイン数をUIへ反映します。
+    /// </summary>
     void UpdateCoinUIRemaining_();
+    /// <summary>
+    /// ハブマップと各ステージの対応関係を登録します。
+    /// </summary>
     void RegisterHubStageMaps_();
+    /// <summary>
+    /// 指定されたマップに必要な操作ヒントを設定します。
+    /// </summary>
+    /// <param name="mapPath">読み込みまたは識別に使用するマップファイルのパス。</param>
     void SetupMapHints_(const std::string& mapPath);
+    /// <summary>
+    /// 指定されたマップに配置するポータル情報を設定します。
+    /// </summary>
+    /// <param name="mapPath">読み込みまたは識別に使用するマップファイルのパス。</param>
     void SetupPortalsForCurrentMap_(const std::string& mapPath);
 
     // UI / マネージャ
@@ -272,12 +350,31 @@ private:
     std::unique_ptr<MyEngine::Sprite> bossNameSprite_;
     bool bossNameVisible_ = false;
 
+    /// <summary>
+    /// ボス戦開始時のカメラ演出と名前表示を開始します。
+    /// </summary>
+    /// <param name="boss">演出対象のボス。</param>
     void StartBossIntro(BossEnemy* boss);
+    /// <summary>
+    /// ボス登場演出のカメラ移動と表示状態を更新します。
+    /// </summary>
+    /// <param name="dt">前フレームからの経過時間（秒）。</param>
     void UpdateBossIntro(float dt);
 
+    /// <summary>
+    /// 現在の敵一覧からボスを検索します。
+    /// </summary>
+    /// <returns>取得した対象へのポインタ。対象が存在しない場合は nullptr。</returns>
     BossEnemy* FindBossEnemy();
 
     // カメラ目標点をマップ境界内に制限する（★ 先に目標を制約してから補間することで、境界沿いの滑りが滑らかになる）
+    /// <summary>
+    /// カメラの目標位置をマップの表示可能範囲内へ補正します。
+    /// </summary>
+    /// <param name="desiredPos">補正前のカメラ目標座標。</param>
+    /// <param name="fovY">カメラの垂直画角。</param>
+    /// <param name="cameraZ">カメラのZ座標。</param>
+    /// <returns>計算または取得した結果。</returns>
     MyEngine::Vector3 ConstrainCameraToMap(const MyEngine::Vector3& desiredPos, float fovY, float cameraZ) const;
 
     // ================== Pause Menu（ESC） ==================
@@ -302,8 +399,17 @@ private:
         Complete
     };
 
+    /// <summary>
+    /// シーンで使用するUIスプライトを初期化します。
+    /// </summary>
     void InitializeUiSprites_();
+    /// <summary>
+    /// カメラや描画共通処理など、ゲーム進行に必要な基盤機能を初期化します。
+    /// </summary>
     void InitializeCoreSystems_();
+    /// <summary>
+    /// ゲーム進行で使用する各種マネージャーを初期化します。
+    /// </summary>
     void InitializeGameplayManagers_();
 
     DeferredInitPhase deferredInitPhase_ = DeferredInitPhase::None;

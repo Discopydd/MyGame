@@ -8,11 +8,30 @@
 /// </summary>
 class NormalEnemy final : public Enemy {
 public:
+    /// <summary>
+    /// 動作に必要な参照とリソースを設定し、初期状態を構築します。
+    /// </summary>
+    /// <param name="common">3Dオブジェクト生成に使用する共通描画処理。</param>
+    /// <param name="camera">描画および座標変換に使用するカメラ。</param>
+    /// <param name="spawnPos">生成時のワールド座標。</param>
+    /// <param name="type">生成または設定する種類。</param>
     void Initialize(MyEngine::Object3dCommon* common, MyEngine::Camera* camera, const MyEngine::Vector3& spawnPos, EnemyType type) override;
+    /// <summary>
+    /// 入力や経過時間に応じて、状態を1フレーム分更新します。
+    /// </summary>
+    /// <param name="deltaTime">前フレームからの経過時間（秒）。</param>
+    /// <param name="map">地形情報と衝突判定に使用するマップデータ。</param>
+    /// <param name="player">判定または更新対象のプレイヤー。</param>
     void Update(float deltaTime, const MapChipField& map, const Player& player) override;
+    /// <summary>
+    /// 現在の状態を画面へ描画します。
+    /// </summary>
     void Draw() override;
 
     // プレイヤーの踏みつけ: 1回で死亡 + 死亡アニメ
+    /// <summary>
+    /// プレイヤーに踏まれた際のダメージと状態変化を処理します。
+    /// </summary>
     void OnStomp() override;
 
 private:

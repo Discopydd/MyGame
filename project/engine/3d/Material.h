@@ -4,6 +4,9 @@
 #include "../math/Matrix4x4.h"
 namespace MyEngine {
 
+/// <summary>
+/// Materialで使用する関連データをまとめて保持する構造体です。
+/// </summary>
 struct Material {
 	Vector4 color;
 	int32_t enableLighting;

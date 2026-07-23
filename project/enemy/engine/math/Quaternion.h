@@ -23,10 +23,24 @@ struct Quaternion {
     float w, x, y, z;
 
     // ===== 構築 =====
+    /// <summary>
+    /// Quaternionのインスタンスを生成します。
+    /// </summary>
     constexpr Quaternion() : w(1.0f), x(0), y(0), z(0) {}
+    /// <summary>
+    /// Quaternionのインスタンスを生成します。
+    /// </summary>
+    /// <param name="_w">処理に使用する_wの値。</param>
+    /// <param name="_x">処理に使用する_xの値。</param>
+    /// <param name="_y">処理に使用する_yの値。</param>
+    /// <param name="_z">処理に使用する_zの値。</param>
     constexpr Quaternion(float _w, float _x, float _y, float _z)
         : w(_w), x(_x), y(_y), z(_z) {}
 
+    /// <summary>
+    /// Identity処理を実行します。
+    /// </summary>
+    /// <returns>計算または取得した結果。</returns>
     static constexpr Quaternion Identity() { return Quaternion(1,0,0,0); }
 
 #if __cpp_concepts
@@ -34,6 +48,12 @@ struct Quaternion {
 #else
     template <class V>
 #endif
+    /// <summary>
+    /// From Axis Angle処理を実行します。
+    /// </summary>
+    /// <param name="axis">移動または回転の軸。</param>
+    /// <param name="angleRad">回転角（ラジアン）。</param>
+    /// <returns>計算または取得した結果。</returns>
     static Quaternion FromAxisAngle(const V& axis, float angleRad) {
         float ax = static_cast<float>(axis.x);
         float ay = static_cast<float>(axis.y);
@@ -46,6 +66,13 @@ struct Quaternion {
         return Quaternion(c, ax*inv*s, ay*inv*s, az*inv*s);
     }
 
+    /// <summary>
+    /// From Yaw Pitch Roll処理を実行します。
+    /// </summary>
+    /// <param name="yawY">処理に使用するyawYの値。</param>
+    /// <param name="pitchX">処理に使用するpitchXの値。</param>
+    /// <param name="rollZ">処理に使用するrollZの値。</param>
+    /// <returns>計算または取得した結果。</returns>
     static Quaternion FromYawPitchRoll(float yawY, float pitchX, float rollZ) {
         float cy = std::cosf(yawY * 0.5f);
         float sy = std::sinf(yawY * 0.5f);
@@ -62,6 +89,12 @@ struct Quaternion {
     }
 
     // Yaw-Pitch-Roll を抽出する（上記の前提と合わせる）。返り値は (yawY, pitchX, rollZ)
+    /// <summary>
+    /// To Yaw Pitch Roll処理を実行します。
+    /// </summary>
+    /// <param name="outYawY">処理に使用する参照値。</param>
+    /// <param name="outPitchX">処理に使用する参照値。</param>
+    /// <param name="outRollZ">処理に使用する参照値。</param>
     inline void ToYawPitchRoll(float& outYawY, float& outPitchX, float& outRollZ) const {
         // 先に回転行列を求め、そこからオイラー角（YXZ）を逆算する
         float m[3][3];
@@ -90,23 +123,54 @@ struct Quaternion {
     }
 
     // ===== 基本运算 =====
+    /// <summary>
+    /// 演算子「+」による計算結果を生成します。
+    /// </summary>
+    /// <param name="r">演算対象の右辺値。</param>
+    /// <returns>計算または取得した結果。</returns>
     constexpr Quaternion operator+(const Quaternion& r) const {
         return { w + r.w, x + r.x, y + r.y, z + r.z };
     }
+    /// <summary>
+    /// 演算子「-」による計算結果を生成します。
+    /// </summary>
+    /// <param name="r">演算対象の右辺値。</param>
+    /// <returns>計算または取得した結果。</returns>
     constexpr Quaternion operator-(const Quaternion& r) const {
         return { w - r.w, x - r.x, y - r.y, z - r.z };
     }
+    /// <summary>
+    /// 演算子「*」による計算結果を生成します。
+    /// </summary>
+    /// <param name="s">演算に使用するスカラー値。</param>
+    /// <returns>計算または取得した結果。</returns>
     constexpr Quaternion operator*(float s) const {
         return { w*s, x*s, y*s, z*s };
     }
+    /// <summary>
+    /// 演算子「*」による計算結果を生成します。
+    /// </summary>
+    /// <param name="s">演算に使用するスカラー値。</param>
+    /// <param name="q">演算対象のクォータニオン。</param>
+    /// <returns>計算または取得した結果。</returns>
     friend constexpr Quaternion operator*(float s, const Quaternion& q) {
         return q * s;
     }
+    /// <summary>
+    /// 演算子「/」による計算結果を生成します。
+    /// </summary>
+    /// <param name="s">演算に使用するスカラー値。</param>
+    /// <returns>計算または取得した結果。</returns>
     constexpr Quaternion operator/(float s) const {
         return { w/s, x/s, y/s, z/s };
     }
 
     // クォータニオン乗算（複合回転。交換法則は成り立たない）
+    /// <summary>
+    /// 演算子「*」による計算結果を生成します。
+    /// </summary>
+    /// <param name="r">演算対象の右辺値。</param>
+    /// <returns>計算または取得した結果。</returns>
     constexpr Quaternion operator*(const Quaternion& r) const {
         return {
             w*r.w - x*r.x - y*r.y - z*r.z,
@@ -121,23 +185,55 @@ struct Quaternion {
     }
 
     // 点积 / 范数
+    /// <summary>
+    /// Dot処理を実行します。
+    /// </summary>
+    /// <param name="a">計算に使用する1つ目の値。</param>
+    /// <param name="b">計算に使用する2つ目の値。</param>
+    /// <returns>計算または取得した数値。</returns>
     constexpr static float Dot(const Quaternion& a, const Quaternion& b) {
         return a.w*b.w + a.x*b.x + a.y*b.y + a.z*b.z;
     }
+    /// <summary>
+    /// Length Sq処理を実行します。
+    /// </summary>
+    /// <returns>計算または取得した数値。</returns>
     constexpr float LengthSq() const { return Dot(*this, *this); }
+    /// <summary>
+    /// Length処理を実行します。
+    /// </summary>
+    /// <returns>計算または取得した数値。</returns>
     float Length() const { return std::sqrt(LengthSq()); }
 
     // 单位化
+    /// <summary>
+    /// dを正規化します。
+    /// </summary>
+    /// <param name="eps">数値誤差判定に使用する許容値。</param>
+    /// <returns>計算または取得した結果。</returns>
     Quaternion Normalized(float eps = 1e-8f) const {
         float lsq = LengthSq();
         if (lsq <= eps) return Identity();
         float inv = 1.0f / std::sqrt(lsq);
         return (*this) * inv;
     }
+    /// <summary>
+    /// Normalize処理を実行します。
+    /// </summary>
+    /// <param name="eps">数値誤差判定に使用する許容値。</param>
     void Normalize(float eps = 1e-8f) { *this = Normalized(eps); }
 
     // 共轭 / 逆
+    /// <summary>
+    /// Conjugate処理を実行します。
+    /// </summary>
+    /// <returns>計算または取得した結果。</returns>
     constexpr Quaternion Conjugate() const { return { w, -x, -y, -z }; }
+    /// <summary>
+    /// Inverse処理を実行します。
+    /// </summary>
+    /// <param name="eps">数値誤差判定に使用する許容値。</param>
+    /// <returns>計算または取得した結果。</returns>
     Quaternion Inverse(float eps = 1e-8f) const {
         float lsq = LengthSq();
         if (lsq <= eps) return Identity();
@@ -146,6 +242,14 @@ struct Quaternion {
 
     // 回転補間
     // Nlerp: 線性後正規化（速度常量近似）
+    /// <summary>
+    /// Nlerp処理を実行します。
+    /// </summary>
+    /// <param name="a">計算に使用する1つ目の値。</param>
+    /// <param name="b">計算に使用する2つ目の値。</param>
+    /// <param name="t">補間係数。</param>
+    /// <param name="shortestPath">対象ファイルまたはリソースのパス。</param>
+    /// <returns>計算または取得した結果。</returns>
     static Quaternion Nlerp(const Quaternion& a, const Quaternion& b, float t, bool shortestPath=true) {
         Quaternion bb = b;
         float d = Dot(a,b);
@@ -155,6 +259,14 @@ struct Quaternion {
     }
 
     // Slerp: 等角速度插值
+    /// <summary>
+    /// Slerp処理を実行します。
+    /// </summary>
+    /// <param name="a">計算に使用する1つ目の値。</param>
+    /// <param name="b">計算に使用する2つ目の値。</param>
+    /// <param name="t">補間係数。</param>
+    /// <param name="eps">数値誤差判定に使用する許容値。</param>
+    /// <returns>計算または取得した結果。</returns>
     static Quaternion Slerp(const Quaternion& a, const Quaternion& b, float t, float eps=1e-6f) {
         float d = Dot(a,b);
         Quaternion bb = b;
@@ -172,6 +284,10 @@ struct Quaternion {
     }
 
     // クォータニオンを 3x3 回転行列へ変換する（行優先 m[row][col]）
+    /// <summary>
+    /// To Rotation Matrix 3 x 3処理を実行します。
+    /// </summary>
+    /// <param name="m">処理に使用するmの値。</param>
     void ToRotationMatrix3x3(float m[3][3]) const {
         float xx = x + x, yy = y + y, zz = z + z;
         float xy = x * yy, xz = x * zz, yz = y * zz;
@@ -192,6 +308,11 @@ struct Quaternion {
     }
 
     // 4x4 行列の回転部分を設定し、残りは単位行列にする（columnMajor に従って配置）
+    /// <summary>
+    /// To Rotation Matrix 4 x 4処理を実行します。
+    /// </summary>
+    /// <param name="m">処理に使用するmの値。</param>
+    /// <param name="columnMajor">処理に使用するcolumnMajorの値。</param>
     void ToRotationMatrix4x4(float m[16], bool columnMajor = true) const {
         float r[3][3];
         ToRotationMatrix3x3(r);
@@ -211,6 +332,11 @@ struct Quaternion {
     }
 
     // 3x3 回転行列から構築する（行優先 m[row][col]）
+    /// <summary>
+    /// From Rotation Matrix 3 x 3処理を実行します。
+    /// </summary>
+    /// <param name="m">処理に使用するmの値。</param>
+    /// <returns>計算または取得した結果。</returns>
     static Quaternion FromRotationMatrix3x3(const float m[3][3]) {
         float trace = m[0][0] + m[1][1] + m[2][2];
         if (trace > 0.0f) {
@@ -257,6 +383,11 @@ struct Quaternion {
 #else
     template <class V>
 #endif
+    /// <summary>
+    /// Rotate処理を実行します。
+    /// </summary>
+    /// <param name="v">設定または計算に使用する値。</param>
+    /// <returns>計算または取得した結果。</returns>
     V Rotate(const V& v) const {
         // より高效的ベクトル回転: v + 2*cross(q.xyz, cross(q.xyz, v) + q.w*v)
         V out{};
@@ -285,6 +416,11 @@ struct Quaternion {
 #else
     template <class V>
 #endif
+    /// <summary>
+    /// From Scaled Axis処理を実行します。
+    /// </summary>
+    /// <param name="v">設定または計算に使用する値。</param>
+    /// <returns>計算または取得した結果。</returns>
     static Quaternion FromScaledAxis(const V& v) {
         float angle = std::sqrtf(v.x*v.x + v.y*v.y + v.z*v.z);
         if (angle < 1e-8f) return Identity();
@@ -293,6 +429,13 @@ struct Quaternion {
     }
 
     // 近等判断（用于避免归一化抖動）
+    /// <summary>
+    /// Almost Equal処理を実行します。
+    /// </summary>
+    /// <param name="a">計算に使用する1つ目の値。</param>
+    /// <param name="b">計算に使用する2つ目の値。</param>
+    /// <param name="eps">数値誤差判定に使用する許容値。</param>
+    /// <returns>判定結果。</returns>
     static bool AlmostEqual(const Quaternion& a, const Quaternion& b, float eps = 1e-5f) {
         // クォータニオン q と -q は同じ回転を表すため、比較時は両方を考慮する
         Quaternion d1 = a - b;
@@ -302,6 +445,13 @@ struct Quaternion {
 };
 
 // ===== 便捷函数 =====
+/// <summary>
+/// Lerp処理を実行します。
+/// </summary>
+/// <param name="a">計算に使用する1つ目の値。</param>
+/// <param name="b">計算に使用する2つ目の値。</param>
+/// <param name="t">補間係数。</param>
+/// <returns>計算または取得した結果。</returns>
 inline Quaternion Lerp(const Quaternion& a, const Quaternion& b, float t) {
     // 普通 Lerp（不保证单位長度）；通常より推荐 Nlerp
     return a*(1.0f - t) + b*t;

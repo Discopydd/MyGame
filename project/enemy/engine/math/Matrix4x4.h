@@ -8,6 +8,11 @@ namespace MyEngine {
 /// </summary>
 struct Matrix4x4 final {
 	float m[4][4];
+	/// <summary>
+	/// 演算子「*」による計算結果を生成します。
+	/// </summary>
+	/// <param name="vec">処理に使用する参照値。</param>
+	/// <returns>計算または取得した結果。</returns>
 	Vector4 operator*(const Vector4& vec) const {
         Vector4 result;
         result.x = m[0][0] * vec.x + m[1][0] * vec.y + m[2][0] * vec.z + m[3][0] * vec.w;
@@ -16,6 +21,11 @@ struct Matrix4x4 final {
         result.w = m[0][3] * vec.x + m[1][3] * vec.y + m[2][3] * vec.z + m[3][3] * vec.w;
         return result;
     }
+    /// <summary>
+    /// 演算子「*」による計算結果を生成します。
+    /// </summary>
+    /// <param name="other">処理に使用する参照値。</param>
+    /// <returns>計算または取得した結果。</returns>
     Matrix4x4 operator*(const Matrix4x4& other) const {
     Matrix4x4 result = {};
     for (int i = 0; i < 4; ++i) {

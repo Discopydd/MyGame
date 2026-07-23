@@ -11,22 +11,46 @@ class SceneManager {
 public:
 
     // デストラクタ
+    /// <summary>
+    /// SceneManagerが保持するリソースを破棄します。
+    /// </summary>
     ~SceneManager();
 
     // 次のシーンを設定（予約）する
+    /// <summary>
+    /// Next Sceneを設定します。
+    /// </summary>
+    /// <param name="nextScene">処理に使用するnextSceneの値。</param>
     void SetNextScene(std::unique_ptr<BaseScene> nextScene);
 
 
     // 一時シーンを設定（ローディングシーンなど）
+    /// <summary>
+    /// Overlay Sceneを設定します。
+    /// </summary>
+    /// <param name="overlayScene">処理に使用するoverlaySceneの値。</param>
     void SetOverlayScene(std::unique_ptr<BaseScene> overlayScene);
+    /// <summary>
+    /// Overlay Sceneをクリアします。
+    /// </summary>
     void ClearOverlayScene();
     // 追加: 現在のオーバーレイシーンを取得（OverlayScene）
+    /// <summary>
+    /// Overlay Sceneを取得します。
+    /// </summary>
+    /// <returns>取得した対象へのポインタ。対象が存在しない場合は nullptr。</returns>
     BaseScene* GetOverlayScene() const { return overlayScene_.get(); }
 
     // 更新処理
+    /// <summary>
+    /// 入力や経過時間に応じて、状態を1フレーム分更新します。
+    /// </summary>
     void Update();
 
     // 描画処理
+    /// <summary>
+    /// 現在の状態を画面へ描画します。
+    /// </summary>
     void Draw();
 
 private:

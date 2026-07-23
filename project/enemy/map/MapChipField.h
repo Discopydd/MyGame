@@ -55,13 +55,38 @@ public:
     uint32_t numBlockVertical_   = 0;
     uint32_t numBlockHorizontal_ = 0;
 
+    /// <summary>
+    /// Map Chip Dataを初期状態へ戻します。
+    /// </summary>
     void ResetMapChipData();
+    /// <summary>
+    /// Map Chip Csvを読み込みます。
+    /// </summary>
+    /// <param name="filePath">読み込むファイルのパス。</param>
     void LoadMapChipCsv(const std::string& filePath);
 
+    /// <summary>
+    /// Map Chip Type By Indexを取得します。
+    /// </summary>
+    /// <param name="xIndex">マップ上のXインデックス。</param>
+    /// <param name="yIndex">マップ上のYインデックス。</param>
+    /// <returns>計算または取得した結果。</returns>
     MapChipType GetMapChipTypeByIndex(uint32_t xIndex, uint32_t yIndex) const;
     // ★ 追加: サブIDを取得
+    /// <summary>
+    /// Map Chip Sub ID By Indexを取得します。
+    /// </summary>
+    /// <param name="xIndex">マップ上のXインデックス。</param>
+    /// <param name="yIndex">マップ上のYインデックス。</param>
+    /// <returns>計算または取得した数値。</returns>
     uint8_t     GetMapChipSubIDByIndex(uint32_t xIndex, uint32_t yIndex) const;
 
+    /// <summary>
+    /// Map Chip Position By Indexを取得します。
+    /// </summary>
+    /// <param name="xIndex">マップ上のXインデックス。</param>
+    /// <param name="yIndex">マップ上のYインデックス。</param>
+    /// <returns>計算または取得した結果。</returns>
     MyEngine::Vector3 GetMapChipPositionByIndex(uint32_t xIndex, uint32_t yIndex) const;
 
     /// <summary>
@@ -71,6 +96,11 @@ public:
         uint32_t xIndex;
         uint32_t yIndex;
     };
+    /// <summary>
+    /// Map Chip Index By Positionを取得します。
+    /// </summary>
+    /// <param name="position">対象のワールド座標。</param>
+    /// <returns>計算または取得した結果。</returns>
     IndexSet GetMapChipIndexByPosition(const MyEngine::Vector3& position) const;
 
     /// <summary>
@@ -82,11 +112,25 @@ public:
         float bottom;
         float top;
     };
+    /// <summary>
+    /// Rect By Indexを取得します。
+    /// </summary>
+    /// <param name="xIndex">マップ上のXインデックス。</param>
+    /// <param name="yIndex">マップ上のYインデックス。</param>
+    /// <returns>計算または取得した結果。</returns>
     Rect GetRectByIndex(uint32_t xIndex, uint32_t yIndex) const;
 
+    /// <summary>
+    /// Map Min Positionを取得します。
+    /// </summary>
+    /// <returns>計算または取得した結果。</returns>
     MyEngine::Vector3 GetMapMinPosition() const {
         return MyEngine::Vector3(0, 0, 0);
     }
+    /// <summary>
+    /// Map Max Positionを取得します。
+    /// </summary>
+    /// <returns>計算または取得した結果。</returns>
     MyEngine::Vector3 GetMapMaxPosition() const {
         return MyEngine::Vector3(
             numBlockHorizontal_ * kBlockWidth,

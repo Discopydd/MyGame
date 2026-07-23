@@ -6,8 +6,14 @@
 
 namespace MyEngine {
 
+/// <summary>
+/// DebugReporterに関する処理と状態を管理するクラスです。
+/// </summary>
 class DebugReporter {
 public:
+    /// <summary>
+    /// DebugReporterのインスタンスを生成します。
+    /// </summary>
     DebugReporter() {
 
         HRESULT hr = DXGIGetDebugInterface1(0, IID_PPV_ARGS(&debug_));
@@ -16,6 +22,9 @@ public:
         }
     }
 
+    /// <summary>
+    /// DebugReporterが保持するリソースを破棄します。
+    /// </summary>
     ~DebugReporter() {
         if (debug_) {
             debug_->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_ALL);

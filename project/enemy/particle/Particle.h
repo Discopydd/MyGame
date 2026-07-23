@@ -24,5 +24,9 @@ struct Particle
     // MyEngine::Sprite 粒子で使用する色
     MyEngine::Vector4 color = {1,1,1,1};
 
+    /// <summary>
+    /// Aliveかを判定します。
+    /// </summary>
+    /// <returns>条件を満たす場合は true、それ以外は false。</returns>
     bool IsAlive() const { return life > 0; }
 };
